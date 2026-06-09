@@ -1,0 +1,158 @@
+# Example harvester_config.yaml for the AgriFoodCA OCA Composer picklist set.
+# Copy this file to harvester_config.yaml in your target project directory, then:
+#   python term_harvester.py -f all   # download source files
+#   python term_harvester.py -c       # process into sources/*.yaml
+#   python term_harvester.py -b       # assemble schema.yaml
+#
+# Sources:
+#   AgriFoodCA_Picklists — full picklist directory from agrifooddatacanada/picklists_for_schemas
+#     minus: 4 enums superseded by NSDB direct sources, education level superseded by StatsCan,
+#            lodging_wheat superseded by FreeText LodgingAssessment,
+#            standards_stages superseded by FreeText StandardsMaturityLevel
+#   NSDBSNTv2 — NSDB Soil Name Table v2; include-filtered to the 4 enums with NSDB authority
+#   StandardsMaturityLevel — LinkML computing/maturity_levels.yaml; include-filtered to one enum
+#   STATSCAN_1313722 — Statistics Canada "Highest level of education" (TVD 1313722)
+#   NRCSSoilFieldBook — USDA NRCS Field Book Ver. 4; include-filtered to ReactionPH
+
+locales:
+  - en
+  - fr
+sources:
+  AgriFoodCA_Picklists:
+    title: AgriFoodCA Picklists
+    name: AgriFoodCA_Picklists
+    version: null
+    content_type: AgriFoodCA
+    file_format: yaml
+    reachable_from:
+      source_ontology: https://github.com/agrifooddatacanada/picklists_for_schemas/tree/main/picklists
+    download_date: null
+    description: Agricultural food data picklists from AgriFoodData Canada
+    minus:
+      concepts:
+        - AgriFoodCA_EducationLevelStatsCan
+        - AgriFoodCA_LodgingWheat
+        - AgriFoodCA_ParentMaterialChemicalProperty
+        - AgriFoodCA_ParentMaterialTexture
+        - AgriFoodCA_SoilDrainage
+        - AgriFoodCA_StandardsStages
+        - AgriFoodCA_WaterTableCharacteristics
+        - AgriFoodCA_CanadianProvinces
+        - AgriFoodCA_Gender   
+        - AgriFoodCA_SoilPh 
+        - AgriFoodCA_SoilSalinity #  minor code differences (STS→ST, VSS→VS)
+        - AgriFoodCA_SoilStructure  
+
+  CRediT:
+    title: CRediT Contributor Roles Taxonomy
+    name: CRediT
+    version: '2022'
+    content_type: CRediT
+    file_format: pdf
+    reachable_from:
+      source_ontology: https://zenodo.org/records/18421449/files/CRediT%20roles%20and%20example%20research%20tasks%20that%20could%20be%20attributed%20to%20them.pdf?download=1
+    download_date: '2026-06-08'
+    description: The Contributor Roles Taxonomy (CRediT) is a high-level taxonomy
+      representing the 14 roles typically played by contributors to scientific scholarly
+      output. Each role describes a specific contribution to the scholarly output.
+    see_also: https://credit.niso.org/
+  ISO_COUNTRY_CA:
+    title: Canada
+    name: ISO_COUNTRY_CA
+    version: null
+    content_type: ISO_COUNTRY
+    file_format: html
+    reachable_from:
+      source_ontology: https://www.iso.org/obp/ui/#iso:code:3166:CA
+    download_date: '2026-06-08'
+  LodgingAssessment:
+    title: Visual Lodging Estimation Before Harvest
+    name: LodgingAssessment
+    version: null
+    content_type: FreeText
+    file_format: yaml
+    reachable_from:
+      source_ontology: https://link.springer.com/article/10.1186/s12870-025-07322-y
+    download_date: '2026-06-08'
+    description: "A visual estimation of lodging before harvest using a scale of 1\u2013\
+      9."
+  NRCSSoilFieldBook:
+    title: NRCS Field Book for Describing and Sampling Soils Ver. 4
+    name: NRCSSoilFieldBook
+    version: Ver. 4 November 2024
+    content_type: NRCSSoilFieldBook
+    file_format: pdf
+    reachable_from:
+      source_ontology: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf
+    download_date: null
+    include:
+      concepts:
+        - NRCSSoilFieldBook_ReactionPH
+  NSDBSNTv2:
+    title: NSDB Soil Name Table
+    name: NSDBSNTv2
+    version: '2'
+    content_type: NSDBSNT
+    file_format: html
+    reachable_from:
+      source_ontology: https://sis.agr.gc.ca/cansis/nsdb/soil/v2/snt/index.html
+    download_date: '2026-06-08'
+    include:
+      concepts:
+        - NSDB_DRAINAGE
+        - NSDB_PMCHEM1
+        - NSDB_PMTEX1
+        - NSDB_WATERTBL
+  SoilSalinityClass:
+    title: Soil Salinity Class
+    name: SoilSalinityClass
+    version: null
+    content_type: FreeText
+    file_format: yaml
+    reachable_from:
+      source_ontology: https://www.undrr.org/understanding-disaster-risk/terminology/hips/en0303
+    download_date: '2026-06-08'
+    description: Soil salinity class
+  SoilStructuralShape:
+    title: Soil Structural Shape
+    name: SoilStructuralShape
+    version: null
+    content_type: FreeText
+    file_format: yaml
+    reachable_from:
+      source_ontology: https://iastate.pressbooks.pub/introsoilscience/chapter/soilstructure/
+    download_date: '2026-06-08'
+    description: Soil structural shape
+  StandardsMaturityLevel:
+    title: Standards Maturity Level
+    name: StandardsMaturityLevel
+    version: null
+    content_type: LinkML
+    file_format: yaml
+    reachable_from:
+      source_ontology: https://raw.githubusercontent.com/linkml/valuesets/main/src/valuesets/schema/computing/maturity_levels.yaml
+    download_date: '2026-06-09'
+    include:
+      concepts:
+        - StandardsMaturityLevel
+  STATSCAN_1313722:
+    title: Highest level of education
+    name: STATSCAN_1313722
+    version: null
+    content_type: STATSCAN
+    file_format: html
+    reachable_from:
+      source_ontology: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1313722
+    download_date: '2026-06-08'
+  valuesets_merged_hierarchy:
+    title: Merged Value Sets with Hierarchical Structure
+    name: valuesets_merged_hierarchy
+    version: null
+    content_type: LinkML
+    file_format: yaml
+    reachable_from:
+      source_ontology: https://raw.githubusercontent.com/linkml/valuesets/refs/heads/main/src/valuesets/merged/merged_hierarchy.yaml
+    download_date: '2026-06-09'
+    include:
+      concepts:
+        - GenderIdentity

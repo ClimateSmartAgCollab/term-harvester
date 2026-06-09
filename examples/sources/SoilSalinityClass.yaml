@@ -1,0 +1,37 @@
+id: https://www.undrr.org/understanding-disaster-risk/terminology/hips/en0303
+name: SoilSalinityClass
+title: Soil Salinity Class
+description: ''
+version: ''
+license: ''
+in_language: en
+imports:
+  - 'linkml:types'
+prefixes: {}
+default_prefix: ''
+classes: {}
+enums:
+  SoilSalinityClass:
+    name: SoilSalinityClass
+    title: Soil Salinity Class
+    description: Classification of soil salinity based on the electrical conductivity
+      of a saturated soil paste extract (ECe, dS/m)
+    see_also: https://www.undrr.org/understanding-disaster-risk/terminology/hips/en0303
+    permissible_values:
+      NS:
+        title: Non-saline
+        description: "ECe 0\u20132 dS/m; salinity effects mostly negligible"
+      SS:
+        title: Slightly saline
+        description: "ECe 2\u20134 dS/m; yields of very sensitive crops may be restricted"
+      MS:
+        title: Moderately saline
+        description: "ECe 4\u20138 dS/m; yields of many crops are restricted"
+      ST:
+        title: Strongly saline
+        description: "ECe 8\u201316 dS/m; only salt-tolerant crops yield satisfactorily"
+      VS:
+        title: Very strongly saline
+        description: ECe greater than 16 dS/m; only a few very salt-tolerant crops
+          yield satisfactorily
+slots: {}

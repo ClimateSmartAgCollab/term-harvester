@@ -1,0 +1,57 @@
+id: https://iastate.pressbooks.pub/introsoilscience/chapter/soilstructure/
+name: SoilStructuralShape
+title: Soil Structural Shape
+description: ''
+version: ''
+license: ''
+in_language: en
+imports:
+  - 'linkml:types'
+prefixes: {}
+default_prefix: ''
+classes: {}
+enums:
+  SoilStructuralShapeScale:
+    name: SoilStructuralShapeScale
+    title: Soil Structural Shape
+    description: Classification of the shape or type of soil structural units (peds)
+      describing how soil aggregates are arranged
+    permissible_values:
+      SG:
+        title: Single grain
+        description: Soil particles exist as individual grains with no aggregation,
+          typical of sandy soils
+      MA:
+        title: Massive
+        description: Soil is coherent with no observable structural units or planes
+          of weakness
+      GR:
+        title: Granular
+        description: Small, rounded, porous aggregates not fitting together closely,
+          common in surface horizons
+      PL:
+        title: Platy
+        description: Flat, plate-like aggregates oriented horizontally and stacked
+          in layers
+      ABK:
+        title: Angular blocky
+        description: Block-like aggregates bounded by flat faces meeting at sharp
+          angles
+      SBK:
+        title: Subangular blocky
+        description: Block-like aggregates with mixed rounded and flat faces meeting
+          at less sharp angles
+      WE:
+        title: Wedge
+        description: Elliptical, interlocking lenses of peds that terminate in acute
+          angles
+      PR:
+        title: Prismatic
+        description: Vertically elongated aggregates with flat tops, bounded by vertical
+          faces
+      CO:
+        title: Columnar
+        description: Vertically elongated aggregates with rounded tops, bounded by
+          vertical faces
+    see_also: https://iastate.pressbooks.pub/introsoilscience/chapter/soilstructure/
+slots: {}

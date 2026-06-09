@@ -1,0 +1,80 @@
+id: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1313722
+name: STATSCAN_1313722
+title: Highest level of education
+description: ''
+version: null
+license: ''
+in_language: en
+imports:
+  - 'linkml:types'
+prefixes:
+  statscan: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=
+default_prefix: ''
+classes: {}
+enums:
+  STATSCAN_1313722:
+    name: STATSCAN_1313722
+    description: ''
+    permissible_values:
+      '2':
+        title: Certificate, diploma or degree
+        description: This category includes persons who have obtained any certificates,
+          diplomas or degrees, or their equivalents.
+      '21':
+        title: High (secondary) school diploma or equivalency certificate (highest)
+        is_a: '2'
+      '22':
+        title: Postsecondary certificate, diploma or degree (highest)
+        is_a: '2'
+      '221':
+        title: Postsecondary certificate or diploma below bachelor level (highest)
+        is_a: '22'
+      '2211':
+        title: Apprenticeship or trades certificate or diploma (highest)
+        is_a: '221'
+      '22111':
+        title: Non-apprenticeship trades certificate or diploma (highest)
+        is_a: '2211'
+      '22112':
+        title: Apprenticeship certificate (highest)
+        is_a: '2211'
+      '2212':
+        title: College, CEGEP or other non-university certificate or diploma (highest)
+        is_a: '221'
+      '22121':
+        title: Program of 3 months to less than 1 year (College, CEGEP and other non-university
+          certificates or diplomas) (highest)
+        is_a: '2212'
+      '22122':
+        title: Program of 1 to 2 years (College, CEGEP and other non-university certificates
+          or diplomas) (highest)
+        is_a: '2212'
+      '22123':
+        title: Program of more than 2 years (College, CEGEP and other non-university
+          certificates or diplomas) (highest)
+        is_a: '2212'
+      '2213':
+        title: University certificate or diploma below bachelor level (highest)
+        is_a: '221'
+      '222':
+        title: "Bachelor's degree or higher (highest)"
+        is_a: '22'
+      '2221':
+        title: "Bachelor's degree (highest)"
+        is_a: '222'
+      '2222':
+        title: University certificate, diploma or degree above bachelor level (highest)
+        is_a: '222'
+      '22221':
+        title: University certificate or diploma above bachelor level (highest)
+        is_a: '2222'
+      '22222':
+        title: Degree in medicine, dentistry, veterinary medicine or optometry (highest)
+        is_a: '2222'
+      '22223':
+        title: "Master's degree (highest)"
+        is_a: '2222'
+      '22224':
+        title: Earned doctorate (highest)
+        is_a: '2222'
+slots: {}

@@ -1,0 +1,812 @@
+id: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf
+name: NRCSSoilFieldBook
+title: NRCS Field Book for Describing and Sampling Soils Ver. 4
+description: ''
+version: Ver. 4 November 2024
+license: ''
+in_language: en
+imports:
+  - 'linkml:types'
+prefixes: {}
+default_prefix: ''
+classes: {}
+enums:
+  NRCSSoilFieldBook_WeatherConditions:
+    name: NRCSSoilFieldBook_WeatherConditions
+    title: Weather Conditions
+    description: Prevailing weather conditions at the time of observation; affects
+      some field methods (e.g., Ksat).
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=19
+    permissible_values:
+      SU:
+        title: sunny/clear
+      PC:
+        title: partly cloudy
+      OV:
+        title: overcast
+      RA:
+        title: rain
+      SL:
+        title: sleet
+      SN:
+        title: snow
+  NRCSSoilFieldBook_DrainagePattern:
+    name: NRCSSoilFieldBook_DrainagePattern
+    title: Drainage Pattern
+    description: The interconnected system of drainage channels on the land surface
+      (also called drainage network).
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=27
+    permissible_values:
+      AN:
+        title: annular
+      AR:
+        title: artificial
+      CE:
+        title: centripetal
+      DN:
+        title: dendritic
+      DR:
+        title: deranged
+      KA:
+        title: karst
+      PA:
+        title: parallel
+      PI:
+        title: pinnate
+      RA:
+        title: radial
+      RE:
+        title: rectangular
+      TH:
+        title: thermokarst
+      TR:
+        title: trellis
+  NRCSSoilFieldBook_DrainageClass:
+    name: NRCSSoilFieldBook_DrainageClass
+    title: Drainage Class
+    description: An estimate of the natural drainage class (i.e., the prevailing wetness
+      conditions) of a soil.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=28
+    permissible_values:
+      SA:
+        title: subaqueous
+      VP:
+        title: very poorly drained
+      PD:
+        title: poorly drained
+      SP:
+        title: somewhat poorly drained
+      MW:
+        title: moderately well drained
+      WD:
+        title: well drained
+      SE:
+        title: somewhat excessively drained
+      ED:
+        title: excessively drained
+        description: natural soil drainage classes (Soil Science Division Staff, 2017).
+          Specific regional definitions and criteria exist. (Contact an NRCS State
+          office for specific local criteria.)
+  NRCSSoilFieldBook_FloodingFrequency:
+    name: NRCSSoilFieldBook_FloodingFrequency
+    title: Flooding Frequency
+    description: How often, typically, flooding occurs at the site.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=30
+    permissible_values:
+      'NO':
+        title: none
+        description: no reasonable chance (e.g., < 1 time in 500 years)
+      VR:
+        title: very rare
+        description: "\u2265 1 time in 500 years, but < 1 time in 100 years"
+      RA:
+        title: rare
+        description: 1 to 5 times in 100 years
+      OC:
+        title: occasional
+        description: '> 5 to 50 times in 100 years'
+      FR:
+        title: frequent
+        description: '> 50 times in 100 years'
+      VF:
+        title: very frequent
+        description: '> 50% of all months in year'
+  NRCSSoilFieldBook_PondingFrequency:
+    name: NRCSSoilFieldBook_PondingFrequency
+    title: Ponding Frequency
+    description: How often, typically, ponding occurs at the observation site.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=31
+    permissible_values:
+      'NO':
+        title: none
+        description: < 1 time in 100 years
+      RA:
+        title: rare
+        description: 1 to 5 times in 100 years
+      OC:
+        title: occasional
+        description: '> 5 to 50 times in 100 years'
+      FR:
+        title: frequent
+        description: '> 50 times in 100 years'
+  NRCSSoilFieldBook_BedrockWeatheringClass:
+    name: NRCSSoilFieldBook_BedrockWeatheringClass
+    title: Bedrock Weathering Class
+    description: The subjective extent to which bedrock has weathered as compared
+      to its presumed nonweathered state. Called Bedrock_weathering in NASIS.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=42
+    permissible_values:
+      SL:
+        title: slight
+      MO:
+        title: moderate
+      ST:
+        title: strong
+  NRCSSoilFieldBook_HorizonBoundaryDistinctness:
+    name: NRCSSoilFieldBook_HorizonBoundaryDistinctness
+    title: Horizon Boundary Distinctness
+    description: The vertical distance (thickness) over which a horizon transitions
+      to the top of the next. Called Boundary Distinctness in NASIS.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=56
+    permissible_values:
+      V:
+        title: very abrupt
+        description: < 0.5 cm
+      A:
+        title: abrupt
+        description: 0.5 to < 2 cm
+      C:
+        title: clear
+        description: 2 to < 5 cm
+      G:
+        title: gradual
+        description: 5 to < 15 cm
+      D:
+        title: diffuse
+        description: "\u2265 15 cm"
+  NRCSSoilFieldBook_HorizonBoundaryTopography:
+    name: NRCSSoilFieldBook_HorizonBoundaryTopography
+    title: Horizon Boundary Topography
+    description: Cross-sectional shape of the contact between horizons.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=57
+    permissible_values:
+      S:
+        title: smooth
+        description: planar with few or no irregularities
+      W:
+        title: wavy
+        description: width of undulation is greater than depth
+      I:
+        title: irregular
+        description: depth of undulation is greater than width
+      B:
+        title: broken
+        description: discontinuous horizons; discrete but intermingled, or irregular,
+          pockets
+  NRCSSoilFieldBook_ColorMoistureState:
+    name: NRCSSoilFieldBook_ColorMoistureState
+    title: Color Moisture State
+    description: The general moisture condition of the soil at the time of color description.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=59
+    permissible_values:
+      D:
+        title: dry
+      M:
+        title: moist
+  NRCSSoilFieldBook_ColorLocationCondition:
+    name: NRCSSoilFieldBook_ColorLocationCondition
+    title: Color Location or Condition
+    description: Pertinent circumstances of the color described. Called Color_physical_state
+      in NASIS.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=59
+    permissible_values:
+      IN:
+        title: interior (within ped)
+      EX:
+        title: exterior (ped surface)
+      BF:
+        title: broken face
+      CR:
+        title: crushed
+      RU:
+        title: rubbed (used only with organic matter)
+      OX:
+        title: oxidized
+      RE:
+        title: reduced
+      VA:
+        title: variegated
+  NRCSSoilFieldBook_ConcentrationShape:
+    name: NRCSSoilFieldBook_ConcentrationShape
+    title: Concentration Shape
+    description: The dominant shape of concentration bodies within a horizon. Also
+      used for Mottles and Redoximorphic Features.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=74
+    permissible_values:
+      CU:
+        title: cubic
+        description: crudely equidimensional blocklike units
+      C:
+        title: cylindrical
+        description: tubular and elongated bodies (e.g., filled wormholes and insect
+          burrows)
+      D:
+        title: dendritic
+        description: tubular, elongated, and branched bodies (e.g., pipestems [root
+          pseudomorphs])
+      I:
+        title: irregular
+        description: bodies of nonrepeating spacing or shape
+      L:
+        title: lenticular
+        description: disk-shaped forms with thicker centers and thinning towards outer
+          edge (e.g., double- convex lens)
+      PE:
+        title: pendular
+        description: irregular drapes, coatings, or nodules suspended from underside
+          of coarse fragments (e.g., pendular gypsum masses)
+      P:
+        title: platy
+        description: relatively thin, tabular sheets, lenses (e.g., lamellae)
+      R:
+        title: reticulate
+        description: crudely interlocking bodies with similar spacing (e.g., plinthite)
+      RO:
+        title: rosettelike
+        description: interlocking blades radiating out from a central point forming
+          petal-like clusters (e.g., barite)
+      S:
+        title: spherical
+        description: well-rounded to crudely spherical bodies (e.g.,
+      T:
+        title: threadlike
+        description: thin (e.g., < 1 mm diam.) elongated filaments; generally not
+          dendritic (e.g., very fine CaCO3 stringers)
+  NRCSSoilFieldBook_ConcentrationLocation:
+    name: NRCSSoilFieldBook_ConcentrationLocation
+    title: Concentration Location
+    description: "Location(s) of concentrations (or depletions for redoximorphic features)\
+      \ within the horizon. Historically called Concentrations \u2013 Distribution."
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=75
+    permissible_values:
+      MAT:
+        title: in the matrix (not associated with peds/pores)
+      MAD:
+        title: in matrix surrounding redox depletions
+      MAC:
+        title: in matrix surrounding redox concentrations
+      TOT:
+        title: throughout (e.g., finely disseminated carbonates)
+      BPF:
+        title: between peds
+      MPF:
+        title: infused into the matrix along faces of peds (hypocoats)
+      APF:
+        title: on faces of peds (all orientations)
+      HPF:
+        title: on horizontal faces of peds
+      VPF:
+        title: on vertical faces of peds
+      MPO:
+        title: "infused into the matrix adjacent to pores (hypocoats; see graphic\
+          \ p. 2\u201333 )"
+      LPO:
+        title: "lining pores (see graphic p. 2\u201333 )"
+      SPO:
+        title: on surfaces along pores
+      RPO:
+        title: on surfaces along root channels
+      CRK:
+        title: in cracks
+      TOH:
+        title: at top of horizon
+      ARF:
+        title: around rock fragments
+      BRF:
+        title: on bottom of rock fragments (e.g., pendants)
+      SSS:
+        title: on slickensides
+      ALS:
+        title: along lamina or strata surfaces
+  NRCSSoilFieldBook_ConcentrationBoundary:
+    name: NRCSSoilFieldBook_ConcentrationBoundary
+    title: Concentration Boundary
+    description: The gradation between a concentration feature and the surrounding
+      matrix. Also used for Redoximorphic Features.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=76
+    permissible_values:
+      S:
+        title: sharp
+        description: color changes in < 0.1 mm between the feature and the soil matrix;
+          change is abrupt even under a 10x hand lens
+      C:
+        title: clear
+        description: color changes within 0.1 to < 2 mm between the feature and the
+          soil matrix; gradation is visible without 10x lens
+      D:
+        title: diffuse
+        description: "color changes in \u2265 2 mm between the feature and the soil\
+          \ matrix; gradation is easily visible without 10x hand lens"
+  NRCSSoilFieldBook_FragmentRoundness:
+    name: NRCSSoilFieldBook_FragmentRoundness
+    title: Fragment Roundness
+    description: The relative roundness of rock fragments, estimated visually. The
+      same classes are used for Artifact Roundness.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=99
+    permissible_values:
+      VA:
+        title: very angular
+        description: "(Use \u201CRoundness\u201D graphic below)"
+      AN:
+        title: angular
+      SA:
+        title: subangular
+      SR:
+        title: subrounded
+      RO:
+        title: rounded
+      WR:
+        title: well rounded
+  NRCSSoilFieldBook_ArtifactShape:
+    name: NRCSSoilFieldBook_ArtifactShape
+    title: Artifact Shape
+    description: The dominant form (shape) of artifacts by horizon/layer.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=101
+    permissible_values:
+      E:
+        title: elongated
+        description: one dimension (length, width, or height) is 3x longer than either
+          of the others
+      Q:
+        title: equidimensional
+        description: length, width, height are approximately the same
+      F:
+        title: flat
+        description: one dimension is < 1/3 that of either of the others, and one
+          dimension is < 3x that of the intermediate
+      I:
+        title: irregular
+        description: branching or convoluted form
+  NRCSSoilFieldBook_ArtifactRoundness:
+    name: NRCSSoilFieldBook_ArtifactRoundness
+    title: Artifact Roundness
+    description: The dominant extent of roundness of artifacts by horizon/layer.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=101
+    permissible_values:
+      AN:
+        title: angular
+      RO:
+        title: rounded
+      SA:
+        title: subangular
+      SR:
+        title: subrounded
+      VA:
+        title: very angular
+      WR:
+        title: well rounded
+  NRCSSoilFieldBook_ArtifactCohesion:
+    name: NRCSSoilFieldBook_ArtifactCohesion
+    title: Artifact Cohesion
+    description: The dominant relative fragment integrity of artifacts.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=102
+    permissible_values:
+      C:
+        title: cohesive
+        description: cannot be readily broken to < 2 mm pieces
+      N:
+        title: noncohesive
+        description: easily broken to < 2 mm pieces by hand or simple crushing
+  NRCSSoilFieldBook_ArtifactPenetrability:
+    name: NRCSSoilFieldBook_ArtifactPenetrability
+    title: Artifact Penetrability
+    description: The prevalent relative ease of penetration of artifacts by external
+      mechanical force by horizon/layer.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=102
+    permissible_values:
+      N:
+        title: nonpenetrable
+        description: roots cannot penetrate through or between artifacts
+      P:
+        title: penetrable
+        description: roots can penetrate through or between artifacts
+  NRCSSoilFieldBook_ArtifactPersistence:
+    name: NRCSSoilFieldBook_ArtifactPersistence
+    title: Artifact Persistence
+    description: The dominant relative extent of artifact persistence in soil.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=102
+    permissible_values:
+      N:
+        title: nonpersistent
+        description: susceptible to relatively rapid weathering or decay (expected
+          loss in < 10 years)
+      P:
+        title: persistent
+        description: expected to remain intact in soil for > 10 years
+  NRCSSoilFieldBook_ArtifactSafety:
+    name: NRCSSoilFieldBook_ArtifactSafety
+    title: Artifact Safety
+    description: The dominant relative level of chemical safety of artifacts present
+      in the soil.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=102
+    permissible_values:
+      IA:
+        title: innocuous artifacts
+        description: harmless to living beings (e.g., brick, wood, glass, etc.)
+      NA:
+        title: noxious artifacts
+        description: potentially harmful or destructive to living beings (e.g., batteries,
+          garbage, bitumen [asphalt], treated wood with arsenic)
+  NRCSSoilFieldBook_StructureGrade:
+    name: NRCSSoilFieldBook_StructureGrade
+    title: Structure Grade
+    description: The distinctness of soil structural units observable in place and
+      in hand samples.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=105
+    permissible_values:
+      '0':
+        title: structureless
+        description: no discrete units observable in place or in a hand sample
+      '1':
+        title: weak
+        description: units are barely observable in place or in a hand sample
+      '2':
+        title: moderate
+        description: units well formed and evident in place or in a hand sample
+      '3':
+        title: strong
+        description: units are distinct in place (undisturbed soil) and separate cleanly
+          when disturbed
+  NRCSSoilFieldBook_SurfaceCrustRuptureResistance:
+    name: NRCSSoilFieldBook_SurfaceCrustRuptureResistance
+    title: Surface Crust Rupture Resistance
+    description: Force required to rupture air-dried surface crust or plate samples.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=115
+    permissible_values:
+      EW:
+        title: extremely weak
+        description: not obtainable
+      VW:
+        title: very weak
+        description: removable, < 1N
+      W:
+        title: weak
+        description: 1 to < 3N
+      M:
+        title: moderate
+        description: 3 to < 8N
+      MS:
+        title: moderately strong
+        description: 8 to < 20N
+      S:
+        title: strong
+        description: 20 to < 40N
+      VS:
+        title: very strong
+        description: 40 to < 80N
+      ES:
+        title: extremely strong
+        description: "\u2265 80N"
+  NRCSSoilFieldBook_CementingAgentKind:
+    name: NRCSSoilFieldBook_CementingAgentKind
+    title: Cementing Agent Kind
+    description: Kind of cementing agent present in the soil. Called Rupture_resist_cem_agent
+      in NASIS.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=115
+    permissible_values:
+      K:
+        title: carbonates
+      G:
+        title: gypsum
+      H:
+        title: humus
+      I:
+        title: iron
+      S:
+        title: silica (SiO2)
+  NRCSSoilFieldBook_PenetrationResistanceClass:
+    name: NRCSSoilFieldBook_PenetrationResistanceClass
+    title: Penetration Resistance Class
+    description: Resistance class based on average of five or more pocket penetrometer
+      measurements by horizon/layer. Called Penetration_resistance in NASIS.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=119
+    permissible_values:
+      EL:
+        title: extremely low
+        description: <   0.01
+      VL:
+        title: very low
+        description: 0.01 to <  0.1
+      L:
+        title: low
+        description: 0.1 to <  1
+      M:
+        title: moderate
+        description: 1 to <  2
+      H:
+        title: high
+        description: 2 to <  4
+      VH:
+        title: very high
+        description: 4 to <  8
+      EH:
+        title: extremely high
+        description: "\u2265  8"
+  NRCSSoilFieldBook_PenetrationOrientation:
+    name: NRCSSoilFieldBook_PenetrationOrientation
+    title: Penetration Orientation
+    description: Orientation of the pocket penetrometer used to determine Penetration
+      Resistance Class.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=119
+    permissible_values:
+      H:
+        title: horizontal
+        description: oriented perpendicular to a vertical pit face
+      V:
+        title: vertical
+        description: oriented perpendicular to the ground surface
+  NRCSSoilFieldBook_ExcavationDifficulty:
+    name: NRCSSoilFieldBook_ExcavationDifficulty
+    title: Excavation Difficulty
+    description: The relative force or energy required to dig soil out of place; described
+      with the moisture condition.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=119
+    permissible_values:
+      L:
+        title: low
+        description: excavation by tile spade requires arm pressure only; impact energy
+          or foot pressure is not needed
+      M:
+        title: moderate
+        description: excavation by tile spade requires impact energy or foot pressure;
+          arm pressure is insufficient
+      H:
+        title: high
+        description: "excavation by tile spade is difficult but easily done by pick\
+          \ with over-the-head swing USDA NRCS 2\u201370 November 2024"
+      VH:
+        title: very high
+        description: excavation by pick with over-the-head swing is moderately to
+          markedly difficult; backhoe excavation by a 50- to 80-hp tractor can be
+          made in a moderate amount of time
+      EH:
+        title: extremely high
+        description: "excavation with pick is nearly impossible; backhoe excavation\
+          \ by a 50- to 80-hp tractor cannot be made in a reasonable amount of time\
+          \ criteria as those for \u201CRoots;\u201D use the combined tables."
+  NRCSSoilFieldBook_PoreShape:
+    name: NRCSSoilFieldBook_PoreShape
+    title: Pore Shape
+    description: The dominant form (type) of pores discernible with a 10x hand lens
+      and by the unaided eye.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=125
+    permissible_values:
+      DT:
+        title: tubular
+        description: cylindrical, elongated, branching voids (e.g., empty root channels)
+      IG:
+        title: irregular
+        description: nonconnected cavities and chambers (e.g., vughs; various shapes)
+      TU:
+        title: tubular
+        description: cylindrical and elongated voids (e.g., worm tunnels)
+      VE:
+        title: vesicular
+        description: ovoid to spherical voids (e.g., solidified pseudomorphs of entrapped
+          gas bubbles concentrated below a crust); most common in arid and semiarid
+          environments
+      IR:
+        title: interstitial
+        description: voids between sand grains or rock fragments
+  NRCSSoilFieldBook_SoilCrustsKind:
+    name: NRCSSoilFieldBook_SoilCrustsKind
+    title: Soil Crusts Kind
+    description: The type of surface crust present. No entry implies that no crust
+      is present.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=131
+    permissible_values:
+      MC:
+        title: biological crusts
+        description: "biotically dominated surface \u201Cmat\u201D of algae, lichens,\
+          \ mosses, etc.; also called biotic, cryptogamic, microbiotic, or microphytic\
+          \ crusts; slightly flexible when moist"
+      MI:
+        title: mineral crusts
+        description: reversibly bonded primary, secondary mineral grains; not biotically
+          dominated; stiff or rigid when moist or dry
+      CC:
+        title: chemical crusts
+        description: "evaporites (e.g., NaCl) or precipitates (e.g., CaCO3) physical\
+          \ crusts \u2014 reorganized, reconstituted raindrop impact"
+      RC:
+        title: crust
+        description: dispersed, puddled, dried
+      DC:
+        title: depositional crust
+        description: sediments of variable thickness
+      FC:
+        title: freeze-thaw crust
+        description: bare ground, small polygons
+      VC:
+        title: vesicular crust/ zone
+        description: substantial discontinuous, spherical or ovoid pores (e.g., 0.5
+          to 4 mm diameter)
+  NRCSSoilFieldBook_PermeabilityClass:
+    name: NRCSSoilFieldBook_PermeabilityClass
+    title: Permeability Class
+    description: NRCS deemphasizes the use of permeability classes; use Ksat. Listed
+      for historic usage and selected soil interpretations.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=137
+    permissible_values:
+      IM:
+        title: impermeable
+        description: < 0.0015
+      VS:
+        title: very slow
+        description: 0.0015 to < 0.06
+      SL:
+        title: slow
+        description: 0.06 to < 0.2
+      MS:
+        title: moderately slow
+        description: 0.2 to < 0.6
+      MO:
+        title: moderate
+        description: 0.6 to < 2.0
+      MR:
+        title: moderately rapid
+        description: 2.0 to < 6.0
+      RA:
+        title: rapid
+        description: 6.0 to < 20
+      VR:
+        title: very rapid
+        description: "\u2265 20"
+  NRCSSoilFieldBook_ReactionPH:
+    name: NRCSSoilFieldBook_ReactionPH
+    title: Reaction (pH)
+    description: Record pH and Method; record the pH value to the precision limit
+      of the method (e.g., to the nearest tenth). The preferred method is pH meter
+      for 1:1 (water:soil). In NASIS, record the pH numerical value and the method
+      used (e.g., pH 6.5; 1:1 water:soil). Called Field_pH in NASIS.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=137
+    permissible_values:
+      ultra acid:
+        description: pH < 3.5
+      extremely acid:
+        description: pH 3.5 to 4.4
+      very strongly acid:
+        description: pH 4.5 to 5.0
+      strongly acid:
+        description: pH 5.1 to 5.5
+      moderately acid:
+        description: pH 5.6 to 6.0
+      slightly acid:
+        description: pH 6.1 to 6.5
+      neutral:
+        description: pH 6.6 to 7.3
+      slightly alkaline:
+        description: pH 7.4 to 7.8
+      moderately alkaline:
+        description: pH 7.9 to 8.4
+      strongly alkaline:
+        description: pH 8.5 to 9.0
+      very strongly alkaline:
+        description: pH > 9.0
+  NRCSSoilFieldBook_EffervescenceClass:
+    name: NRCSSoilFieldBook_EffervescenceClass
+    title: Effervescence Class
+    description: "Gaseous response of soil matrix to applied HCl (carbonate test),\
+      \ H\u2082O\u2082 (MnO\u2082 test), or other chemicals, seen as bubbles."
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=139
+    permissible_values:
+      NE:
+        title: noneffervescent
+        description: no bubbles form
+      VS:
+        title: very slightly effervescent
+        description: few bubbles form
+      SL:
+        title: slightly effervescent
+        description: numerous bubbles form
+      ST:
+        title: strongly effervescent
+        description: bubbles form a low foam
+      VE:
+        title: violently effervescent
+        description: bubbles rapidly form a thick foam
+  NRCSSoilFieldBook_SalinityClass:
+    name: NRCSSoilFieldBook_SalinityClass
+    title: Salinity Class
+    description: "Soil salinity classes are based on electrical conductivity from\
+      \ a saturation paste extract. Gypsum (CaSO4 \u2022 2H 2O) and salts more soluble\
+      \ than gypsum (e.g., Na, Mg, and Ca chlorides and sulfates) are the sole or\
+      \ major contributors to the saturated paste extract EC."
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=141
+    permissible_values:
+      '0':
+        title: nonsaline
+        description: ECe < 2 dS/m
+      '1':
+        title: very slightly saline
+        description: ECe 2 to < 4 dS/m
+      '2':
+        title: slightly saline
+        description: ECe 4 to < 8 dS/m
+      '3':
+        title: moderately saline
+        description: ECe 8 to < 16 dS/m
+      '4':
+        title: strongly saline
+        description: "ECe \u2265 16 dS/m"
+  NRCSSoilFieldBook_OdorKind:
+    name: NRCSSoilFieldBook_OdorKind
+    title: Odor Kind
+    description: The kind of odor detected immediately after soil is exposed to air.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=142
+    permissible_values:
+      N:
+        title: none
+        description: no odor detected
+      P:
+        title: petrochemical
+        description: presence of gaseous or liquid gasoline, oil, creosote, etc.
+      S:
+        title: sulfurous
+        description: "presence of H2S (hydrogen sulfide); \u201Crotten egg\u201D smell;\
+          \ commonly associated with strongly reduced soil containing sulfides"
+  NRCSSoilFieldBook_OdorIntensity:
+    name: NRCSSoilFieldBook_OdorIntensity
+    title: Odor Intensity
+    description: Relative intensity of any odor present, recorded by horizon immediately
+      after soil is exposed to air.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=142
+    permissible_values:
+      SL:
+        title: slight
+        description: odor is faint (e.g., only detected when sample is brought close
+          to nose)
+      MD:
+        title: moderate
+        description: "odor is readily noticeable at arm\u2019s length as one handles\
+          \ the material (e.g., intermediate intensity); only detected as one starts\
+          \ to dig into the material"
+      ST:
+        title: strong
+        description: odor is quite intense and readily detected before or immediately
+          after the sample is exposed to air information and features with no existing
+          data element. Record as freehand notes under Miscellaneous Field Notes /
+          Sketch. properties necessary to adequately describe a given soil. However,
+          some soil properties or features are so universally essential for interpretations
+  NRCSSoilFieldBook_ObservationMethod:
+    name: NRCSSoilFieldBook_ObservationMethod
+    title: Observation Method
+    description: For each layer, describe the Kind of sampling device or procedure
+      used to make observations of the site. Methods and tools for SAS are listed
+      in the following table.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=154
+    permissible_values:
+      BA:
+        title: bucket auger
+        description: 'device: open, closed, sand, or mud buckets (5-12 cm diam.)'
+      DA:
+        title: dutch or mud auger
+        description: 'device: an open, strap-sided bucket auger (5-10 cm diam.) with
+          a sharpened outer edge and a screw tip with a partial twist'
+      DV:
+        title: dive observation
+        description: 'method: a visual, onsite assessment performed under water'
+      MS:
+        title: Macaulay sampler
+        description: "device: a half-cylinder \u201Cgouge\u201D sampler with a hinged\
+          \ door that\u2019s pushed in and partially rotated to obtain a sample of\
+          \ soft sediments (e.g., organics)"
+      VT:
+        title: vibracore tube
+        description: 'device: a hollow tube (e.g., 4-8 cm diam.) vibrated into wet
+          sands, silts, or organics'
+      VO:
+        title: video
+        description: 'method: electronically recorded photo or sequential digital
+          images of a subaqueous setting or site'
+slots: {}

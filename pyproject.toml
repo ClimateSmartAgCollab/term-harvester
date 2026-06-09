@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "term-harvester"
+version = "0.1.0"
+description = "Fetch and assemble controlled vocabulary from heterogeneous sources into LinkML schema YAML"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+# PDF parsing — required for NASIS, NRCSSoilFieldBook, and FreeText PDF input
+pdf = ["pypdf"]
+# OWL ontology support — required for content_type: OWL
+owl = ["owlready2"]
+# AI-assisted free-text extraction — required for content_type: FreeText
+freetext = ["anthropic"]
+# All optional dependencies
+all = ["pypdf", "owlready2", "anthropic"]
+
+[tool.setuptools]
+py-modules = ["term_harvester"]

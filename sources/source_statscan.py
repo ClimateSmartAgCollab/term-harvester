@@ -10,6 +10,26 @@ Public API used by term_harvester.py:
     parse_statscan_structure(html_text)
     process_statscan_source(key, source, config_file=None, locales=None)
     match_statscan(url, tmp_path, config_file)
+
+Classification catalog:
+    parse_classification_catalog(html_text) → list[dict]
+    fetch_classification_catalog(cache_path, force_refresh) → list[dict]
+    ENUM_DEFINITIONS  — list of available classifications; loaded from the
+                        local cache at import time (empty until first fetch).
+
+Each ENUM_DEFINITIONS entry:
+    tvd_id  — StatsCan TVD identifier
+    key     — harvester source key (STATSCAN_{tvd_id})
+    title   — classification name
+    subject — subject area (closest available description from the search page)
+    url     — dedicated StatsCan IMDB page URL
+
+To populate the catalog and cache it locally run (once per project directory):
+    from source_statscan import fetch_classification_catalog
+    fetch_classification_catalog()
+
+To add any entry directly to a project:
+    python term_harvester.py -a {url}
 """
 
 import html
@@ -30,6 +50,141 @@ from source_utils import (
     MENU_CONFIG,
 )
 
+
+# ---------------------------------------------------------------------------
+# Classification catalog
+# ---------------------------------------------------------------------------
+
+CLASSIFICATIONS_SEARCH_URL = (
+    "https://www.statcan.gc.ca/en/concepts/search?show=all"
+)
+CLASSIFICATIONS_SEARCH_URL_FR = (
+    "https://www.statcan.gc.ca/fr/concepts/recherche?show=all"
+)
+
+_DEFAULT_CATALOG_PATH = "sources/statscan_classifications.yaml"
+
+
+def parse_classification_catalog(html_text):
+    """Parse the StatsCan concepts search page (?show=all).
+
+    Expects a table with three columns per row: title link, subject, type.
+    All entry types are included (Classification, Variable, Statistical unit).
+
+    URL patterns handled:
+        p3VD.pl?Function=getVD&TVD=NNN  — Classifications
+        p3Var.pl?Function=DEC&Id=NNN    — Variables
+        p3Var.pl?Function=Unit&Id=NNN   — Statistical units
+
+    Returns a list of dicts sorted alphabetically by title:
+        tvd_id     – numeric identifier (TVD for Classifications, Id for others)
+        key        – harvester source key  (STATSCAN_{tvd_id})
+        title      – entry name
+        subject    – subject area (e.g. "Education", "Housing")
+        entry_type – "Classification", "Variable", or "Statistical unit"
+        url        – dedicated StatsCan IMDB page URL
+    """
+    entries = []
+    for tr_m in re.finditer(r'<tr\b[^>]*>(.*?)</tr>', html_text, re.IGNORECASE | re.DOTALL):
+        cells = re.findall(r'<td\b[^>]*>(.*?)</td>', tr_m.group(1), re.IGNORECASE | re.DOTALL)
+        if len(cells) < 3:
+            continue
+
+        # Classification: p3VD.pl?Function=getVD&TVD=NNN
+        tvd_m = re.search(
+            r'href=["\']([^"\']*p3VD\.pl[^"\']*[?&](?:amp;)?TVD=(\d+)[^"\']*)["\']',
+            cells[0], re.IGNORECASE,
+        )
+        # Variable / Statistical unit: p3Var.pl?Function=DEC|Unit&Id=NNN
+        var_m = re.search(
+            r'href=["\']([^"\']*p3Var\.pl[^"\']*[?&](?:amp;)?Id=(\d+)[^"\']*)["\']',
+            cells[0], re.IGNORECASE,
+        )
+        link_m = tvd_m or var_m
+        if not link_m:
+            continue
+
+        url        = html.unescape(link_m.group(1))
+        numeric_id = link_m.group(2)
+        title      = html.unescape(_strip_tags(cells[0])).strip()
+        subject    = html.unescape(_strip_tags(cells[1])).strip()
+        entry_type = html.unescape(_strip_tags(cells[2])).strip()
+        if not title:
+            continue
+
+        entries.append({
+            "tvd_id":     numeric_id,
+            "key":        f"STATSCAN_{numeric_id}",
+            "title":      title,
+            "subject":    subject,
+            "entry_type": entry_type,
+            "url":        url,
+        })
+
+    return sorted(entries, key=lambda e: e["title"].lower())
+
+
+def fetch_classification_catalog(
+    cache_path=_DEFAULT_CATALOG_PATH,
+    force_refresh=False,
+):
+    """Return the list of Statistics Canada classification enumerations.
+
+    First call (or when force_refresh=True): fetches CLASSIFICATIONS_SEARCH_URL,
+    parses the results table, and writes the result to cache_path as YAML.
+    Subsequent calls load from the cache without hitting the network.
+
+    Args:
+        cache_path:     Path for the local YAML cache.  Pass None to skip caching.
+        force_refresh:  Re-fetch from the web even if the cache exists.
+
+    Returns:
+        list[dict] — each entry has keys tvd_id, key, title, subject, url.
+    """
+    if not force_refresh and cache_path and os.path.exists(cache_path):
+        with open(cache_path) as f:
+            data = yaml.safe_load(f) or {}
+        cached = data.get("classifications", [])
+        if cached:
+            return cached
+
+    print(f"  Fetching StatsCan classification catalog from {CLASSIFICATIONS_SEARCH_URL} ...")
+    html_text = fetch_html(CLASSIFICATIONS_SEARCH_URL)
+    entries = parse_classification_catalog(html_text)
+
+    if cache_path and entries:
+        with open(cache_path, "w") as f:
+            yaml.dump(
+                {"classifications": entries},
+                f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False,
+            )
+        print(f"  Cached {len(entries)} classifications to {cache_path}")
+
+    return entries
+
+
+def _load_enum_definitions():
+    """Load ENUM_DEFINITIONS from the local cache file at import time, if present."""
+    if os.path.exists(_DEFAULT_CATALOG_PATH):
+        try:
+            with open(_DEFAULT_CATALOG_PATH) as f:
+                data = yaml.safe_load(f) or {}
+            return data.get("classifications", [])
+        except Exception:
+            pass
+    return []
+
+
+# Available Statistics Canada classification enumerations.
+# Empty until fetch_classification_catalog() has been called at least once.
+# After the first fetch the cache at sources/statscan_classifications.yaml is
+# loaded automatically on every subsequent import.
+ENUM_DEFINITIONS = _load_enum_definitions()
+
+
+# ---------------------------------------------------------------------------
+# URL utilities
+# ---------------------------------------------------------------------------
 
 def statscan_fr_url(url):
     """Return the French-language equivalent of a StatsCan IMDB page URL.
@@ -204,7 +359,6 @@ def process_statscan_source(key, source, config_file=None, locales=None):
                 idx = cat_td_index if cat_td_index < len(td_cells) else 0
                 title = html.unescape(strip_tags(td_cells[idx])).strip()
             add_permissible_value(permissible_values, code, title=title)
-            print(f"  Unlinked code: {code!r} title={title!r}")
 
     # ---- 3. For each CPV page: fetch structure + definitions -------------
     for cpv_url in cpv_urls:
@@ -372,6 +526,51 @@ def process_statscan_source(key, source, config_file=None, locales=None):
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
     print(f"Updated {yaml_path}"
           + (f" ({len(fr_permissible_values)} French translations)" if fr_permissible_values else ""))
+
+
+def match_statscan_catalog(url, config_file=MENU_CONFIG):
+    """Pre-download handler for the StatsCan classifications catalog search page.
+
+    Detected URLs (English or French):
+        https://www.statcan.gc.ca/en/concepts/search?datatype=classification...
+        https://www.statcan.gc.ca/fr/concepts/recherche?datatype=classification...
+
+    Fetches (or refreshes) the catalog, prints a subject-grouped summary, and
+    caches the result to sources/statscan_classifications.yaml.  Does NOT add
+    any entry to harvester_config.yaml — this is a discovery tool.  To add a
+    classification after browsing the list, run:
+        python term_harvester.py -a "{url}"
+
+    Returns True if the URL matched (caller should skip further processing).
+    """
+    if "statcan.gc.ca" not in url:
+        return False
+    if "concepts/search" not in url and "concepts/recherche" not in url:
+        return False
+
+    entries = fetch_classification_catalog(force_refresh=True)
+    if not entries:
+        print("  Warning: catalog fetch returned no entries.", file=sys.stderr)
+        return True
+
+    # Group by subject for a compact summary
+    by_subject: dict[str, list] = {}
+    for e in entries:
+        by_subject.setdefault(e["subject"], []).append(e)
+
+    print(f"\n  {len(entries)} Statistics Canada entries"
+          f" (cached to {_DEFAULT_CATALOG_PATH})\n")
+    for subject in sorted(by_subject):
+        group = by_subject[subject]
+        print(f"  {subject} ({len(group)})")
+        for e in group:
+            print(f"    {e['key']:<30}  {e.get('entry_type', ''):<22}  {e['title']}")
+
+    print(f"\n  To add any classification to your project:")
+    print(f"    python term_harvester.py -a \"<url>\"")
+    print(f"  where <url> is from the list above, e.g.:")
+    print(f"    python term_harvester.py -a \"{entries[0]['url']}\"")
+    return True
 
 
 def match_statscan(url, tmp_path, config_file=MENU_CONFIG):

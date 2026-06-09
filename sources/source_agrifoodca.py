@@ -541,8 +541,20 @@ def refetch_agrifood_dir(key, source, locales=None):
 
     schema = _build_combined_yaml(results, source_url, key, locales=locales)
     yaml_path = f"sources/{key}.yaml"
+    yaml_content = yaml.dump(schema, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
+    new_size = len(yaml_content.encode("utf-8"))
+    if new_size == 0:
+        print(f"  Error: generated YAML is empty — keeping existing {yaml_path}", file=sys.stderr)
+        return
+    if os.path.exists(yaml_path):
+        existing_size = os.path.getsize(yaml_path)
+        if existing_size > 0 and new_size <= existing_size * 0.8:
+            print(f"  Error: new YAML is {new_size:,} bytes "
+                  f"({new_size / existing_size:.0%} of existing {existing_size:,}) "
+                  f"— keeping existing {yaml_path}", file=sys.stderr)
+            return
     with open(yaml_path, "w") as f:
-        yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
+        f.write(yaml_content)
     print(f"Saved {len(results)} enums to {yaml_path}"
           + (f" ({skipped} file(s) skipped)" if skipped else ""))
 

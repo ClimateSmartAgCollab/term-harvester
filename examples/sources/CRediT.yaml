@@ -1,0 +1,84 @@
+id: https://zenodo.org/records/18421449/files/CRediT%20roles%20and%20example%20research%20tasks%20that%20could%20be%20attributed%20to%20them.pdf?download=1
+name: CRediT
+title: CRediT Contributor Roles Taxonomy
+description: The Contributor Roles Taxonomy (CRediT) is a high-level taxonomy representing
+  the 14 roles typically played by contributors to scientific scholarly output. Each
+  role describes a specific contribution to the scholarly output.
+version: '2022'
+license: ''
+in_language: en
+imports:
+  - 'linkml:types'
+prefixes: {}
+default_prefix: ''
+classes: {}
+enums:
+  CRediT:
+    permissible_values:
+      conceptualization:
+        description: Ideas; formulation or evolution of overarching research goals
+          and aims
+        meaning: https://credit.niso.org/contributor-roles/conceptualization/
+      data_curation:
+        title: Data Curation
+        description: Management activities to annotate (produce metadata), scrub data
+          and maintain research data (including software code, where it is necessary
+          for interpreting the data itself) for initial use and later re-use
+        meaning: https://credit.niso.org/contributor-roles/data-curation/
+      formal_analysis:
+        title: Formal Analysis
+        description: Application of statistical, mathematical, computational, or other
+          formal techniques to analyse or synthesize study data
+        meaning: https://credit.niso.org/contributor-roles/formal-analysis/
+      funding_acquisition:
+        title: Funding Acquisition
+        description: Acquisition of the financial support for the project leading
+          to this publication
+        meaning: https://credit.niso.org/contributor-roles/funding-acquisition/
+      investigation:
+        description: Conducting a research and investigation process, specifically
+          performing the experiments, or data/evidence collection
+        meaning: https://credit.niso.org/contributor-roles/investigation/
+      methodology:
+        description: Development or design of methodology; creation of models
+        meaning: https://credit.niso.org/contributor-roles/methodology/
+      project_administration:
+        title: Project Administration
+        description: Management and coordination responsibility for the research activity
+          planning and execution
+        meaning: https://credit.niso.org/contributor-roles/project-administration/
+      resources:
+        description: Provision of study materials, reagents, materials, patients,
+          laboratory samples, animals, instrumentation, computing resources, or other
+          analysis tools
+        meaning: https://credit.niso.org/contributor-roles/resources/
+      software:
+        description: Programming, software development; designing computer programs;
+          implementation of the computer code and supporting algorithms; testing of
+          existing code components
+        meaning: https://credit.niso.org/contributor-roles/software/
+      supervision:
+        description: Oversight and leadership responsibility for the research activity
+          planning and execution, including mentorship external to the core team
+        meaning: https://credit.niso.org/contributor-roles/supervision/
+      validation:
+        description: Verification, whether as a part of the activity or separate,
+          of the overall replication/reproducibility of results/experiments and other
+          research outputs
+        meaning: https://credit.niso.org/contributor-roles/validation/
+      visualization:
+        description: Preparation, creation and/or presentation of the published work,
+          specifically visualization/data presentation
+        meaning: https://credit.niso.org/contributor-roles/visualization/
+      writing_original_draft:
+        title: "Writing \u2013 original draft"
+        description: Preparation, creation and/or presentation of the published work,
+          specifically writing the initial draft (including substantive translation)
+        meaning: https://credit.niso.org/contributor-roles/writing-original-draft/
+      writing_review_editing:
+        title: "Writing \u2013 review & editing"
+        description: "Preparation, creation and/or presentation of the published work\
+          \ by those from the original research group, specifically critical review,\
+          \ commentary or revision \u2013 including pre- or post-publication stages"
+        meaning: https://credit.niso.org/contributor-roles/writing-review-editing/
+slots: {}

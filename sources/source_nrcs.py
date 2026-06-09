@@ -10,6 +10,7 @@ Public API used by term_harvester.py:
 
 import os
 import re
+import subprocess
 import sys
 import urllib.request
 import yaml
@@ -23,35 +24,35 @@ from source_utils import (
 )
 
 
-# ---------------------------------------------------------------------------
-# Enum extraction registry
-#
-# Each entry describes one enum to extract from the PDF source.
-#
-# Keys:
-#   enum_key           – LinkML enum name (key in schema["enums"])
-#   title              – human-readable enum title
-#   pdf_page           – 1-based physical PDF page number containing the table
-#   discussion_marker  – text that opens the Discussion paragraph, before "—"
-#   table_parser       – name of the _parse_* function in _PARSERS
-# ---------------------------------------------------------------------------
+NRCS_FIELD_BOOK_PDF = (
+    "https://www.nrcs.usda.gov/sites/default/files/2025-05/"
+    "Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf"
+)
 
-ENUM_DEFINITIONS = [
-    {
-        "enum_key":          "NRCSSoilFieldBook_SalinityClass",
-        "title":             "Salinity Class",
-        "pdf_page":          141,
-        "discussion_marker": "Salinity Class (Discussion)",
-        "table_parser":      "_parse_salinity_class",
-    },
-    {
-        "enum_key":          "NRCSSoilFieldBook_ObservationMethod",
-        "title":             "Observation Method",
-        "pdf_page":          154,
-        "discussion_marker": "Observation Method",
-        "table_parser":      "_parse_observation_method",
-    },
-]
+# Shared PDF cache — all NRCSSoilFieldBook source entries use the same file
+_NRCS_PDF_CACHE = "sources/NRCSSoilFieldBook.pdf"
+
+_ENUM_DEFS_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "nrcs_enum_definitions.yaml"
+)
+
+
+def _load_enum_definitions():
+    """Load enum extraction registry from nrcs_enum_definitions.yaml."""
+    try:
+        with open(_ENUM_DEFS_PATH) as f:
+            data = yaml.safe_load(f) or {}
+        return data.get("enum_definitions", [])
+    except FileNotFoundError:
+        print(
+            f"Warning: {_ENUM_DEFS_PATH} not found;"
+            " NRCS enum extraction unavailable.",
+            file=sys.stderr,
+        )
+        return []
+
+
+ENUM_DEFINITIONS = _load_enum_definitions()
 
 
 # ---------------------------------------------------------------------------
@@ -80,6 +81,44 @@ def fetch_pdf(url, dest_path):
     with open(dest_path, "wb") as f:
         f.write(data)
     print(f"  Downloaded {url} → {dest_path} ({len(data):,} bytes)")
+
+
+def fetch_nrcs_pdf():
+    """Download the NRCS Field Book PDF to the shared cache path via curl.
+
+    Uses curl rather than urllib so that connection/stall timeouts apply and
+    government server restrictions are less likely to block the download.
+    Multiple NRCSSoilFieldBook source entries share this one file; the -f loop
+    in term_harvester.py deduplicates calls.
+    """
+    print(f"  Downloading NRCS Field Book PDF from {NRCS_FIELD_BOOK_PDF} ...")
+    result = subprocess.run(
+        [
+            "curl", "-L",
+            "--connect-timeout", "30",
+            "--max-time", "300",
+            "--silent", "--show-error",
+            "-o", _NRCS_PDF_CACHE,
+            NRCS_FIELD_BOOK_PDF,
+        ],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        print(f"  Error downloading PDF: {result.stderr.strip()}", file=sys.stderr)
+        return
+    with open(_NRCS_PDF_CACHE, 'rb') as fh:
+        magic = fh.read(5)
+    if magic != b'%PDF-':
+        preview = (magic + open(_NRCS_PDF_CACHE, 'rb').read(195))[:200]
+        print(
+            f"  Error: downloaded content is not a PDF.\n"
+            f"  First bytes: {preview.decode('utf-8', errors='replace')[:120]!r}\n"
+            f"  Check the URL is still valid: {NRCS_FIELD_BOOK_PDF}",
+            file=sys.stderr,
+        )
+        return
+    size = os.path.getsize(_NRCS_PDF_CACHE)
+    print(f"  Saved to {_NRCS_PDF_CACHE} ({size:,} bytes)")
 
 
 def extract_page_text(pdf_path, page_num):
@@ -120,7 +159,7 @@ def _extract_discussion(page_text, marker):
 # a list of dicts: {code, title, description}.
 # ---------------------------------------------------------------------------
 
-def _parse_salinity_class(page_text):
+def _parse_salinity_class(page_text, defn=None):
     """Parse the Salinity Class table (PDF page 141, book page 2-91).
 
     Table layout after header rows:
@@ -148,7 +187,7 @@ def _parse_salinity_class(page_text):
     return rows
 
 
-def _parse_observation_method(page_text):
+def _parse_observation_method(page_text, defn=None):
     """Parse the Observation Method table (PDF page 154, book page 2-104).
 
     Table layout:
@@ -230,9 +269,169 @@ def _parse_observation_method(page_text):
     return rows
 
 
+def _parse_reaction_ph(page_text, defn=None):
+    """Parse the Reaction (pH) table (PDF pages 137–138, book pages 2-87/2-88).
+
+    Table layout:
+        Descriptive Term  #  Criteria: pH Range
+
+    The '#' code means no formal codes are assigned; the descriptive term
+    itself is used as the permissible-value key.
+    """
+    rows = []
+    for m in re.finditer(
+        r"^([a-z][a-z ]+?)\s+#\s+(.+)$",
+        page_text, re.MULTILINE,
+    ):
+        term     = m.group(1).strip()
+        ph_range = m.group(2).strip()
+        rows.append({
+            "code":        term,
+            "title":       term,
+            "description": f"pH {ph_range}",
+        })
+    return rows
+
+
+def _parse_generic(page_text, defn):
+    """Generic parser for standard two- or three-column NRCS tables.
+
+    Algorithm:
+    1. Anchor to defn['table_header'] — skip text before it.
+    2. Pre-join wrapped titles (up to three source lines):
+       - 2-line: "moderately \\nfluid MF" → title-word ends with space, next
+         line ends with an all-caps code token.
+       - 3-line: "extremely \\nhigh\\nEH criteria…" — title fragment ends with
+         space, middle word has no code, third line starts with code + space.
+    3. Scan for row lines: start with lowercase, contain an all-caps/digit
+       1–6-char code token, optionally followed by criteria text.
+       Inline footnote digits (e.g. "occasional 2 OC") are stripped.
+    4. Criteria that wraps onto subsequent lines is accumulated.
+    5. Stop at a field-definition line: starts uppercase or '(' AND contains
+       an em/en dash NOT flanked by digits (so "USDA NRCS 1–10" is safe).
+
+    Returns list of {code, title, description} dicts.
+    """
+    table_header = defn.get("table_header", "") if defn else ""
+
+    # 1. Anchor
+    if table_header:
+        idx = page_text.find(table_header)
+        if idx >= 0:
+            page_text = page_text[idx + len(table_header):]
+
+    # 2. Pre-join wrapped titles (2- and 3-line variants)
+    _ENDS_WITH_CODE  = re.compile(r'\s+[A-Z][A-Z0-9]{0,5}$')
+    _STARTS_WITH_CODE = re.compile(r'^[A-Z][A-Z0-9]{0,5}\s')
+    lines = page_text.split("\n")
+    joined: list[str] = []
+    i = 0
+    while i < len(lines):
+        l0 = lines[i]
+        l1 = lines[i + 1].strip() if i + 1 < len(lines) else ""
+        l2 = lines[i + 2].strip() if i + 2 < len(lines) else ""
+        if l0.endswith(" ") and _ENDS_WITH_CODE.search(l1):
+            # 2-line join: title-fragment + "word CODE"
+            joined.append(l0.rstrip() + " " + l1)
+            i += 2
+        elif (l0.endswith(" ") and l1
+              and not l1[0].isupper()
+              and not _ENDS_WITH_CODE.search(l1)
+              and _STARTS_WITH_CODE.match(l2)):
+            # 3-line join: title-word + plain-word + "CODE criteria"
+            joined.append(l0.rstrip() + " " + l1 + " " + l2)
+            i += 3
+        else:
+            joined.append(l0)
+            i += 1
+
+    # 3 & 4. State-machine row extraction
+    _ROW = re.compile(
+        r'^([a-z][^"\n]*?)'               # title: starts with lowercase
+        r'\s+'
+        r'(?:\d+(?:[,\s]+\d+)*\s+)?'     # optional inline footnote markers
+        r'([A-Z0-9][A-Z0-9]{0,5})'       # code: 1–6 all-caps/digit chars
+        r'(?:\s+(.+))?$'                 # optional same-line criteria
+    )
+    # Field-definition line: starts uppercase or '(', contains em/en dash
+    # NOT flanked by digits (excludes USDA page headers like "1–10 November").
+    _FIELD_HEADER = re.compile(r'^[A-Z(].*(?<!\d)[—–](?!\d)')
+
+    def _semicolon_outside_parens(s: str) -> bool:
+        """True if *s* contains ';' outside of any parentheses."""
+        depth = 0
+        for c in s:
+            if c == "(":
+                depth += 1
+            elif c == ")":
+                depth = max(0, depth - 1)
+            elif c == ";" and depth == 0:
+                return True
+        return False
+
+    rows: list[dict] = []
+    current: dict | None = None
+
+    def flush() -> None:
+        nonlocal current
+        if current:
+            rows.append({
+                "code":        current["code"],
+                "title":       current["title"],
+                "description": " ".join(current["desc"]).strip(),
+            })
+            current = None
+
+    for line in joined:
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        if _FIELD_HEADER.match(stripped):
+            flush()
+            break
+        if re.match(r'^\d+\s', stripped):  # footnote line
+            flush()
+            continue
+
+        m = _ROW.match(stripped)
+        if m:
+            code  = m.group(2)
+            title = re.sub(r'\s+\d+(?:[,\s]+\d+)*\s*$', '', m.group(1)).strip()
+            # Reject prose false-positives (check title, not full line):
+            #   • ';' outside parens in title → description sentence, not label
+            #   • title ends with '.' → sentence boundary (footnote continuation)
+            #   • '. ' before non-digit in title → internal sentence break
+            #   • code is a chemical formula (letter–digit–letter e.g. H2S)
+            #   • numeric code with complex title: valid numeric codes (StructureGrade
+            #     0–3) have pure-lowercase single-word titles; "< 1 mm" context does not
+            if (_semicolon_outside_parens(title)
+                    or title.endswith(".")
+                    or re.search(r'\. [^0-9]', title)
+                    or re.match(r'[A-Z]\d+[A-Z]', code)
+                    or (code.isdigit()
+                        and (len(code) > 1 or not re.match(r'^[a-z]+$', title)))):
+                m = None
+        if m:
+            flush()
+            criteria = (m.group(3) or "").strip()
+            current = {
+                "code":  code,
+                "title": title,
+                "desc":  [criteria] if criteria else [],
+            }
+        elif current is not None and not stripped[0].isupper() and len(stripped) < 80:
+            current["desc"].append(stripped)
+
+    flush()
+    return rows
+
+
 # Map parser name strings → callables (used by process_nrcs_source dispatch)
 _PARSERS = {
-    "_parse_salinity_class":    _parse_salinity_class,
+    "_parse_generic":            _parse_generic,
+    "_parse_reaction_ph":        _parse_reaction_ph,
+    "_parse_salinity_class":     _parse_salinity_class,
     "_parse_observation_method": _parse_observation_method,
 }
 
@@ -249,14 +448,16 @@ def process_nrcs_source(key, source, locales=None):
     sources/{key}.yaml.
     """
     base_url  = (source.get("reachable_from") or {}).get("source_ontology", "")
-    pdf_path  = f"sources/{key}.pdf"
+    pdf_path  = _NRCS_PDF_CACHE
     yaml_path = f"sources/{key}.yaml"
 
     if not os.path.exists(pdf_path):
-        print(f"  Downloading PDF from {base_url} ...")
-        fetch_pdf(base_url, pdf_path)
-    else:
-        print(f"  Using cached PDF {pdf_path}")
+        print(
+            f"Skipping {key}: {pdf_path} not found — run -f {key} to download first",
+            file=sys.stderr,
+        )
+        return
+    print(f"  Using cached PDF {pdf_path}")
 
     schema = make_config_schema(
         id=base_url, name=key,
@@ -271,15 +472,23 @@ def process_nrcs_source(key, source, locales=None):
     for defn in ENUM_DEFINITIONS:
         enum_key    = defn["enum_key"]
         title       = defn["title"]
-        pdf_page    = defn["pdf_page"]
-        disc_marker = defn["discussion_marker"]
+        pdf_pages   = defn["pdf_pages"]
+        disc_marker = defn.get("discussion_marker")
         parser_name = defn["table_parser"]
-        see_also    = f"{pdf_base}#page={pdf_page}"
+        see_also    = f"{pdf_base}#page={pdf_pages[0]}"
 
-        print(f"  Extracting {enum_key} from PDF page {pdf_page} ...")
-        page_text = extract_page_text(pdf_path, pdf_page)
+        page_label = (
+            f"pages {pdf_pages[0]}–{pdf_pages[-1]}"
+            if len(pdf_pages) > 1
+            else f"page {pdf_pages[0]}"
+        )
+        print(f"  Extracting {enum_key} from PDF {page_label} ...")
+        page_text = "\n".join(extract_page_text(pdf_path, p) for p in pdf_pages)
 
-        description = _extract_discussion(page_text, disc_marker)
+        if "description" in defn:
+            description = defn["description"]
+        else:
+            description = _extract_discussion(page_text, disc_marker)
 
         parser = _PARSERS.get(parser_name)
         if parser is None:
@@ -287,7 +496,7 @@ def process_nrcs_source(key, source, locales=None):
                   file=sys.stderr)
             continue
 
-        rows = parser(page_text)
+        rows = parser(page_text, defn)
         if not rows:
             print(f"  Warning: no table rows parsed for {enum_key}", file=sys.stderr)
             continue

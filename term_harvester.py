@@ -210,6 +210,17 @@ from source_statscan import (
     parse_statscan_structure,
     process_statscan_source,
     match_statscan,
+    match_statscan_catalog,
+    ENUM_DEFINITIONS as STATSCAN_CATALOG,
+)
+from source_statscan_table import (
+    process_statscan_table_source,
+    match_statscan_table,
+)
+from source_iso_country import (
+    process_iso_country_source,
+    fetch_iso_country_source,
+    match_iso_country,
 )
 from source_loinc import (
     to_camel_case,
@@ -240,6 +251,7 @@ from source_nsdb import (
 )
 from source_nrcs import (
     process_nrcs_source,
+    fetch_nrcs_pdf,
     match_nrcs,
 )
 from source_nasis import (
@@ -249,6 +261,11 @@ from source_nasis import (
 from source_credit import (
     process_credit_source,
     match_credit,
+)
+from source_freetext import (
+    match_freetext,
+    process_freetext_source,
+    fetch_freetext_source,
 )
 from source_utils import (
     MENU_CONFIG,
@@ -493,7 +510,7 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
     Syncs prefixes from all sources stored in harvester_config.yaml:
     - Upserts prefix key+URI pairs from each source's 'prefixes' dict.
     - Removes schema prefixes absent from every source's stored prefix list.
-    - Warns if any source has no stored prefix list (run -p to populate).
+    - Warns if any source has no stored prefix list (run -c to populate).
     - Sorts prefixes alphabetically (case-insensitive) and warns on case variants.
     """
     folder = os.path.basename(os.path.abspath("."))
@@ -539,7 +556,7 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
         for key, source in sources_to_build.items():
             source_path = f"sources/{key}.yaml"
             if not os.path.exists(source_path):
-                print(f"Skipping {key} enums: {source_path} not found — run -f and -p first", file=sys.stderr)
+                print(f"Skipping {key} enums: {source_path} not found — run -f and -c first", file=sys.stderr)
                 continue
 
             with open(source_path, "r") as f:
@@ -841,7 +858,7 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
         if sources_missing:
             print(
                 f"Warning: prefix lists not stored for: {', '.join(sources_missing)}. "
-                f"Run -p to populate them. Skipping prefix sync.",
+                f"Run -c to populate them. Skipping prefix sync.",
                 file=sys.stderr
             )
         else:
@@ -912,7 +929,7 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
 
 
 
-def add_source(urls, config_file=MENU_CONFIG):
+def add_source(urls, config_file=MENU_CONFIG, free_text=None):
     """Add sources from URLs to harvester_config.yaml and process them.
 
     For each URL, downloads the file and detects its type:
@@ -940,6 +957,32 @@ def add_source(urls, config_file=MENU_CONFIG):
         # Unescape HTML entities (e.g. &amp; → &) so the server receives a valid URL
         url = html.unescape(url)
 
+        # Resolve a bare STATSCAN key (e.g. STATSCAN_1313722) to its full URL.
+        # Prefers the catalog-stored URL so Variables route to p3Var.pl (not
+        # a constructed p3VD.pl URL).  Falls back to p3VD.pl when not cached.
+        _statscan_key_m = re.match(r'^(STATSCAN_(\d+))$', url, re.IGNORECASE)
+        if _statscan_key_m:
+            _numeric_id = _statscan_key_m.group(2)
+            _catalog_entry = next(
+                (e for e in STATSCAN_CATALOG if e["tvd_id"] == _numeric_id), None
+            )
+            if _catalog_entry:
+                url = _catalog_entry["url"]
+                print(f"  {_statscan_key_m.group(1)} → {_catalog_entry['title']}"
+                      f" [{_catalog_entry.get('entry_type', 'Classification')}]"
+                      f" ({_catalog_entry['subject']})")
+            else:
+                url = (f"https://www23.statcan.gc.ca/imdb/p3VD.pl"
+                       f"?Function=getVD&TVD={_numeric_id}")
+                print(f"  {_statscan_key_m.group(1)} → {url}")
+
+        # FreeText: extract from provided text via Claude — no download needed.
+        # Always stop after the call; do not fall through to other matchers
+        # even if the API key is missing or extraction fails.
+        if free_text:
+            match_freetext(url, free_text, config_file)
+            continue
+
         # Pre-download detectors: handle their own download (or need none)
         if match_agrovoc(url, config_file):
             continue
@@ -952,6 +995,8 @@ def add_source(urls, config_file=MENU_CONFIG):
         if match_nasis(url, config_file):
             continue
         if match_credit(url, config_file):
+            continue
+        if match_statscan_catalog(url, config_file):
             continue
 
         print(f"Fetching {url} ...")
@@ -973,13 +1018,20 @@ def add_source(urls, config_file=MENU_CONFIG):
             os.unlink(tmp_path)
             continue
 
+        if os.path.getsize(tmp_path) == 0:
+            print(f"  Error: downloaded file is empty — skipping {url}", file=sys.stderr)
+            os.unlink(tmp_path)
+            continue
+
         # URL-pattern and content-based detection (matcher returns True if handled)
         if (match_nsdb_snt(url, tmp_path, config_file) or
                 match_nsdb_slt(url, tmp_path, config_file) or
                 match_nsdb_soil(url, tmp_path, config_file) or
                 match_nsdb_slc(url, tmp_path, config_file) or
                 match_loinc_table(url, tmp_path, config_file) or
+                match_statscan_table(url, tmp_path, config_file) or
                 match_statscan(url, tmp_path, config_file) or
+                match_iso_country(url, tmp_path, config_file) or
                 match_napcs_csv(url, tmp_path, config_file, downloaded_filename) or
                 match_agrifood_csv(url, tmp_path, config_file)):
             continue
@@ -1103,6 +1155,16 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG):
             process_statscan_source(key, source, config_file, locales=locales)
             continue
 
+        if content_type == "STATSCAN_TABLE":
+            if not _require_source_file(key, "html"): continue
+            process_statscan_table_source(key, source, config_file, locales=locales)
+            continue
+
+        if content_type == "ISO_COUNTRY":
+            if not _require_source_file(key, "html"): continue
+            process_iso_country_source(key, source, config_file, locales=locales)
+            continue
+
         if content_type == "NAPCSCanada":
             if not _require_source_file(key, "csv"): continue
             process_napcscanada_source(key, source, config_file, locales=locales)
@@ -1168,6 +1230,12 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG):
 
         if content_type == "CRediT":
             process_credit_source(key, source, locales=locales)
+            continue
+
+        if content_type == "FreeText":
+            if not source_keys:
+                continue  # skip on -c with no args; only process when explicitly named
+            process_freetext_source(key, source, config_file, locales=locales)
             continue
 
         process_linkml_source(key, source, config_file)
@@ -1414,22 +1482,26 @@ def main():
             f"({', '.join(SSSOM_PREDICATE_MAP)}); omit to apply all."
         ))
     parser.add_argument("-t", "--tabformat", action="store_true", help="Output report as tab-delimited TSV (default is space-padded columns)")
+    parser.add_argument("-i", "--input", metavar="CONFIG_FILE", default=None, help="Path to the configuration file (default: harvester_config.yaml)")
+    parser.add_argument("--free_text", metavar="TEXT", default=None, help="Free text describing a picklist to extract via Claude API (used with -a; requires ANTHROPIC_API_KEY)")
     args = parser.parse_args()
 
+    config_file = args.input if args.input else MENU_CONFIG
+
     if args.add:
-        add_source(args.add)
+        add_source(args.add, config_file, free_text=args.free_text)
     if args.delete:
-        with open(MENU_CONFIG, "r") as f:
+        with open(config_file, "r") as f:
             config = yaml.safe_load(f)
         all_sources = config.get("sources", {})
 
-        # Delete any keys that are harvester_config.yaml source entries
+        # Delete any keys that are config file source entries
         config_keys = [k for k in args.delete if k in all_sources]
         for key in config_keys:
             del config["sources"][key]
-            print(f"Deleted source '{key}' from {MENU_CONFIG}")
+            print(f"Deleted source '{key}' from {config_file}")
         if config_keys:
-            write_config(config)
+            write_config(config, config_file)
 
         # Delete matching enums from schema.yaml:
         # - enum key directly matches a given key, OR
@@ -1455,9 +1527,9 @@ def main():
         acted_on = set(config_keys) | set(removed)
         not_found = [k for k in args.delete if k not in acted_on]
         if not_found:
-            print(f"Warning: key(s) not found in {MENU_CONFIG} or {schema_file}: {', '.join(not_found)}", file=sys.stderr)
+            print(f"Warning: key(s) not found in {config_file} or {schema_file}: {', '.join(not_found)}", file=sys.stderr)
     if args.fetch is not None:
-        with open(MENU_CONFIG, "r") as f:
+        with open(config_file, "r") as f:
             config = yaml.safe_load(f)
         all_sources = config.get("sources", {})
         if "all" in args.fetch:
@@ -1475,9 +1547,28 @@ def main():
             sys.exit(1)
         os.makedirs("sources", exist_ok=True)
         locales_cfg = config.get("locales") or ["en"]
+        _nrcs_pdf_fetched = False  # deduplicate: all NRCSSoilFieldBook entries share one PDF
         for key in keys_to_download:
             source = all_sources[key]
             content_type = source.get("content_type", "")
+            # FreeText: skip silently on -f all; allow only when explicitly named.
+            if content_type == "FreeText":
+                if "all" in args.fetch:
+                    continue
+                fetch_freetext_source(key, source, config_file)
+                continue
+            # NRCSSoilFieldBook: all source entries share one PDF; download only once per run.
+            if content_type == "NRCSSoilFieldBook":
+                if not _nrcs_pdf_fetched:
+                    fetch_nrcs_pdf()
+                    _nrcs_pdf_fetched = True
+                else:
+                    print(f"  Skipping {key}: NRCSSoilFieldBook PDF already downloaded this run")
+                continue
+            # ISO_COUNTRY: source_ontology is a Vaadin SPA URL; fetch Wikipedia instead.
+            if content_type == "ISO_COUNTRY":
+                fetch_iso_country_source(key, source, config_file)
+                continue
             # AgriFoodCA directory sources (file_format: yaml) are built from
             # multiple CSVs fetched via the GitHub API — raw urlretrieve would
             # download the GitHub tree HTML page instead.
@@ -1491,23 +1582,49 @@ def main():
             file_format = source.get("file_format", "yaml")
             output_path = f"sources/{key}.{file_format}"
             print(f"Fetching {uri} ...")
-            urllib.request.urlretrieve(uri, output_path)
+            tmp_fd, tmp_path = tempfile.mkstemp(dir="sources")
+            os.close(tmp_fd)
+            try:
+                req = urllib.request.Request(uri, headers=BROWSER_HEADERS)
+                with urllib.request.urlopen(req) as response:
+                    with open(tmp_path, "wb") as tmp_f:
+                        tmp_f.write(response.read())
+            except Exception as e:
+                print(f"  Error fetching {uri}: {e} — keeping existing {output_path}",
+                      file=sys.stderr)
+                os.unlink(tmp_path)
+                continue
+            new_size = os.path.getsize(tmp_path)
+            if new_size == 0:
+                print(f"  Error: downloaded file is empty — keeping existing {output_path}",
+                      file=sys.stderr)
+                os.unlink(tmp_path)
+                continue
+            if os.path.exists(output_path):
+                existing_size = os.path.getsize(output_path)
+                if existing_size > 0 and new_size <= existing_size * 0.8:
+                    print(f"  Error: new download is {new_size:,} bytes "
+                          f"({new_size / existing_size:.0%} of existing {existing_size:,}) "
+                          f"— keeping existing {output_path}", file=sys.stderr)
+                    os.unlink(tmp_path)
+                    continue
+            os.replace(tmp_path, output_path)
             print(f"Saved to {output_path}")
-            update_source_config(key, {"download_date": datetime.date.today().isoformat()})
+            update_source_config(key, {"download_date": datetime.date.today().isoformat()}, config_file)
             content_type = source.get("content_type", "")
             if content_type in ("LOINCCodeSystem", "LOINCValueSet"):
-                fill_loinc_source_metadata(output_path, key)
+                fill_loinc_source_metadata(output_path, key, config_file)
             else:
                 if file_format == "yaml":
                     generate_enum_report(output_path, tsv=args.tabformat)
     if args.config is not None:
-        process_sources(args.config)
+        process_sources(args.config, config_file)
     if args.build is not None:
-        build_schema(keys=[args.build] if isinstance(args.build, str) else None)
+        build_schema(keys=[args.build] if isinstance(args.build, str) else None, config_file=config_file)
     # -s must run after -b: SSSOM mappings are applied to the schema.yaml that
     # -b produces, so this order must be preserved.
     if args.sssom is not None:
-        apply_sssom_mappings(predicates=args.sssom or None)
+        apply_sssom_mappings(predicates=args.sssom or None, config_file=config_file)
     if args.lookup is not None:
         schema_file = "schema.yaml"
         if not os.path.exists(schema_file):
@@ -1516,7 +1633,7 @@ def main():
             lookup_results = {}   # enum_key -> pv count
 
             # Load apis and locales config once for all lookup calls
-            with open(MENU_CONFIG, "r") as f:
+            with open(config_file, "r") as f:
                 _lconfig = yaml.safe_load(f) or {}
             _apis    = _lconfig.get("apis") or {}
             _locales = _lconfig.get("locales") or ["en"]
@@ -1572,7 +1689,7 @@ def main():
             else:
                 print("Lookup: no reachable_from.source_nodes enums found to expand")
     if args.report:
-        with open(MENU_CONFIG, "r") as f:
+        with open(config_file, "r") as f:
             config = yaml.safe_load(f)
         all_sources = config.get("sources", {})
         first = True

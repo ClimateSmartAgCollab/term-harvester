@@ -38,6 +38,8 @@ from source_utils import (
     MENU_CONFIG,
 )
 
+_NSDB_SEE_ALSO = "https://sis.agr.gc.ca/cansis/nsdb/index.html"
+
 
 def nsdb_fr_url(url):
     """Return the French-language equivalent of an NSDB URL.
@@ -644,6 +646,7 @@ def match_nsdb_snt(url, tmp_path, config_file=MENU_CONFIG):
 
     entry = make_source_entry(key, url, "NSDBSNT", "html",
                               title=title, version=version, description=desc)
+    entry["see_also"] = _NSDB_SEE_ALSO
     config.setdefault("sources", {})[key] = entry
     write_config(config, config_file)
     print(f"Added source '{key}' to {config_file}")
@@ -702,6 +705,7 @@ def match_nsdb_slt(url, tmp_path, config_file=MENU_CONFIG):
 
     entry = make_source_entry(key, url, "NSDBSLT", "html",
                               title=title, version=version, description=desc)
+    entry["see_also"] = _NSDB_SEE_ALSO
     config.setdefault("sources", {})[key] = entry
     write_config(config, config_file)
     print(f"Added source '{key}' to {config_file}")
@@ -751,6 +755,7 @@ def match_nsdb_soil(url, tmp_path, config_file=MENU_CONFIG):
         key, url, "NSDB", "html",
         title="NSDB Soil Name and Layer Tables", version=version_label,
         description="This schema contains summary information for named soils within the Canadian soil surveys NSDB database")
+    entry["see_also"] = _NSDB_SEE_ALSO
     config.setdefault("sources", {})[key] = entry
     write_config(config, config_file)
     print(f"Added source '{key}' to {config_file}")
@@ -796,6 +801,7 @@ def match_nsdb_slc(url, tmp_path, config_file=MENU_CONFIG):
 
     entry = make_source_entry(key, url, "NSDBSLC", "html",
                               title=slc_title, version=slc_version, description=slc_desc)
+    entry["see_also"] = _NSDB_SEE_ALSO
     config.setdefault("sources", {})[key] = entry
     write_config(config, config_file)
     print(f"Added source '{key}' to {config_file}")

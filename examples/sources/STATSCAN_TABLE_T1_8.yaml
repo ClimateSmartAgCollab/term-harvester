@@ -1,0 +1,82 @@
+id: https://www12.statcan.gc.ca/census-recensement/2021/ref/dict/tab/index-eng.cfm?ID=T1_8
+name: STATSCAN_TABLE_T1_8
+title: Abbreviations and codes for provinces and territories, 2021 Census
+description: ''
+version: ''
+license: ''
+in_language: en
+imports:
+  - 'linkml:types'
+prefixes: {}
+default_prefix: ''
+classes: {}
+enums:
+  ProvinceTerritory:
+    name: ProvinceTerritory
+    title: Province/Territory
+    permissible_values:
+      NL:
+        title: Newfoundland and Labrador
+      PE:
+        title: Prince Edward Island
+      NS:
+        title: Nova Scotia
+      NB:
+        title: New Brunswick
+      QC:
+        title: Quebec
+      'ON':
+        title: Ontario
+      MB:
+        title: Manitoba
+      SK:
+        title: Saskatchewan
+      AB:
+        title: Alberta
+      BC:
+        title: British Columbia
+      YT:
+        title: Yukon
+      NT:
+        title: Northwest Territories
+      NU:
+        title: Nunavut
+slots: {}
+extensions:
+  locales:
+    tag: locales
+    value:
+      fr:
+        id: https://www12.statcan.gc.ca/census-recensement/2021/ref/dict/tab/index-fra.cfm?ID=T1_8
+        name: STATSCAN_TABLE_T1_8
+        version: ''
+        in_language: fr
+        enums:
+          ProvinceTerritory:
+            permissible_values:
+              NL:
+                title: Terre-Neuve-et-Labrador
+              PE:
+                title: "\xCEle-du-Prince-\xC9douard"
+              NS:
+                title: "Nouvelle-\xC9cosse"
+              NB:
+                title: Nouveau-Brunswick
+              QC:
+                title: "Qu\xE9bec"
+              'ON':
+                title: Ontario
+              MB:
+                title: Manitoba
+              SK:
+                title: Saskatchewan
+              AB:
+                title: Alberta
+              BC:
+                title: Colombie-Britannique
+              YT:
+                title: Yukon
+              NT:
+                title: Territoires du Nord-Ouest
+              NU:
+                title: Nunavut

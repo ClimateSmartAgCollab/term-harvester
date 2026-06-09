@@ -1,0 +1,397 @@
+# NRCS Field Book for Describing and Sampling Soils – enum extraction registry.
+# Each entry maps one LinkML enum to its location in the PDF and the parser to use.
+#
+# Regenerate this file (via Claude) when a new PDF version is released.
+# Adding a new parser requires a code change to source_nrcs.py (_PARSERS dict).
+#
+# Fields:
+#   enum_key           – LinkML enum name
+#   title              – human-readable enum title
+#   pdf_pages          – list of 1-based physical PDF page numbers
+#   table_header       – substring preceding data rows; _parse_generic anchors here
+#   discussion_marker  – text opening the Discussion paragraph (before "—");
+#                        used when description is extracted live from the PDF
+#   description        – static description override; omit to extract from PDF
+#   table_parser       – _parse_generic or a named specialist function
+
+enum_definitions:
+
+  # ---- Site Description – Climate / Water Status (Ch. 1) ----
+
+  - enum_key: NRCSSoilFieldBook_WeatherConditions
+    title: Weather Conditions
+    pdf_pages: [19]
+    table_header: "Weather Conditions Code"
+    description: "Prevailing weather conditions at the time of observation; affects some field methods (e.g., Ksat)."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_DrainagePattern
+    title: Drainage Pattern
+    pdf_pages: [27, 28]
+    table_header: "Drainage Pattern Code"
+    description: "The interconnected system of drainage channels on the land surface (also called drainage network)."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_DrainageClass
+    title: Drainage Class
+    pdf_pages: [28]
+    table_header: "Drainage Class Conv. Code"
+    description: "An estimate of the natural drainage class (i.e., the prevailing wetness conditions) of a soil."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_FloodingFrequency
+    title: Flooding Frequency
+    pdf_pages: [30]
+    table_header: "Frequency Class Code"
+    description: "How often, typically, flooding occurs at the site."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_FloodingDuration
+    title: Flooding Duration
+    pdf_pages: [30]
+    description: "How long an area is typically flooded during a single flood event."
+    table_parser: _parse_flooding_duration
+
+  - enum_key: NRCSSoilFieldBook_PondingFrequency
+    title: Ponding Frequency
+    pdf_pages: [31]
+    table_header: "Class Code Criteria: Estimated, Average # of"
+    description: "How often, typically, ponding occurs at the observation site."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_PondingDuration
+    title: Ponding Duration
+    pdf_pages: [31]
+    description: "How long, typically, the ponding lasts at the observation site."
+    table_parser: _parse_ponding_duration
+
+  # ---- Bedrock / Erosion (Ch. 1) ----
+
+  - enum_key: NRCSSoilFieldBook_BedrockWeatheringClass
+    title: Bedrock Weathering Class
+    pdf_pages: [42]
+    table_header: "Class Code"
+    description: "The subjective extent to which bedrock has weathered as compared to its presumed nonweathered state. Called Bedrock_weathering in NASIS."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_ErosionKind
+    title: Erosion Kind
+    pdf_pages: [42]
+    description: "The dominant kind of accelerated erosion at the site. Called Erosion_accelerated_kind in NASIS."
+    table_parser: _parse_erosion_kind
+
+  - enum_key: NRCSSoilFieldBook_ErosionDegreeClass
+    title: Erosion Degree Class
+    pdf_pages: [42, 43]
+    description: "Degree of accelerated erosion based on estimated percent loss of original combined A + E horizons. Called Erosion_class in NASIS."
+    table_parser: _parse_erosion_degree_class
+
+  # ---- Horizon Description – Boundaries / Color (Ch. 2) ----
+
+  - enum_key: NRCSSoilFieldBook_HorizonBoundaryDistinctness
+    title: Horizon Boundary Distinctness
+    pdf_pages: [56]
+    table_header: "Class Code Criteria: Transitional"
+    description: "The vertical distance (thickness) over which a horizon transitions to the top of the next. Called Boundary Distinctness in NASIS."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_HorizonBoundaryTopography
+    title: Horizon Boundary Topography
+    pdf_pages: [57]
+    table_header: "Topography Code Criteria"
+    description: "Cross-sectional shape of the contact between horizons."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_ColorMoistureState
+    title: Color Moisture State
+    pdf_pages: [59]
+    table_header: "Moisture State Code"
+    description: "The general moisture condition of the soil at the time of color description."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_ColorLocationCondition
+    title: Color Location or Condition
+    pdf_pages: [59]
+    table_header: "Color Location or Condition Code"
+    description: "Pertinent circumstances of the color described. Called Color_physical_state in NASIS."
+    table_parser: _parse_generic
+
+  # ---- Redoximorphic Features / Concentrations (Ch. 2) ----
+
+  - enum_key: NRCSSoilFieldBook_RedoxContrastClass
+    title: Redox Contrast Class
+    pdf_pages: [64]
+    description: "The color difference between a redoximorphic feature and the dominant matrix color. Also used for Concentrations and Mottles."
+    table_parser: _parse_redox_contrast_class
+
+  - enum_key: NRCSSoilFieldBook_ConcentrationShape
+    title: Concentration Shape
+    pdf_pages: [74]
+    table_header: "Shape 1 Code Criteria"
+    description: "The dominant shape of concentration bodies within a horizon. Also used for Mottles and Redoximorphic Features."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_ConcentrationLocation
+    title: Concentration Location
+    pdf_pages: [75, 76]
+    table_header: "Location Code"
+    description: "Location(s) of concentrations (or depletions for redoximorphic features) within the horizon. Historically called Concentrations – Distribution."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_ConcentrationBoundary
+    title: Concentration Boundary
+    pdf_pages: [76]
+    table_header: "Class Code Criteria"
+    description: "The gradation between a concentration feature and the surrounding matrix. Also used for Redoximorphic Features."
+    table_parser: _parse_generic
+
+  # ---- Rock / Artifact Fragments (Ch. 2) ----
+
+  - enum_key: NRCSSoilFieldBook_FragmentRoundness
+    title: Fragment Roundness
+    pdf_pages: [99]
+    table_header: "Class Code Criteria: Visual Estimate"
+    description: "The relative roundness of rock fragments, estimated visually. The same classes are used for Artifact Roundness."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_ArtifactShape
+    title: Artifact Shape
+    pdf_pages: [101]
+    table_header: "Shape Class Code Criteria"
+    description: "The dominant form (shape) of artifacts by horizon/layer."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_ArtifactRoundness
+    title: Artifact Roundness
+    pdf_pages: [101]
+    table_header: "Roundness Class Code"
+    description: "The dominant extent of roundness of artifacts by horizon/layer."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_ArtifactCohesion
+    title: Artifact Cohesion
+    pdf_pages: [102]
+    table_header: "Cohesion Class Code Criteria"
+    description: "The dominant relative fragment integrity of artifacts."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_ArtifactPenetrability
+    title: Artifact Penetrability
+    pdf_pages: [102]
+    table_header: "Penetrability Class Code Criteria"
+    description: "The prevalent relative ease of penetration of artifacts by external mechanical force by horizon/layer."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_ArtifactPersistence
+    title: Artifact Persistence
+    pdf_pages: [102]
+    table_header: "Persistence Class Code Criteria"
+    description: "The dominant relative extent of artifact persistence in soil."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_ArtifactSafety
+    title: Artifact Safety
+    pdf_pages: [102]
+    table_header: "Safety Class Code Criteria"
+    description: "The dominant relative level of chemical safety of artifacts present in the soil."
+    table_parser: _parse_generic
+
+  # ---- Soil Structure (Ch. 2) ----
+
+  - enum_key: NRCSSoilFieldBook_StructureType
+    title: Structure Type
+    pdf_pages: [103, 104]
+    description: "The dominant type (formerly shape) of ped by layer. For compound structure, list each size and type (e.g., medium and coarse SBK parting to fine GR)."
+    table_parser: _parse_structure_type
+
+  - enum_key: NRCSSoilFieldBook_StructureGrade
+    title: Structure Grade
+    pdf_pages: [105]
+    table_header: "Grade Code Criteria"
+    description: "The distinctness of soil structural units observable in place and in hand samples."
+    table_parser: _parse_generic
+
+  # ---- Rupture Resistance / Failure / Crusts (Ch. 2) ----
+
+  - enum_key: NRCSSoilFieldBook_SurfaceCrustRuptureResistance
+    title: Surface Crust Rupture Resistance
+    pdf_pages: [115]
+    table_header: "Class (air dried) Code Force"
+    description: "Force required to rupture air-dried surface crust or plate samples."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_CementingAgentKind
+    title: Cementing Agent Kind
+    pdf_pages: [115]
+    table_header: "Kind Code 1"
+    description: "Kind of cementing agent present in the soil. Called Rupture_resist_cem_agent in NASIS."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_MannerOfFailureBrittleness
+    title: "Manner of Failure – Brittleness"
+    pdf_pages: [116]
+    description: "Brittleness class of moist soil under compression using a 3-cm block pressed between thumb and forefinger."
+    table_parser: _parse_manner_of_failure_brittleness
+
+  - enum_key: NRCSSoilFieldBook_MannerOfFailureFluidity
+    title: "Manner of Failure – Fluidity"
+    pdf_pages: [116]
+    description: "Fluidity class of moist soil under compression using a palmful of soil squeezed in the hand."
+    table_parser: _parse_manner_of_failure_fluidity
+
+  - enum_key: NRCSSoilFieldBook_MannerOfFailureSmeariness
+    title: "Manner of Failure – Smeariness"
+    pdf_pages: [116]
+    description: "Smeariness class of moist soil under compression using a 3-cm block pressed between thumb and forefinger."
+    table_parser: _parse_manner_of_failure_smeariness
+
+  # ---- Penetration / Excavation (Ch. 2) ----
+
+  - enum_key: NRCSSoilFieldBook_PenetrationResistanceClass
+    title: Penetration Resistance Class
+    pdf_pages: [119]
+    table_header: "Resistance (MPa)"
+    description: "Resistance class based on average of five or more pocket penetrometer measurements by horizon/layer. Called Penetration_resistance in NASIS."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_PenetrationOrientation
+    title: Penetration Orientation
+    pdf_pages: [119]
+    table_header: "Orientation Code Criteria"
+    description: "Orientation of the pocket penetrometer used to determine Penetration Resistance Class."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_ExcavationDifficulty
+    title: Excavation Difficulty
+    pdf_pages: [119, 120]
+    table_header: "Class Code Criteria"
+    description: "The relative force or energy required to dig soil out of place; described with the moisture condition."
+    table_parser: _parse_generic
+
+  # ---- Roots and Pores (Ch. 2) ----
+
+  - enum_key: NRCSSoilFieldBook_RootPoreQuantity
+    title: Root and Pore Quantity
+    pdf_pages: [120]
+    description: "Quantity (number) of roots or pores for each size class in a horizontal plane."
+    table_parser: _parse_root_pore_quantity
+
+  - enum_key: NRCSSoilFieldBook_PoreShape
+    title: Pore Shape
+    pdf_pages: [125]
+    table_header: "Description Code Criteria"
+    description: "The dominant form (type) of pores discernible with a 10x hand lens and by the unaided eye."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_PoreVerticalContinuity
+    title: Pore Vertical Continuity
+    pdf_pages: [125]
+    description: "Average vertical distance the minimum pore diameter exceeds 0.5 mm. Soil must be moist or wetter."
+    table_parser: _parse_pore_vertical_continuity
+
+  # ---- Cracks / Crusts / Special Features (Ch. 2) ----
+
+  - enum_key: NRCSSoilFieldBook_CrackKind
+    title: Crack Kind
+    pdf_pages: [128]
+    description: "The dominant types of fissures present in the soil."
+    table_parser: _parse_crack_kind
+
+  - enum_key: NRCSSoilFieldBook_SoilCrustsKind
+    title: Soil Crusts Kind
+    pdf_pages: [131]
+    table_header: "Kind Code Criteria"
+    description: "The type of surface crust present. No entry implies that no crust is present."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_SpecialFeaturesKind
+    title: Special Features Kind
+    pdf_pages: [132]
+    description: "The kind of special soil feature present, recorded with area (percent) occupied. Called Horizon_feature_kind in NASIS."
+    table_parser: _parse_special_features_kind
+
+  # ---- Physical / Hydraulic Properties (Ch. 2) ----
+
+  # '#' codes for Ksat mean no formal code is assigned; record the measured value.
+  - enum_key: NRCSSoilFieldBook_KsatClass
+    title: Ksat Class
+    pdf_pages: [136]
+    description: "Saturated hydraulic conductivity class. '#' codes indicate no formal codes; record the measured value."
+    table_parser: _parse_ksat_class
+
+  - enum_key: NRCSSoilFieldBook_PermeabilityClass
+    title: Permeability Class
+    pdf_pages: [137]
+    table_header: "in/hr 1"
+    description: "NRCS deemphasizes the use of permeability classes; use Ksat. Listed for historic usage and selected soil interpretations."
+    table_parser: _parse_generic
+
+  # ---- Chemical Response (Ch. 2) ----
+
+  # '#' codes for ReactionPH mean no formal code; the descriptive term is used as the PV key.
+  - enum_key: NRCSSoilFieldBook_ReactionPH
+    title: "Reaction (pH)"
+    pdf_pages: [137, 138]
+    description: "Record pH and Method; record the pH value to the precision limit of the method (e.g., to the nearest tenth). The preferred method is pH meter for 1:1 (water:soil). In NASIS, record the pH numerical value and the method used (e.g., pH 6.5; 1:1 water:soil). Called Field_pH in NASIS."
+    table_parser: _parse_reaction_ph
+
+  - enum_key: NRCSSoilFieldBook_pHMethod
+    title: pH Method
+    pdf_pages: [138]
+    description: "Method used to measure pH. Called ph_determination_method in NASIS."
+    table_parser: _parse_ph_method
+
+  - enum_key: NRCSSoilFieldBook_EffervescenceClass
+    title: Effervescence Class
+    pdf_pages: [139]
+    table_header: "Effervescence Class Code Criteria"
+    description: "Gaseous response of soil matrix to applied HCl (carbonate test), H₂O₂ (MnO₂ test), or other chemicals, seen as bubbles."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_EffervescenceAgent
+    title: Effervescence Agent
+    pdf_pages: [139, 140]
+    description: "Chemical agent applied to test for effervescence. In NASIS, the manganese agent (H₂O₂) is recorded in a separate table (Mn_effervescence_agent)."
+    table_parser: _parse_effervescence_agent
+
+  - enum_key: NRCSSoilFieldBook_ReducedConditions
+    title: Reduced Conditions
+    pdf_pages: [140]
+    description: "Reaction to α,α-dipyridyl test for presence of Fe²⁺ (reduced conditions). Called Reaction_to_alpha-dipyridyl in NASIS."
+    table_parser: _parse_reduced_conditions
+
+  - enum_key: NRCSSoilFieldBook_SalinityClass
+    title: Salinity Class
+    pdf_pages: [141]
+    discussion_marker: "Salinity Class (Discussion)"
+    table_parser: _parse_salinity_class
+
+  - enum_key: NRCSSoilFieldBook_OdorKind
+    title: Odor Kind
+    pdf_pages: [142]
+    table_header: "Odor – Kind Code Criteria"
+    description: "The kind of odor detected immediately after soil is exposed to air."
+    table_parser: _parse_generic
+
+  - enum_key: NRCSSoilFieldBook_OdorIntensity
+    title: Odor Intensity
+    pdf_pages: [142]
+    table_header: "Intensity Code Criteria:"
+    description: "Relative intensity of any odor present, recorded by horizon immediately after soil is exposed to air."
+    table_parser: _parse_generic
+
+  # ---- Observation Method ----
+
+  - enum_key: NRCSSoilFieldBook_ObservationMethod
+    title: Observation Method
+    pdf_pages: [154]
+    discussion_marker: "Observation Method"
+    table_parser: _parse_observation_method
+
+  # ---- Subaqueous / Organic Soils (Ch. 3) ----
+
+  - enum_key: NRCSSoilFieldBook_FluidityClass
+    title: Fluidity Class
+    pdf_pages: [160]
+    description: "Relative degree to which moist to wet soil flows through clenched fingers when squeezed (expressed as n value). Soil bearing capacity decreases as fluidity increases."
+    table_parser: _parse_fluidity_class

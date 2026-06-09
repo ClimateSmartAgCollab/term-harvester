@@ -1,0 +1,1185 @@
+classifications:
+  - tvd_id: '1584256'
+    key: STATSCAN_1584256
+    title: Acceptable housing
+    subject: Housing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1584256
+  - tvd_id: '1398138'
+    key: STATSCAN_1398138
+    title: Accommodations of collective dwellings
+    subject: Housing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1398138
+  - tvd_id: '323293'
+    key: STATSCAN_323293
+    title: Admission category
+    subject: Immigration and ethnocultural diversity
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=323293
+  - tvd_id: '299664'
+    key: STATSCAN_299664
+    title: After-tax income
+    subject: Income, pensions, spending and wealth
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=299664
+  - tvd_id: '299481'
+    key: STATSCAN_299481
+    title: After-tax income of person
+    subject: Income, pensions, spending and wealth
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=299481
+  - tvd_id: '61988'
+    key: STATSCAN_61988
+    title: Age categories by five-year age groups
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=61988
+  - tvd_id: '1313972'
+    key: STATSCAN_1313972
+    title: Apprenticeship certificates
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1313972
+  - tvd_id: '117126'
+    key: STATSCAN_117126
+    title: Canadian citizenship status
+    subject: Immigration and ethnocultural diversity
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=117126
+  - tvd_id: '141018'
+    key: STATSCAN_141018
+    title: Canadian Classification of Institutional Units and Sectors (CCIUS) 2012
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=141018
+  - tvd_id: '1538765'
+    key: STATSCAN_1538765
+    title: Canadian Research and Development Classification (CRDC) 2020 Version 2.0
+      - Field of Research (FOR)
+    subject: Science and technology
+    url: https://www23.statcan.gc.ca/imdb/p3vd.pl?Function=getVD&TVD=1538765
+  - tvd_id: '1538751'
+    key: STATSCAN_1538751
+    title: Canadian Research and Development Classification (CRDC) 2020 Version 2.0
+      - Socioeconomic Objective (SEO)
+    subject: Science and technology
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1538751
+  - tvd_id: '1538747'
+    key: STATSCAN_1538747
+    title: Canadian Research and Development Classification (CRDC) 2020 Version 2.0
+      - Type Of Activity (TOA)
+    subject: Science and technology
+    url: https://www23.statcan.gc.ca/imdb/p3vd.pl?Function=getVD&TVD=1538747
+  - tvd_id: '1314060'
+    key: STATSCAN_1314060
+    title: Census family status
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1314060
+  - tvd_id: '1314074'
+    key: STATSCAN_1314074
+    title: Census family status, variant with children
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1314074
+  - tvd_id: '1314056'
+    key: STATSCAN_1314056
+    title: Census family structure (for census family)
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1314056
+  - tvd_id: '61902'
+    key: STATSCAN_61902
+    title: Census family type
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=61902
+  - tvd_id: '135661'
+    key: STATSCAN_135661
+    title: Chart of accounts (COA) Canada 2006 - Balance sheet accounts - Assets
+    subject: Economic accounts
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=135661
+  - tvd_id: '135686'
+    key: STATSCAN_135686
+    title: Chart of accounts (COA) Canada 2006 - Balance sheet accounts - Equity
+    subject: Economic accounts
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=135686
+  - tvd_id: '135677'
+    key: STATSCAN_135677
+    title: Chart of accounts (COA) Canada 2006 - Balance sheet accounts - Liabilities
+    subject: Economic accounts
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=135677
+  - tvd_id: '135701'
+    key: STATSCAN_135701
+    title: Chart of accounts (COA) Canada 2006 - Income statement - Expenses
+    subject: Economic accounts
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=135701
+  - tvd_id: '135721'
+    key: STATSCAN_135721
+    title: Chart of accounts (COA) Canada 2006 - Income statement - Extraordinary
+      Gains/Losses, Non-recurring Items & Adjustments
+    subject: Economic accounts
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=135721
+  - tvd_id: '135715'
+    key: STATSCAN_135715
+    title: Chart of accounts (COA) Canada 2006 - Income statement - Gains/Losses,
+      Corporate Taxes and Other Items
+    subject: Economic accounts
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=135715
+  - tvd_id: '135692'
+    key: STATSCAN_135692
+    title: Chart of accounts (COA) Canada 2006 - Income statement - Revenue
+    subject: Economic accounts
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=135692
+  - tvd_id: '1314130'
+    key: STATSCAN_1314130
+    title: Child presence
+    subject: Children and youth; Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1314130
+  - tvd_id: '1326715'
+    key: STATSCAN_1326715
+    title: Cisgender, transgender and non-binary
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1326715
+  - tvd_id: '1309556'
+    key: STATSCAN_1309556
+    title: Class of Worker
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1309556
+  - tvd_id: '1305438'
+    key: STATSCAN_1305438
+    title: Class of worker - variant on employees and self-employed
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1305438
+  - tvd_id: '1420413'
+    key: STATSCAN_1420413
+    title: Classification of Instructional Programs (CIP) Canada 2021 Version 1.0
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1420413
+  - tvd_id: '103032'
+    key: STATSCAN_103032
+    title: Classification of the Economic Territory of Canada (CETC) 2011
+    subject: Economic accounts
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=103032
+  - tvd_id: '1313718'
+    key: STATSCAN_1313718
+    title: College, CEGEP or other non-university certificates or diplomas
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1313718
+  - tvd_id: '1313918'
+    key: STATSCAN_1313918
+    title: Combinations of certificates, diplomas and degrees awarded
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1313918
+  - tvd_id: '1313809'
+    key: STATSCAN_1313809
+    title: "Combinations of college, CEGEP or other non-university certificate or\
+      \ diploma with a bachelor's degree or higher"
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1313809
+  - tvd_id: '1313962'
+    key: STATSCAN_1313962
+    title: Combinations of trades certificates and diplomas
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1313962
+  - tvd_id: '1309646'
+    key: STATSCAN_1309646
+    title: Commuting destination
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1309646
+  - tvd_id: '1309666'
+    key: STATSCAN_1309666
+    title: Commuting vehicle occupancy
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1309666
+  - tvd_id: '305712'
+    key: STATSCAN_305712
+    title: Completion of secondary (high) school diploma or equivalency certificate
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=305712
+  - tvd_id: '298076'
+    key: STATSCAN_298076
+    title: Condominium status
+    subject: Housing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=298076
+  - tvd_id: '1323783'
+    key: STATSCAN_1323783
+    title: Core housing need
+    subject: Housing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1323783
+  - tvd_id: '1323436'
+    key: STATSCAN_1323436
+    title: Country of Citizenship 2021
+    subject: Immigration and ethnocultural diversity
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1323436
+  - tvd_id: '304010'
+    key: STATSCAN_304010
+    title: Degree in medicine, dentistry, veterinary medicine or optometry
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=304010
+  - tvd_id: '134788'
+    key: STATSCAN_134788
+    title: Drainage Regions - Variant of SDAC 2003
+    subject: Environment
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=134788
+  - tvd_id: '144972'
+    key: STATSCAN_144972
+    title: Duration of commute
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=144972
+  - tvd_id: '87591'
+    key: STATSCAN_87591
+    title: Dwelling condition
+    subject: Housing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=87591
+  - tvd_id: '426171'
+    key: STATSCAN_426171
+    title: Ecological Land Classification (ELC) 2017
+    subject: Environment
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=426171
+  - tvd_id: '1314411'
+    key: STATSCAN_1314411
+    title: Economic family status
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1314411
+  - tvd_id: '1314423'
+    key: STATSCAN_1314423
+    title: Economic family structure (for economic family)
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1314423
+  - tvd_id: '286525'
+    key: STATSCAN_286525
+    title: Economic family type
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=286525
+  - tvd_id: '1583662'
+    key: STATSCAN_1583662
+    title: Educational qualifications responses
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1583662
+  - tvd_id: '1583694'
+    key: STATSCAN_1583694
+    title: Educational qualifications responses - variant for alternate reporting
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1583694
+  - tvd_id: '1495089'
+    key: STATSCAN_1495089
+    title: Eligibility for instruction in the minority official language
+    subject: Education, training and learning, Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1495089
+  - tvd_id: '1495112'
+    key: STATSCAN_1495112
+    title: Eligibility for instruction in the minority official language by detailed
+      eligibility criteria
+    subject: Education, training and learning, Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1495112
+  - tvd_id: '1495093'
+    key: STATSCAN_1495093
+    title: Eligibility for instruction in the minority official language by single
+      and multiple eligibility criteria
+    subject: Education, training and learning, Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1495093
+  - tvd_id: '114333'
+    key: STATSCAN_114333
+    title: Employed Status
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=114333
+  - tvd_id: '1317328'
+    key: STATSCAN_1317328
+    title: Enrollment under an Inuit land claims agreement
+    subject: Indigenous peoples
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1317328
+  - tvd_id: '1310919'
+    key: STATSCAN_1310919
+    title: 'Ethnic or cultural origin: Single or multiple response indicator'
+    subject: Immigration and ethnocultural diversity
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1310919
+  - tvd_id: '1310929'
+    key: STATSCAN_1310929
+    title: Ethnic or cultural origins 2021 - List
+    subject: Immigration and ethnocultural diversity
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1310929
+  - tvd_id: '285156'
+    key: STATSCAN_285156
+    title: Family size (for economic family)
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=285156
+  - tvd_id: '285153'
+    key: STATSCAN_285153
+    title: First Official Language Spoken
+    subject: Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=285153
+  - tvd_id: '114066'
+    key: STATSCAN_114066
+    title: Frequency of Participation in Religious Activities (with once a day)
+    subject: Society and community
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=114066
+  - tvd_id: '114086'
+    key: STATSCAN_114086
+    title: Frequency of Participation in Religious Activities (without once a day)
+    subject: Society and community
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=114086
+  - tvd_id: '114437'
+    key: STATSCAN_114437
+    title: Full-time and Part-Time Work Hours
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=114437
+  - tvd_id: '141129'
+    key: STATSCAN_141129
+    title: Full-time or part-time weeks worked during the reference year
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=141129
+  - tvd_id: '1326727'
+    key: STATSCAN_1326727
+    title: Gender
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1326727
+  - tvd_id: '1329623'
+    key: STATSCAN_1329623
+    title: Gender diversity status
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1329623
+  - tvd_id: '1329639'
+    key: STATSCAN_1329639
+    title: Gender diversity status of marriage or common-law union
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1329639
+  - tvd_id: '1329652'
+    key: STATSCAN_1329652
+    title: Gender diversity status of marriage or common-law union, variant
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1329652
+  - tvd_id: '1329636'
+    key: STATSCAN_1329636
+    title: Gender diversity status, variant
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1329636
+  - tvd_id: '1317342'
+    key: STATSCAN_1317342
+    title: Generation status
+    subject: Immigration and ethnocultural diversity
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1317342
+  - tvd_id: '114020'
+    key: STATSCAN_114020
+    title: Health problems, self-reported
+    subject: Health
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=114020
+  - tvd_id: '423493'
+    key: STATSCAN_423493
+    title: Health Regions (HR) 2017
+    subject: Health
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=423493
+  - tvd_id: '423497'
+    key: STATSCAN_423497
+    title: Health Regions for Alternate Reporting - Variant of HR 2017
+    subject: Health
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=423497
+  - tvd_id: '113998'
+    key: STATSCAN_113998
+    title: Health satisfaction, self-assessed
+    subject: Health
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=113998
+  - tvd_id: '1583574'
+    key: STATSCAN_1583574
+    title: Highest certificate, diploma or degree
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1583574
+  - tvd_id: '1583609'
+    key: STATSCAN_1583609
+    title: Highest educational attainment
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1583609
+  - tvd_id: '1583645'
+    key: STATSCAN_1583645
+    title: Highest educational attainment - variant for alternate reporting
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1583645
+  - tvd_id: '1584275'
+    key: STATSCAN_1584275
+    title: Homelessness experience
+    subject: Housing; Income, pensions, spending and wealth
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1584275
+  - tvd_id: '87486'
+    key: STATSCAN_87486
+    title: Hours of activity per week
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=87486
+  - tvd_id: '286464'
+    key: STATSCAN_286464
+    title: Household living arrangements
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=286464
+  - tvd_id: '1584187'
+    key: STATSCAN_1584187
+    title: Household maintainer status
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1584187
+  - tvd_id: '1314672'
+    key: STATSCAN_1314672
+    title: Household type
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1314672
+  - tvd_id: '1314687'
+    key: STATSCAN_1314687
+    title: Household type, multigenerational variant
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1314687
+  - tvd_id: '141809'
+    key: STATSCAN_141809
+    title: Housing suitability
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=141809
+  - tvd_id: '1324474'
+    key: STATSCAN_1324474
+    title: Immigrant status
+    subject: Immigration and ethnocultural diversity
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1324474
+  - tvd_id: '328790'
+    key: STATSCAN_328790
+    title: Immigration applicant type
+    subject: Immigration and ethnocultural diversity
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=328790
+  - tvd_id: '243809'
+    key: STATSCAN_243809
+    title: In-Migration, Five years
+    subject: Immigration and ethnocultural diversity
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=243809
+  - tvd_id: '243799'
+    key: STATSCAN_243799
+    title: In-Migration, One year
+    subject: Immigration and ethnocultural diversity
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=243799
+  - tvd_id: '1317229'
+    key: STATSCAN_1317229
+    title: Income sources
+    subject: Income, pensions, spending and wealth
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1317229
+  - tvd_id: '1314192'
+    key: STATSCAN_1314192
+    title: Indigenous ancestry
+    subject: Indigenous peoples
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1314192
+  - tvd_id: '1314225'
+    key: STATSCAN_1314225
+    title: Indigenous ancestry responses 2021 - List
+    subject: Indigenous peoples
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1314225
+  - tvd_id: '1312037'
+    key: STATSCAN_1312037
+    title: Indigenous group
+    subject: Indigenous peoples
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1312037
+  - tvd_id: '1311595'
+    key: STATSCAN_1311595
+    title: Indigenous group response
+    subject: Indigenous peoples
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1311595
+  - tvd_id: '1311600'
+    key: STATSCAN_1311600
+    title: Indigenous identity
+    subject: Indigenous peoples
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1311600
+  - tvd_id: '1313893'
+    key: STATSCAN_1313893
+    title: Institution of school attendance
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1313893
+  - tvd_id: '281265'
+    key: STATSCAN_281265
+    title: Knowledge of Official Languages
+    subject: Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=281265
+  - tvd_id: '114258'
+    key: STATSCAN_114258
+    title: Labour Force Status
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=114258
+  - tvd_id: '114324'
+    key: STATSCAN_114324
+    title: Labour Force Status - Collapsed classification
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=114324
+  - tvd_id: '1324764'
+    key: STATSCAN_1324764
+    title: Languages 2021 - Collapsed classification
+    subject: Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1324764
+  - tvd_id: '1420278'
+    key: STATSCAN_1420278
+    title: Languages 2021 - Indigenous languages variant - List
+    subject: Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1420278
+  - tvd_id: '1420389'
+    key: STATSCAN_1420389
+    title: Languages 2021 - Inuit languages variant
+    subject: Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1420389
+  - tvd_id: '1420022'
+    key: STATSCAN_1420022
+    title: Languages 2021 - List
+    subject: Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1420022
+  - tvd_id: '1420262'
+    key: STATSCAN_1420262
+    title: Languages 2021 - total responses - List
+    subject: Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1420262
+  - tvd_id: '1314707'
+    key: STATSCAN_1314707
+    title: Legal marital status
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1314707
+  - tvd_id: '113650'
+    key: STATSCAN_113650
+    title: Level of perceived health
+    subject: Health
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=113650
+  - tvd_id: '61929'
+    key: STATSCAN_61929
+    title: Living in family household
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=61929
+  - tvd_id: '117279'
+    key: STATSCAN_117279
+    title: Location of study
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=117279
+  - tvd_id: '304006'
+    key: STATSCAN_304006
+    title: Location of study compared with province or territory of residence
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=304006
+  - tvd_id: '299251'
+    key: STATSCAN_299251
+    title: Low-income status
+    subject: Income, pensions, spending and wealth
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=299251
+  - tvd_id: '148092'
+    key: STATSCAN_148092
+    title: Main reason for absence from work (main reason for time lost)
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=148092
+  - tvd_id: '1305358'
+    key: STATSCAN_1305358
+    title: Main reason for not working the full year
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1305358
+  - tvd_id: '148125'
+    key: STATSCAN_148125
+    title: Main reason for work interruptions
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=148125
+  - tvd_id: '1305373'
+    key: STATSCAN_1305373
+    title: Main reason for working mostly part time
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1305373
+  - tvd_id: '252495'
+    key: STATSCAN_252495
+    title: Marital status
+    subject: Families, households and marital status; Society and community
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=252495
+  - tvd_id: '252517'
+    key: STATSCAN_252517
+    title: Marital status - short title variant for dissemination
+    subject: Society and community; Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=252517
+  - tvd_id: '1311580'
+    key: STATSCAN_1311580
+    title: Membership in a First Nation or Indian band
+    subject: Indigenous peoples
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1311580
+  - tvd_id: '1404876'
+    key: STATSCAN_1404876
+    title: "Membership in a M\xE9tis organization or Settlement"
+    subject: Indigenous peoples
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1404876
+  - tvd_id: '1311570'
+    key: STATSCAN_1311570
+    title: Military service status
+    subject: Society and community
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1311570
+  - tvd_id: '243793'
+    key: STATSCAN_243793
+    title: Mobility status, five years
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=243793
+  - tvd_id: '243750'
+    key: STATSCAN_243750
+    title: Mobility status, one year
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=243750
+  - tvd_id: '1309885'
+    key: STATSCAN_1309885
+    title: Mode of commuting
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1309885
+  - tvd_id: '1322554'
+    key: STATSCAN_1322554
+    title: National Occupational Classification (NOC) 2021 Version 1.0
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1322554
+  - tvd_id: '1423044'
+    key: STATSCAN_1423044
+    title: Non-official languages 2021 - List
+    subject: Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1423044
+  - tvd_id: '1369825'
+    key: STATSCAN_1369825
+    title: North American Industry Classification System (NAICS) Canada 2022 Version
+      1.0
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1369825
+  - tvd_id: '1384502'
+    key: STATSCAN_1384502
+    title: North American Product Classification System (NAPCS) Canada 2022 Version
+      1.0
+    subject: Manufacturing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1384502
+  - tvd_id: '87592'
+    key: STATSCAN_87592
+    title: Number of bedrooms
+    subject: Housing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=87592
+  - tvd_id: '62049'
+    key: STATSCAN_62049
+    title: Number of children ever born
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=62049
+  - tvd_id: '117145'
+    key: STATSCAN_117145
+    title: Number of Citizenships
+    subject: Immigration and ethnocultural diversity
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=117145
+  - tvd_id: '143798'
+    key: STATSCAN_143798
+    title: Number of earners
+    subject: Income, pensions, spending and wealth
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=143798
+  - tvd_id: '61359'
+    key: STATSCAN_61359
+    title: Number of Non-official Language(s)
+    subject: Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=61359
+  - tvd_id: '141835'
+    key: STATSCAN_141835
+    title: Number of persons per room
+    subject: Housing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=141835
+  - tvd_id: '299322'
+    key: STATSCAN_299322
+    title: Number of rooms
+    subject: Housing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=299322
+  - tvd_id: '299331'
+    key: STATSCAN_299331
+    title: Number of rooms - Collapsed classification
+    subject: Housing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=299331
+  - tvd_id: '133167'
+    key: STATSCAN_133167
+    title: Number of years of education attended
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=133167
+  - tvd_id: '133177'
+    key: STATSCAN_133177
+    title: Number of years of education completed
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=133177
+  - tvd_id: '133182'
+    key: STATSCAN_133182
+    title: Number of years of other non-university education completed
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=133182
+  - tvd_id: '1495102'
+    key: STATSCAN_1495102
+    title: Number of years of primary schooling in a regular French program in a French-language
+      school in Canada
+    subject: Education, training and learning, Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1495102
+  - tvd_id: '1495072'
+    key: STATSCAN_1495072
+    title: Number of years of primary schooling in an English-language school in Canada
+    subject: Education, training and learning, Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1495072
+  - tvd_id: '1495107'
+    key: STATSCAN_1495107
+    title: Number of years of secondary schooling in a regular French program in a
+      French-language school in Canada
+    subject: Education, training and learning, Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1495107
+  - tvd_id: '1495060'
+    key: STATSCAN_1495060
+    title: Number of years of secondary schooling in an English-language school in
+      Canada
+    subject: Education, training and learning, Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1495060
+  - tvd_id: '133186'
+    key: STATSCAN_133186
+    title: Number of years of university education completed
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=133186
+  - tvd_id: '1324451'
+    key: STATSCAN_1324451
+    title: Opposite- or same-sex married spouse or common-law partner
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1324451
+  - tvd_id: '1323869'
+    key: STATSCAN_1323869
+    title: Opposite- or same-sex status
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1323869
+  - tvd_id: '243814'
+    key: STATSCAN_243814
+    title: Out-Migration, Five years
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=243814
+  - tvd_id: '243802'
+    key: STATSCAN_243802
+    title: Out-Migration, One year
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=243802
+  - tvd_id: '1584133'
+    key: STATSCAN_1584133
+    title: Period of construction
+    subject: Construction; Housing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1584133
+  - tvd_id: '117287'
+    key: STATSCAN_117287
+    title: Place of birth
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=117287
+  - tvd_id: '1318355'
+    key: STATSCAN_1318355
+    title: Place of birth of parent
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1318355
+  - tvd_id: '1318359'
+    key: STATSCAN_1318359
+    title: Place of birth of parents
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1318359
+  - tvd_id: '1323852'
+    key: STATSCAN_1323852
+    title: Place of work status
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1323852
+  - tvd_id: '339235'
+    key: STATSCAN_339235
+    title: Population Centre and Rural Area Classification 2016
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=339235
+  - tvd_id: '1323683'
+    key: STATSCAN_1323683
+    title: Population group
+    subject: Immigration and ethnocultural diversity; Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1323683
+  - tvd_id: '1482743'
+    key: STATSCAN_1482743
+    title: Pre-admission experience
+    subject: Immigration and ethnocultural diversity
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1482743
+  - tvd_id: '87584'
+    key: STATSCAN_87584
+    title: Primary activity status
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=87584
+  - tvd_id: '1495157'
+    key: STATSCAN_1495157
+    title: Primary or secondary schooling in an English-language school in Canada
+    subject: Education, training and learning, Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1495157
+  - tvd_id: '1252482'
+    key: STATSCAN_1252482
+    title: Programs and credentials
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1252482
+  - tvd_id: '1566776'
+    key: STATSCAN_1566776
+    title: Programs and credentials - professional degree variant
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1566776
+  - tvd_id: '87585'
+    key: STATSCAN_87585
+    title: Recipient of unpaid service
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=87585
+  - tvd_id: '1311584'
+    key: STATSCAN_1311584
+    title: Registered or Treaty Indian status
+    subject: Indigenous peoples
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1311584
+  - tvd_id: '1314717'
+    key: STATSCAN_1314717
+    title: Relationship structure
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1314717
+  - tvd_id: '1311904'
+    key: STATSCAN_1311904
+    title: Religions 2021 - Collapsed List
+    subject: Society and community
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1311904
+  - tvd_id: '1311612'
+    key: STATSCAN_1311612
+    title: Religions 2021 - List
+    subject: Society and community
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1311612
+  - tvd_id: '250617'
+    key: STATSCAN_250617
+    title: Residence inside or outside Inuit Nunangat
+    subject: Indigenous peoples
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=250617
+  - tvd_id: '1450676'
+    key: STATSCAN_1450676
+    title: Residence on or off reserve 2021
+    subject: Indigenous peoples
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1450676
+  - tvd_id: '144257'
+    key: STATSCAN_144257
+    title: Residential structures
+    subject: Housing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=144257
+  - tvd_id: '148121'
+    key: STATSCAN_148121
+    title: Retirement
+    subject: Labour; Older adults and population aging
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=148121
+  - tvd_id: '1326697'
+    key: STATSCAN_1326697
+    title: Sex at birth
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1326697
+  - tvd_id: '1326701'
+    key: STATSCAN_1326701
+    title: Sex at birth, variant
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1326701
+  - tvd_id: '61901'
+    key: STATSCAN_61901
+    title: Sex of reference person in a family
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=61901
+  - tvd_id: '61921'
+    key: STATSCAN_61921
+    title: Sex of reference person of lone-parent family
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=61921
+  - tvd_id: '1316072'
+    key: STATSCAN_1316072
+    title: Sexual orientation
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1316072
+  - tvd_id: '1584157'
+    key: STATSCAN_1584157
+    title: Shelter cost to income ratio
+    subject: Housing; Income, pensions, spending and wealth
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1584157
+  - tvd_id: '148088'
+    key: STATSCAN_148088
+    title: Source(s) of financial compensation received during absence from work
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=148088
+  - tvd_id: '1521190'
+    key: STATSCAN_1521190
+    title: Standard Classification of Countries and Areas of Interest (SCCAI) 2022
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1521190
+  - tvd_id: '134769'
+    key: STATSCAN_134769
+    title: Standard Drainage Area Classification (SDAC) 2003
+    subject: Environment
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=134769
+  - tvd_id: '1346772'
+    key: STATSCAN_1346772
+    title: Standard Geographical Classification (SGC) 2021
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1346772
+  - tvd_id: '299362'
+    key: STATSCAN_299362
+    title: Status of presence of mortgage payments
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=299362
+  - tvd_id: '117240'
+    key: STATSCAN_117240
+    title: Status of school attendance
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=117240
+  - tvd_id: '117242'
+    key: STATSCAN_117242
+    title: Status of school enrolment
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=117242
+  - tvd_id: '299407'
+    key: STATSCAN_299407
+    title: Status of subsidized housing
+    subject: Housing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=299407
+  - tvd_id: '299389'
+    key: STATSCAN_299389
+    title: Status of tenure of household
+    subject: Housing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=299389
+  - tvd_id: '1314735'
+    key: STATSCAN_1314735
+    title: Stepfamily status
+    subject: Children and youth; Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1314735
+  - tvd_id: '396083'
+    key: STATSCAN_396083
+    title: Time arriving at work
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=396083
+  - tvd_id: '251151'
+    key: STATSCAN_251151
+    title: Time leaving for work
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=251151
+  - tvd_id: '299520'
+    key: STATSCAN_299520
+    title: Total income
+    subject: Income, pensions, spending and wealth
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=299520
+  - tvd_id: '299533'
+    key: STATSCAN_299533
+    title: Total income of person
+    subject: Income, pensions, spending and wealth
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=299533
+  - tvd_id: '1495053'
+    key: STATSCAN_1495053
+    title: Total number of years of primary and secondary schooling in a regular French
+      program in a French-language school in Canada
+    subject: Education, training and learning, Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1495053
+  - tvd_id: '1495030'
+    key: STATSCAN_1495030
+    title: Total number of years of primary and secondary schooling in an English-language
+      school in Canada
+    subject: Education, training and learning, Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1495030
+  - tvd_id: '117123'
+    key: STATSCAN_117123
+    title: Type of Canadian Citizenship
+    subject: Immigration and ethnocultural diversity
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=117123
+  - tvd_id: '117133'
+    key: STATSCAN_117133
+    title: Type of Citizenship Response
+    subject: Immigration and ethnocultural diversity
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=117133
+  - tvd_id: '1541698'
+    key: STATSCAN_1541698
+    title: Type of French program attended in Canada
+    subject: Education, training and learning, Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1541698
+  - tvd_id: '1495145'
+    key: STATSCAN_1495145
+    title: Type of French program attended in Canada and level of instruction
+    subject: Education, training and learning, Languages
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1495145
+  - tvd_id: '114087'
+    key: STATSCAN_114087
+    title: Type of Participation in Religious Activities
+    subject: Society and community
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=114087
+  - tvd_id: '1314741'
+    key: STATSCAN_1314741
+    title: Type of union of couple
+    subject: Families, households and marital status
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1314741
+  - tvd_id: '87586'
+    key: STATSCAN_87586
+    title: Unpaid care
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=87586
+  - tvd_id: '114433'
+    key: STATSCAN_114433
+    title: Usual Weekly Work Hours
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=114433
+  - tvd_id: '114431'
+    key: STATSCAN_114431
+    title: Usual Weekly Work Hours - Collapsed classification
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=114431
+  - tvd_id: '202695'
+    key: STATSCAN_202695
+    title: Variant of NAPCS Canada 2012 Version 1.1 - Capital expenditures on non-residential
+      construction
+    subject: Construction
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=202695
+  - tvd_id: '331696'
+    key: STATSCAN_331696
+    title: Variant of NOC 2016 Version 1.0 - Highly aggregated data
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=331696
+  - tvd_id: '1368814'
+    key: STATSCAN_1368814
+    title: Variant of Standard Geographical Classification (SGC) 2021 for Agricultural
+      Regions
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1368814
+  - tvd_id: '1368923'
+    key: STATSCAN_1368923
+    title: Variant of Standard Geographical Classification (SGC) 2021 for Economic
+      Regions
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1368923
+  - tvd_id: '1372103'
+    key: STATSCAN_1372103
+    title: Variant of Standard Geographical Classification (SGC) 2021 for North and
+      South
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1372103
+  - tvd_id: '1348193'
+    key: STATSCAN_1348193
+    title: Variant of Standard Geographical Classification (SGC) 2021 for Statistical
+      area classification
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1348193
+  - tvd_id: '1348372'
+    key: STATSCAN_1348372
+    title: Variant of Standard Geographical Classification (SGC) 2021 for Statistical
+      area classification by Province and Territory
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1348372
+  - tvd_id: '1584151'
+    key: STATSCAN_1584151
+    title: Variant of status of tenure of household
+    subject: Housing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1584151
+  - tvd_id: '1486506'
+    key: STATSCAN_1486506
+    title: Variant of the Classification of Instructional Programs (CIP) Canada 2021
+      Version 1.0 for Alternative primary groupings
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1486506
+  - tvd_id: '1486532'
+    key: STATSCAN_1486532
+    title: Variant of the Classification of Instructional Programs (CIP) Canada 2021
+      Version 1.0 for Primary groupings
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1486532
+  - tvd_id: '1486451'
+    key: STATSCAN_1486451
+    title: Variant of the Classification of Instructional Programs (CIP) Canada 2021
+      Version 1.0 for Science, technology, engineering and mathematics (STEM) and
+      Business, humanities, health, arts, social science and education (BHASE) groupings
+    subject: Education, training and learning
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1486451
+  - tvd_id: '1380438'
+    key: STATSCAN_1380438
+    title: Variant of the National Occupational Classification (NOC) 2021 Version
+      1.0 for Analysis by TEER (Training, Education, Experience and Responsibility)
+      categories
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1380438
+  - tvd_id: '1369127'
+    key: STATSCAN_1369127
+    title: Variant of the National Occupational Classification (NOC) 2021 Version
+      1.0 for Science, Technology, Engineering and Mathematics (STEM)
+    subject: Science and technology
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1369127
+  - tvd_id: '1389874'
+    key: STATSCAN_1389874
+    title: Variant of the North American Industry Classification System (NAICS) 2022
+      Version 1.0 for Content and media sector
+    subject: Digital economy and society
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1389874
+  - tvd_id: '1383631'
+    key: STATSCAN_1383631
+    title: Variant of the North American Industry Classification System (NAICS) 2022
+      Version 1.0 for Durable and non-durable manufacturing industries
+    subject: Manufacturing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1383631
+  - tvd_id: '1383176'
+    key: STATSCAN_1383176
+    title: Variant of the North American Industry Classification System (NAICS) 2022
+      Version 1.0 for Energy sector
+    subject: Energy
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1383176
+  - tvd_id: '1381557'
+    key: STATSCAN_1381557
+    title: Variant of the North American Industry Classification System (NAICS) 2022
+      Version 1.0 for Goods and services producing industries
+    subject: Business and consumer services and culture
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1381557
+  - tvd_id: '1383838'
+    key: STATSCAN_1383838
+    title: Variant of the North American Industry Classification System (NAICS) 2022
+      Version 1.0 for Industrial production (based on the 1950 United Nations definition)
+    subject: Manufacturing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1383838
+  - tvd_id: '1383855'
+    key: STATSCAN_1383855
+    title: Variant of the North American Industry Classification System (NAICS) 2022
+      Version 1.0 for Industrial production (based on the 2008 International Recommendations
+      for Industrial Statistics)
+    subject: Manufacturing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1383855
+  - tvd_id: '1384253'
+    key: STATSCAN_1384253
+    title: Variant of the North American Industry Classification System (NAICS) 2022
+      Version 1.0 for Information and communication technology (ICT) sector
+    subject: Digital economy and society
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1384253
+  - tvd_id: '1541574'
+    key: STATSCAN_1541574
+    title: Variant of the North American Industry Classification System (NAICS) 2022
+      Version 1.0 for Labour force
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1541574
+  - tvd_id: '1441857'
+    key: STATSCAN_1441857
+    title: Variant of the North American Product Classification System (NAPCS) Canada
+      2022 Version 1.0 for Agricultural goods (extension variant)
+    subject: Agriculture and food
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1441857
+  - tvd_id: '1442788'
+    key: STATSCAN_1442788
+    title: Variant of the North American Product Classification System (NAPCS) Canada
+      2022 Version 1.0 for Farm Product Price Index - FPPI (regrouping variant)
+    subject: Agriculture and food
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1442788
+  - tvd_id: '1524698'
+    key: STATSCAN_1524698
+    title: Variant of the North American Product Classification System (NAPCS) Canada
+      2022 Version 1.0 for Industrial Product Price Index - IPPI (regrouping variant)
+    subject: Prices and price indexes
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1524698
+  - tvd_id: '1582195'
+    key: STATSCAN_1582195
+    title: Variant of the North American Product Classification System (NAPCS) Canada
+      2022 Version 1.0 for Manufacturing and Logging - Update 1 (extension variant)
+    subject: Manufacturing
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1582195
+  - tvd_id: '1517136'
+    key: STATSCAN_1517136
+    title: Variant of the North American Product Classification System (NAPCS) Canada
+      2022 Version 1.0 for Merchandise import and export accounts (regrouping variant)
+    subject: International trade; Economic accounts
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1517136
+  - tvd_id: '1524747'
+    key: STATSCAN_1524747
+    title: Variant of the North American Product Classification System (NAPCS) Canada
+      2022 Version 1.0 for Raw Materials Price Index - RMPI (regrouping variant)
+    subject: Prices and price indexes
+    url: https://www23.statcan.gc.ca/imdb/p3vd.pl?Function=getVD&TVD=1524747
+  - tvd_id: '1521171'
+    key: STATSCAN_1521171
+    title: Variant of the Standard Classification of Countries and Areas of Interest
+      2022 for Social Statistics
+    subject: Society and community
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1521171
+  - tvd_id: '340985'
+    key: STATSCAN_340985
+    title: 'Variant: Population Centre and Rural Area 2016 by Province and Territory'
+    subject: Population and demography
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=340985
+  - tvd_id: '1323643'
+    key: STATSCAN_1323643
+    title: Visible minority
+    subject: Immigration and ethnocultural diversity
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1323643
+  - tvd_id: '141132'
+    key: STATSCAN_141132
+    title: Weeks worked during the reference year
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=141132
+  - tvd_id: '244104'
+    key: STATSCAN_244104
+    title: Work activity during the reference year
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=244104
+  - tvd_id: '148084'
+    key: STATSCAN_148084
+    title: Work interruption in the reference period
+    subject: Labour
+    url: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=148084

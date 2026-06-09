@@ -1,0 +1,73 @@
+id: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1326727
+name: STATSCAN_1326727
+title: Classification of gender
+description: ''
+version: null
+license: ''
+in_language: en
+imports:
+  - 'linkml:types'
+prefixes:
+  statscan: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=
+default_prefix: ''
+classes: {}
+enums:
+  STATSCAN_1326727:
+    name: STATSCAN_1326727
+    description: ''
+    permissible_values:
+      '1':
+        title: Man
+        description: This category includes persons whose reported gender is male.
+          It includes cisgender (cis) and transgender (trans) men.
+      '2':
+        title: Woman
+        description: This category includes persons whose reported gender is female.
+          It includes cisgender (cis) and transgender (trans) women.
+      '3':
+        title: Non-binary person
+        description: This category includes persons whose reported gender is not exclusively
+          male or female. It includes persons whose reported gender is, for example,
+          agender, pangender, genderqueer, genderfluid, or gender-nonconforming. It
+          also includes persons whose reported gender is Two-Spirit, a term specific
+          to some Indigenous peoples of North America.It includes persons whose reported
+          gender is both male and female, neither male nor female, or either male
+          or female in addition to another gender. It may also include those who reported
+          or were reported by proxy as questioning or in the process of deciding.
+slots: {}
+extensions:
+  locales:
+    tag: locales
+    value:
+      fr:
+        id: https://www23.statcan.gc.ca/imdb/p3VD_f.pl?Function=getVD&TVD=1326727
+        name: STATSCAN_1326727
+        version: ''
+        in_language: fr
+        enums:
+          STATSCAN_1326727:
+            permissible_values:
+              '1':
+                title: Homme
+                description: "Cette cat\xE9gorie comprend les personnes dont le genre\
+                  \ d\xE9clar\xE9 est masculin. Elle comprend les hommes cisgenres\
+                  \ (cis) et les hommes transgenres (trans)."
+              '2':
+                title: Femme
+                description: "Cette cat\xE9gorie comprend les personnes dont le genre\
+                  \ d\xE9clar\xE9 est f\xE9minin. Elle comprend les femmes cisgenres\
+                  \ (cis) et les femmes transgenres (trans)."
+              '3':
+                title: Personne non binaire
+                description: "Cette cat\xE9gorie comprend les personnes dont le genre\
+                  \ d\xE9clar\xE9 n'est pas exclusivement masculin ni f\xE9minin.Elle\
+                  \ comprend les personnes dont le genre d\xE9clar\xE9 est, par exemple,\
+                  \ agenre, pangenre, genre queer, genre fluide ou genre non conforme.\
+                  \ Elle comprend \xE9galement les personnes dont le genre d\xE9clar\xE9\
+                  \ est bispirituel \u2014 un terme propre \xE0 certains peuples autochtones\
+                  \ d'Am\xE9rique du Nord.Elle comprend les personnes dont le genre\
+                  \ d\xE9clar\xE9 est \xE0 la fois masculin et f\xE9minin, ni l'un\
+                  \ ni l'autre ou l'un ou l'autre en plus d'un autre genre. Elle peut\
+                  \ \xE9galement comprendre celles ayant indiqu\xE9 ou ayant \xE9\
+                  t\xE9 identifi\xE9es par personne interpos\xE9e comme \xE9tant en\
+                  \ questionnement ou en processus de d\xE9cision."

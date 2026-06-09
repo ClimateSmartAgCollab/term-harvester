@@ -1,0 +1,2437 @@
+id: https://example.org/examples
+name: example_name
+title: Example title
+description: Example description ...
+version: ''
+license: CC0
+prefixes:
+  adms: http://www.w3.org/ns/adms#
+  AFO: http://purl.allotrope.org/ontologies/quality#
+  AGRO: http://purl.obolibrary.org/obo/AGRO_
+  anthropics: https://github.com/anthropics/
+  BAO: http://www.bioassayontology.org/bao#BAO_
+  BSPO: http://purl.obolibrary.org/obo/BSPO_
+  CHEBI: http://purl.obolibrary.org/obo/CHEBI_
+  CHMO: http://purl.obolibrary.org/obo/CHMO_
+  CIO: http://purl.obolibrary.org/obo/CIO_
+  COB: http://purl.obolibrary.org/obo/COB_
+  CRediT: https://credit.niso.org/contributor-roles/
+  damlpt: http://www.daml.org/2003/01/periodictable/PeriodicTable#
+  DataCite: https://datacite.org/schema/kernel-4/
+  DCMITYPE: http://purl.org/dc/dcmitype/
+  dcterms: http://purl.org/dc/terms/
+  DUO: http://purl.obolibrary.org/obo/DUO_
+  EC: https://enzyme.expasy.org/EC/
+  ECO: http://purl.obolibrary.org/obo/ECO_
+  ECOCORE: http://purl.obolibrary.org/obo/ECOCORE_
+  ECTO: http://purl.obolibrary.org/obo/ECTO_
+  EDAM: http://edamontology.org/
+  EFO: http://www.ebi.ac.uk/efo/EFO_
+  ENM: http://purl.enanomapper.org/onto/ENM_
+  ENVO: http://purl.obolibrary.org/obo/ENVO_
+  euvoc: http://publications.europa.eu/resource/authority/
+  ExO: http://purl.obolibrary.org/obo/ExO_
+  FABIO: http://purl.org/spar/fabio/
+  FBbi: http://purl.obolibrary.org/obo/FBbi_
+  fhir_data_absent_reason: http://terminology.hl7.org/CodeSystem/data-absent-reason
+  FOODON: http://purl.obolibrary.org/obo/FOODON_
+  gc: http://purl.org/gc/
+  GENO: http://purl.obolibrary.org/obo/GENO_
+  geonames: http://sws.geonames.org/
+  GO: http://purl.obolibrary.org/obo/GO_
+  GO_REF: http://purl.obolibrary.org/obo/GO_REF_
+  greg: http://www.w3.org/ns/time/gregorian#
+  GSSO: http://purl.obolibrary.org/obo/GSSO_
+  HEX: https://www.color-hex.com/color/
+  HL7: http://terminology.hl7.org/CodeSystem/
+  HP: http://purl.obolibrary.org/obo/HP_
+  HsapDv: http://purl.obolibrary.org/obo/HsapDv_
+  iana: https://www.iana.org/assignments/media-types/
+  IAO: http://purl.obolibrary.org/obo/IAO_
+  iso3166loc: http://id.loc.gov/vocabulary/countries/
+  LOINC: https://loinc.org/
+  MESH: http://id.nlm.nih.gov/mesh/
+  mesh: http://id.nlm.nih.gov/mesh/
+  MFOEM: http://purl.obolibrary.org/obo/MFOEM_
+  MI: http://purl.obolibrary.org/obo/MI_
+  MICRO: http://purl.obolibrary.org/obo/MICRO_
+  mixs: http://purl.obolibrary.org/obo/MIXS_
+  MMO: http://purl.obolibrary.org/obo/MMO_
+  MmusDv: http://purl.obolibrary.org/obo/MmusDv_
+  MOD: http://purl.obolibrary.org/obo/MOD_
+  MOP: http://purl.obolibrary.org/obo/MOP_
+  MS: http://purl.obolibrary.org/obo/MS_
+  MSIO: http://purl.obolibrary.org/obo/MSIO_
+  NCBITaxon: http://purl.obolibrary.org/obo/NCBITaxon_
+  NCIT: http://purl.obolibrary.org/obo/NCIT_
+  OBCS: http://purl.obolibrary.org/obo/OBCS_
+  OBI: http://purl.obolibrary.org/obo/OBI_
+  OEO: http://openenergy-platform.org/ontology/oeo/OEO_
+  PATO: http://purl.obolibrary.org/obo/PATO_
+  PECO: http://purl.obolibrary.org/obo/PECO_
+  PO: http://purl.obolibrary.org/obo/PO_
+  premis: http://id.loc.gov/vocabulary/preservation/
+  quantitykind: http://qudt.org/vocab/quantitykind/
+  QUDT: http://qudt.org/vocab/unit/
+  RO: http://purl.obolibrary.org/obo/RO_
+  ROR: https://ror.org/
+  RXNO: http://purl.obolibrary.org/obo/RXNO_
+  SIO: http://semanticscience.org/resource/SIO_
+  SNOMED: http://snomed.info/id/
+  SO: http://purl.obolibrary.org/obo/SO_
+  SPDX: https://spdx.org/licenses/
+  spdx: https://spdx.org/licenses/
+  STATO: http://purl.obolibrary.org/obo/STATO_
+  SWO: http://purl.obolibrary.org/obo/SWO_
+  TAXRANK: http://purl.obolibrary.org/obo/TAXRANK_
+  TIME: http://www.w3.org/2006/time#
+  UBERON: http://purl.obolibrary.org/obo/UBERON_
+  UO: http://purl.obolibrary.org/obo/UO_
+  VO: http://purl.obolibrary.org/obo/VO_
+  xsd: http://www.w3.org/2001/XMLSchema#
+default_prefix: menu
+imports:
+  - 'linkml:types'
+slots: {}
+enums:
+  AgriFoodCA_AgreementScale:
+    permissible_values:
+      '1':
+        title: Strongly agree
+      '2':
+        title: Agree
+      '3':
+        title: Mildly agree
+      '4':
+        title: Neither agree nor disagree
+      '5':
+        title: Mildly disagree
+      '6':
+        title: Disagree
+      '7':
+        title: Strongly disagree
+      '8':
+        title: "Don't know"
+    title: Agreement scale
+    description: Standard agreement response scale from strongly agree to strongly
+      disagree.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_ComfortLevel:
+    permissible_values:
+      MLC:
+        title: Much less comfortable with genetically modified rice than cellular
+          agriculture
+      LC:
+        title: Less comfortable
+      LLC:
+        title: A little less comfortable
+      SLC:
+        title: Same level of comfort
+      LMC:
+        title: A little more comfortable
+      MC:
+        title: More comfortable
+      MMC:
+        title: Much more comfortable with genetically modified rice than cellular
+          agriculture
+      DK:
+        title: "Don't know"
+    title: Comfort level scale
+    description: Level of comfort or discomfort expressed in relation to a subject
+      option or comparison.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_ConceptAwareness:
+    permissible_values:
+      Y:
+        title: 'Yes'
+      N:
+        title: 'No'
+      DK:
+        title: "I don't know"
+    title: Awareness of concept
+    description: Whether the respondent has previously heard of or is aware of a concept
+      topic or subject.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_DataQualityCodes:
+    permissible_values:
+      '1':
+        title: Unaltered data
+      '2':
+        title: Manually corrected data
+      '3':
+        title: Calibration corrected data
+      '4':
+        title: Estimated data
+      '5':
+        title: Modelled data
+      '6':
+        title: Derived data
+      '7':
+        title: Aggregated data
+      '8':
+        title: Interpolated data
+      '9':
+        title: Extrapolated data
+      '10':
+        title: Rounded data
+      '11':
+        title: Standardized data
+      '12':
+        title: Transformed data
+      '13':
+        title: Validated data
+      '14':
+        title: Verified data
+      '15':
+        title: Provisional data
+      '16':
+        title: Preliminary data
+      '17':
+        title: Final data
+      '18':
+        title: Revised data
+      '19':
+        title: Deprecated data
+      '20':
+        title: Duplicated data
+      '100':
+        title: Null value
+      '101':
+        title: Missing value
+      '102':
+        title: Not applicable
+      '103':
+        title: Not measured
+      '104':
+        title: Not reported
+      '105':
+        title: Value masked for privacy
+      '106':
+        title: Value withheld
+      '107':
+        title: Value redacted
+      '200':
+        title: Below detection limit
+      '201':
+        title: Above detection limit
+      '202':
+        title: Below quantification limit
+      '203':
+        title: Above quantification limit
+      '204':
+        title: Below reporting threshold
+      '205':
+        title: Above reporting threshold
+      '300':
+        title: Suspect data
+      '301':
+        title: Outlier
+      '302':
+        title: Instrument error
+      '303':
+        title: Transcription error
+      '304':
+        title: Sampling error
+      '305':
+        title: Processing error
+      '306':
+        title: Contamination detected
+      '307':
+        title: Data entry error
+      '308':
+        title: Unit conversion error
+      '309':
+        title: Reference material failure
+      '400':
+        title: Data pending review
+      '401':
+        title: Data under embargo
+      '402':
+        title: Data archived
+      '403':
+        title: Data retracted
+    title: Data Quality Codes
+    description: A controlled picklist of codes used to describe the quality, status,
+      and provenance of research data values
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_Days:
+    permissible_values:
+      Monday:
+        title: Mon
+      Tuesday:
+        title: Tues
+      Wednesday:
+        title: Wed
+      Thursday:
+        title: Thurs
+      Friday:
+        title: Fri
+      Saturday:
+        title: Sat
+      Sunday:
+        title: Sun
+    title: days
+    description: Days of the week
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_EducationLevel:
+    permissible_values:
+      Primary or elementary school: {}
+      Secondary (high school diploma or equivalent): {}
+      Apprenticeship or trades: {}
+      College or other non-university level: {}
+      Professional school: {}
+      University bachelor level degree: {}
+      University graduate school: {}
+      Prefer not to say: {}
+    title: Education level
+    description: Highest level of education completed by the respondent.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_EightPointCardinality:
+    permissible_values:
+      N:
+        title: North
+      NE:
+        title: Northeast
+      E:
+        title: East
+      SE:
+        title: Southeast
+      S:
+        title: South
+      SW:
+        title: Southwest
+      W:
+        title: West
+      NW:
+        title: Northwest
+    title: Eight Point Cardinality
+    description: "The 8\u2011wind compass rose consists of the four cardinal directions\u2014\
+      north (N), east (E), south (S), and west (W)\u2014arranged at 90\u2011degree\
+      \ intervals. By bisecting each of these angles, four intercardinal directions\
+      \ are formed: northeast (NE), southeast (SE), southwest (SW), and northwest\
+      \ (NW). Altogether, these eight points provide a simple directional framework\
+      \ commonly used in navigation and maps."
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_Frequency:
+    permissible_values:
+      ED:
+        title: Every day
+      FTW:
+        title: A few times per week
+      OW:
+        title: Once a week
+      OM:
+        title: Once a month
+      FT:
+        title: A few times per year
+      NV:
+        title: Never
+    title: Frequency scale
+    description: Frequency with which an activity behaviour or event occurs over a
+      typical time period.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_HouseholdComposition:
+    permissible_values:
+      LO:
+        title: I live on my own
+      CLT:
+        title: Couple living together
+      FC:
+        title: Family with children
+      MLG:
+        title: Multigenerational (two or more families living together)
+      Oth:
+        title: Other
+      PNS:
+        title: Prefer not to say
+    title: Household structure
+    description: Composition and living arrangement of the household.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_Months:
+    permissible_values:
+      January:
+        title: Jan
+      February:
+        title: Feb
+      March:
+        title: Mar
+      April:
+        title: Apr
+      May: {}
+      June:
+        title: Jun
+      July:
+        title: Jul
+      August:
+        title: Aug
+      September:
+        title: Sep
+      October:
+        title: Oct
+      November:
+        title: Nov
+      December:
+        title: Dec
+    title: months
+    description: Months of the year
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SixteenPointCardinality:
+    permissible_values:
+      N:
+        title: North
+      NNE:
+        title: North-Northeast
+      NE:
+        title: Northeast
+      ENE:
+        title: East-Northeast
+      E:
+        title: East
+      ESE:
+        title: East-Southeast
+      SE:
+        title: Southeast
+      SSE:
+        title: South-Southeast
+      S:
+        title: South
+      SSW:
+        title: South-Southwest
+      SW:
+        title: Southwest
+      WSW:
+        title: West-Southwest
+      W:
+        title: West
+      WNW:
+        title: West-Northwest
+      NW:
+        title: Northwest
+      NNW:
+        title: North-Northwest
+    title: Sixteen Point Cardinality
+    description: "The 16\u2011wind compass rose expands on the 8\u2011point system\
+      \ by adding eight half\u2011winds. These are created by bisecting each 45\u2011\
+      degree angle between the cardinal and intercardinal points. The added directions\
+      \ are: north\u2011northeast (NNE), east\u2011northeast (ENE), east\u2011southeast\
+      \ (ESE), south\u2011southeast (SSE), south\u2011southwest (SSW), west\u2011\
+      southwest (WSW), west\u2011northwest (WNW), and north\u2011northwest (NNW).\
+      \ This system provides more precise directional reference at 22.5\u2011degree\
+      \ increments."
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilAerationStatus:
+    permissible_values:
+      AERW:
+        title: Well-aerated
+        description: Good oxygen availability
+      AERM:
+        title: Moderately aerated
+        description: Moderate oxygen availability
+      AERP:
+        title: Poorly aerated (anaerobic)
+        description: Low oxygen; anaerobic conditions
+    title: Soil aeration status
+    description: Qualitative oxygen availability status.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilBulkDensity:
+    permissible_values:
+      BDL:
+        title: Low
+        description: Favorable for root growth (texture-dependent)
+      BDM:
+        title: Moderate
+        description: May affect growth (approaching restrictive)
+      BDH:
+        title: High
+        description: Restrictive to roots (texture-dependent)
+    title: Bulk density class
+    description: Generalized classes; specific restrictive thresholds depend on texture.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilCarbonToNitrogenRatio:
+    permissible_values:
+      CNL:
+        title: Low
+        description: 'C:N < 10'
+      CNM:
+        title: Medium
+        description: 'C:N 10-20'
+      CNH:
+        title: High
+        description: 'C:N > 20'
+    title: Carbon-to-Nitrogen (C:N) ratio class
+    description: 'C:N ratio categories.'
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilColloidFraction:
+    permissible_values:
+      COLL:
+        title: Low
+        description: Low colloid fraction
+      COLM:
+        title: Medium
+        description: Medium colloid fraction
+      COLH:
+        title: High
+        description: High colloid fraction
+    title: Soil colloid fraction class
+    description: Relative abundance of colloids.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilCompressibility:
+    permissible_values:
+      CMPL:
+        title: Low
+        description: Low compressibility
+      CMPM:
+        title: Moderate
+        description: Moderate compressibility
+      CMPH:
+        title: High
+        description: High compressibility
+    title: Soil compressibility class
+    description: Relative compressibility category.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilEffectiveRootingDepth:
+    permissible_values:
+      RDVS:
+        title: Very shallow
+        description: < 25 cm
+      RDSH:
+        title: Shallow
+        description: "25\u201350 cm"
+      RDM:
+        title: Moderate
+        description: "50\u2013100 cm"
+      RDD:
+        title: Deep
+        description: "100\u2013150 cm"
+      RDVD:
+        title: Very deep
+        description: '> 150 cm'
+    title: Effective rooting depth class
+    description: Depth available for roots.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilErodibility:
+    permissible_values:
+      ERL:
+        title: Low
+        description: Low susceptibility to erosion
+      ERM:
+        title: Moderate
+        description: Moderate susceptibility to erosion
+      ERH:
+        title: High
+        description: High susceptibility to erosion
+    title: Soil erodibility class
+    description: Susceptibility to erosion (qualitative).
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilFertility:
+    permissible_values:
+      FERL:
+        title: Low
+        description: Low inherent fertility
+      FERM:
+        title: Medium
+        description: Medium inherent fertility
+      FERH:
+        title: High
+        description: High inherent fertility
+    title: Soil fertility class
+    description: General inherent soil fertility.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilMineralContentType:
+    permissible_values:
+      MINQ:
+        title: Quartz-rich
+        description: Dominant quartz mineralogy
+      MINC:
+        title: Carbonate-rich
+        description: High carbonate content
+      MINA:
+        title: Clay-rich
+        description: High clay mineral content
+      MINM:
+        title: Mixed mineralogy
+        description: Mixed or undifferentiated
+    title: Soil mineral content type
+    description: Dominant mineralogical character.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilOrganicMatter:
+    permissible_values:
+      SOMVL:
+        title: Very low
+        description: < 1% organic matter
+      SOML:
+        title: Low
+        description: "1\u20132% organic matter"
+      SOMM:
+        title: Moderate
+        description: "2\u20134% organic matter"
+      SOMH:
+        title: High
+        description: "4\u20138% organic matter"
+      SOMVH:
+        title: Very high
+        description: '> 8% organic matter'
+    title: Soil organic matter class
+    description: Organic matter percentage class.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilPermeability:
+    permissible_values:
+      KPVS:
+        title: Very slow
+        description: Saturated hydraulic conductivity very slow
+      KPS:
+        title: Slow
+        description: Saturated hydraulic conductivity slow
+      KPM:
+        title: Moderate
+        description: Saturated hydraulic conductivity moderate
+      KPR:
+        title: Rapid
+        description: Saturated hydraulic conductivity rapid
+      KPVR:
+        title: Very rapid
+        description: Saturated hydraulic conductivity very rapid
+    title: Soil permeability class
+    description: Saturated hydraulic conductivity (qualitative classes).
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilPlasticity:
+    permissible_values:
+      PLAL:
+        title: Low
+        description: Low plasticity
+      PLAM:
+        title: Medium
+        description: Medium plasticity
+      PLAH:
+        title: High
+        description: High plasticity
+    title: Soil plasticity class
+    description: Plasticity category (Atterberg-related).
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilPorosity:
+    permissible_values:
+      PORVL:
+        title: Very low
+        description: Total porosity very low
+      PORL:
+        title: Low
+        description: Total porosity low
+      PORM:
+        title: Moderate
+        description: Total porosity moderate
+      PORH:
+        title: High
+        description: Total porosity high
+      PORVH:
+        title: Very high
+        description: Total porosity very high
+    title: Soil porosity class
+    description: Total porosity class.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilSalinityType:
+    permissible_values:
+      STCL:
+        title: Chloride-dominated
+        description: Chloride salts predominate
+      STSO:
+        title: Sulfate-dominated
+        description: Sulfate salts predominate
+      STCB:
+        title: Carbonate/bicarbonate-dominated
+        description: Carbonate/bicarbonate salts predominate
+      STMX:
+        title: Mixed salts
+        description: No single anion dominates
+    title: Soil salinity type (dominant anion)
+    description: Dominant salt type in saline conditions.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilSodicity:
+    permissible_values:
+      NSD:
+        title: Non-sodic
+        description: SAR < 13 and/or ESP < 15
+      SD:
+        title: Sodic
+        description: "SAR \u2265 13 and/or ESP \u2265 15"
+    title: Soil sodicity class (SAR/ESP)
+    description: Classification using Sodium Adsorption Ratio (SAR) and/or Exchangeable
+      Sodium Percentage (ESP).
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SoilTexture:
+    permissible_values:
+      SND:
+        title: Sand
+        description: Coarse soil with large particles and rapid drainage.
+      LSA:
+        title: Loamy sand
+        description: Very sandy soil with slightly improved water holding.
+      SLM:
+        title: Sandy loam
+        description: Sandy soil that holds more water and nutrients than sand.
+      LOM:
+        title: Loam
+        description: Balanced mix of sand, silt and clay with good tilth.
+      SIL:
+        title: Silt loam
+        description: Smooth soil that holds water well and drains slowly.
+      SIT:
+        title: Silt
+        description: Fine soil with silky feel and high water holding.
+      SCL:
+        title: Sandy clay loam
+        description: "Coarser fine\u2011textured mix with moderate water holding."
+      CLM:
+        title: Clay loam
+        description: "Fine\u2011textured mix with slower drainage and higher fertility."
+      SCLo:
+        title: Silty clay loam
+        description: "Fine\u2011textured soil with slow drainage and strong nutrient\
+          \ holding."
+      SAC:
+        title: Sandy clay
+        description: Clayey soil containing sand with slow drainage.
+      SIC:
+        title: Silty clay
+        description: Clayey soil containing silt with slow drainage.
+      CLY:
+        title: Clay
+        description: Very fine soil with slow drainage and high nutrient holding.
+    title: Soil texture class
+    description: USDA-NRCS 12-class soil texture scheme.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_SupportConcept:
+    permissible_values:
+      SO:
+        title: Strongly oppose
+      OP:
+        title: Oppose
+      MO:
+        title: Mildly oppose
+      NOS:
+        title: Neither oppose nor support
+      MS:
+        title: Mildly support
+      SU:
+        title: Support
+      SS:
+        title: Strongly support
+      DK:
+        title: "Don't know"
+    title: Support scale
+    description: Level of support or opposition expressed toward a proposal idea policy
+      or action.
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  AgriFoodCA_ThirtyTwoPointCardinality:
+    permissible_values:
+      N:
+        title: North
+      N by E:
+        title: North by East
+      NNE:
+        title: North-Northeast
+      NE by N:
+        title: Northeast by North
+      NE:
+        title: Northeast
+      NE by E:
+        title: Northeast by East
+      ENE:
+        title: East-Northeast
+      E by N:
+        title: East by North
+      E:
+        title: East
+      E by S:
+        title: East by South
+      ESE:
+        title: East-Southeast
+      SE by E:
+        title: Southeast by East
+      SE:
+        title: Southeast
+      SE by S:
+        title: Southeast by South
+      SSE:
+        title: South-Southeast
+      S by E:
+        title: South by East
+      S:
+        title: South
+      S by W:
+        title: South by West
+      SSW:
+        title: South-Southwest
+      SW by S:
+        title: Southwest by South
+      SW:
+        title: Southwest
+      SW by W:
+        title: Southwest by West
+      WSW:
+        title: West-Southwest
+      W by S:
+        title: West by South
+      W:
+        title: West
+      W by N:
+        title: West by North
+      WNW:
+        title: West-Northwest
+      NW by W:
+        title: Northwest by West
+      NW:
+        title: Northwest
+      NW by N:
+        title: Northwest by North
+      NNW:
+        title: North-Northwest
+      N by W:
+        title: North by West
+    title: Thirty-two Point Cardinality
+    description: "The 32 wind compass rose subdivides the circle even further by adding\
+      \ quarter winds, which fall halfway between each pair of 16 wind points. These\
+      \ \uFFFDby\uFFFD directions\uFFFDsuch as north by east, northeast by north,\
+      \ and southwest by west\uFFFDcreate a system of 32 points spaced at 11.25 degree\
+      \ intervals. Historically used in maritime navigation, this finer resolution\
+      \ allows much more accurate description of direction."
+    annotations:
+      imported_from: AgriFoodCA_Picklists
+      source_file: sources/AgriFoodCA_Picklists.yaml
+  Canada:
+    name: Canada
+    title: Canada
+    permissible_values:
+      AB:
+        title: Alberta
+      BC:
+        title: British Columbia
+      MB:
+        title: Manitoba
+      NB:
+        title: New Brunswick
+      NL:
+        title: Newfoundland and Labrador
+      NT:
+        title: Northwest Territories
+      NS:
+        title: Nova Scotia
+      NU:
+        title: Nunavut
+      'ON':
+        title: Ontario
+      PE:
+        title: Prince Edward Island
+      QC:
+        title: Quebec
+      SK:
+        title: Saskatchewan
+      YT:
+        title: Yukon
+    annotations:
+      imported_from: ISO_COUNTRY_CA
+      source_file: sources/ISO_COUNTRY_CA.yaml
+  CRediT:
+    permissible_values:
+      conceptualization:
+        description: Ideas; formulation or evolution of overarching research goals
+          and aims
+        meaning: https://credit.niso.org/contributor-roles/conceptualization/
+      data_curation:
+        title: Data Curation
+        description: Management activities to annotate (produce metadata), scrub data
+          and maintain research data (including software code, where it is necessary
+          for interpreting the data itself) for initial use and later re-use
+        meaning: https://credit.niso.org/contributor-roles/data-curation/
+      formal_analysis:
+        title: Formal Analysis
+        description: Application of statistical, mathematical, computational, or other
+          formal techniques to analyse or synthesize study data
+        meaning: https://credit.niso.org/contributor-roles/formal-analysis/
+      funding_acquisition:
+        title: Funding Acquisition
+        description: Acquisition of the financial support for the project leading
+          to this publication
+        meaning: https://credit.niso.org/contributor-roles/funding-acquisition/
+      investigation:
+        description: Conducting a research and investigation process, specifically
+          performing the experiments, or data/evidence collection
+        meaning: https://credit.niso.org/contributor-roles/investigation/
+      methodology:
+        description: Development or design of methodology; creation of models
+        meaning: https://credit.niso.org/contributor-roles/methodology/
+      project_administration:
+        title: Project Administration
+        description: Management and coordination responsibility for the research activity
+          planning and execution
+        meaning: https://credit.niso.org/contributor-roles/project-administration/
+      resources:
+        description: Provision of study materials, reagents, materials, patients,
+          laboratory samples, animals, instrumentation, computing resources, or other
+          analysis tools
+        meaning: https://credit.niso.org/contributor-roles/resources/
+      software:
+        description: Programming, software development; designing computer programs;
+          implementation of the computer code and supporting algorithms; testing of
+          existing code components
+        meaning: https://credit.niso.org/contributor-roles/software/
+      supervision:
+        description: Oversight and leadership responsibility for the research activity
+          planning and execution, including mentorship external to the core team
+        meaning: https://credit.niso.org/contributor-roles/supervision/
+      validation:
+        description: Verification, whether as a part of the activity or separate,
+          of the overall replication/reproducibility of results/experiments and other
+          research outputs
+        meaning: https://credit.niso.org/contributor-roles/validation/
+      visualization:
+        description: Preparation, creation and/or presentation of the published work,
+          specifically visualization/data presentation
+        meaning: https://credit.niso.org/contributor-roles/visualization/
+      writing_original_draft:
+        title: "Writing \u2013 original draft"
+        description: Preparation, creation and/or presentation of the published work,
+          specifically writing the initial draft (including substantive translation)
+        meaning: https://credit.niso.org/contributor-roles/writing-original-draft/
+      writing_review_editing:
+        title: "Writing \u2013 review & editing"
+        description: "Preparation, creation and/or presentation of the published work\
+          \ by those from the original research group, specifically critical review,\
+          \ commentary or revision \u2013 including pre- or post-publication stages"
+        meaning: https://credit.niso.org/contributor-roles/writing-review-editing/
+    see_also: https://credit.niso.org/
+    annotations:
+      imported_from: CRediT
+      source_file: sources/CRediT.yaml
+  GenderIdentity:
+    title: Gender Identity
+    description: "Gender identity codes indicating an individual's personal sense\
+      \ of gender"
+    status: DRAFT
+    contributors:
+      - 'orcid:0000-0002-6601-2165'
+      - https://github.com/anthropics/claude-code
+    instantiates:
+      - valuesets_meta:ValueSetEnumDefinitionWithSource
+    source: https://terminology.hl7.org/ValueSet-gender-identity.html
+    permissible_values:
+      FEMALE:
+        description: Identifies as female gender (finding)
+        meaning: 'SNOMED:446141000124107'
+      MALE:
+        description: Identifies as male gender (finding)
+        meaning: 'SNOMED:446151000124109'
+      NON_BINARY:
+        description: Identifies as gender nonbinary
+        meaning: 'SNOMED:33791000087105'
+      ASKED_DECLINED:
+        description: Asked But Declined
+        meaning: 'HL7:asked-declined'
+      UNKNOWN:
+        description: A proper value is applicable, but not known
+        meaning: 'HL7:UNK'
+    is_a: DemographicsSchemaEnum
+    annotations:
+      source_domain: root
+      source_schema: demographics
+      imported_from: valuesets_merged_hierarchy
+      source_file: sources/valuesets_merged_hierarchy.yaml
+  LodgingScale:
+    name: LodgingScale
+    title: Lodging Scale
+    description: "A visual estimation of lodging before harvest using a 1\u20139 scale"
+    permissible_values:
+      '1':
+        title: No lodging
+        description: Plants completely erect, no lodging observed
+      '2':
+        title: Very slight lodging
+        description: Very minor lodging, plants almost completely erect
+      '3':
+        title: Slight lodging
+        description: Slight lodging present
+      '4':
+        title: Below moderate lodging
+        description: Lodging slightly less than moderate
+      '5':
+        title: Moderate lodging
+        description: Intermediate level of lodging
+      '6':
+        title: Above moderate lodging
+        description: Lodging somewhat more than moderate
+      '7':
+        title: Considerable lodging
+        description: Considerable lodging present
+      '8':
+        title: Severe lodging
+        description: Severe lodging, most plants leaning or down
+      '9':
+        title: Complete lodging
+        description: Complete lodging, all plants flat
+    annotations:
+      imported_from: LodgingAssessment
+      source_file: sources/LodgingAssessment.yaml
+  NRCSSoilFieldBook_ReactionPH:
+    name: NRCSSoilFieldBook_ReactionPH
+    title: Reaction (pH)
+    description: Record pH and Method; record the pH value to the precision limit
+      of the method (e.g., to the nearest tenth). The preferred method is pH meter
+      for 1:1 (water:soil). In NASIS, record the pH numerical value and the method
+      used (e.g., pH 6.5; 1:1 water:soil). Called Field_pH in NASIS.
+    see_also: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=137
+    permissible_values:
+      ultra acid:
+        description: pH < 3.5
+      extremely acid:
+        description: pH 3.5 to 4.4
+      very strongly acid:
+        description: pH 4.5 to 5.0
+      strongly acid:
+        description: pH 5.1 to 5.5
+      moderately acid:
+        description: pH 5.6 to 6.0
+      slightly acid:
+        description: pH 6.1 to 6.5
+      neutral:
+        description: pH 6.6 to 7.3
+      slightly alkaline:
+        description: pH 7.4 to 7.8
+      moderately alkaline:
+        description: pH 7.9 to 8.4
+      strongly alkaline:
+        description: pH 8.5 to 9.0
+      very strongly alkaline:
+        description: pH > 9.0
+    annotations:
+      imported_from: NRCSSoilFieldBook
+      source_file: sources/NRCSSoilFieldBook.yaml
+  NSDB_DRAINAGE:
+    name: DRAINAGE
+    title: Soil Drainage Class
+    description: Indicates the type of drainage found within a soil profile. First
+      used in SLC 3.0. Identical classes to drainage in SLC 1.0, but codes differ.
+    permissible_values:
+      VR:
+        title: Very rapidly drained
+        description: Water is removed from the soil very rapidly in relation to supply.
+          Excess water flows downward very rapidly if underlying material is pervious.
+          There may be very rapid subsurface flow during heavy rainfall provided there
+          is a steep gradient. Soils have very low available water storage capacity
+          (usually less than 2.5 cm) within the control section and are usually coarse
+          textured, or shallow, or both. Water source is precipitation.
+      R:
+        title: Rapidly drained
+        description: Water is removed from the soil rapidly in relation to supply.
+          Excess water flows downward if underlying material is pervious. Subsurface
+          flow may occur on steep gradients during heavy rainfall. Soils have low
+          available water storage capacity (2.5-4 cm) within the control section,
+          and are usually coarse textured, or shallow, or both. Water source is precipitation.
+      W:
+        title: Well drained
+        description: Water is removed from the soil readily but not rapidly. Excess
+          water flows downward readily into underlying pervious material or laterally
+          as subsurface flow. Soils have intermediate available water storage capacity
+          (4-5 cm) within the control section, and are generally intermediate in texture
+          and depth. Water source is precipitation. On slopes subsurface flow may
+          occur for short durations, but additions are equaled by losses.
+      MW:
+        title: Moderately well drained
+        description: Water is removed from the soil somewhat slowly in relation to
+          supply. Excess water is removed somewhat slowly due to low perviousness,
+          shallow water table, lack of gradient, or some combination of these. Soils
+          have intermediate to high water storage capacity (5-6 cm) within the control
+          section and are usually medium to fined textured. Precipitation is the dominant
+          water source in medium to fine textured soils; precipitation and significant
+          additions by subsurface flow are necessary in coarse textured soils.
+      I:
+        title: Imperfectly drained
+        description: Water is removed from the soil sufficiently slowly in relation
+          to supply, to keep the soil wet for a significant part of the growing season.
+          Excess water moves slowly downward if precipitation is the major supply.
+          If subsurface water or groundwater, or both, is the main source, the flow
+          rate may vary but the soil remains wet for a significant part of the growing
+          season. Precipitation is the main source if available water storage capacity
+          is high; contribution by subsurface flow or groundwater flow, or both, increases
+          as available water storage capacity decreases. Soils have a wide range in
+          available water supply, texture, and depth, and are gleyed phases of well
+          drained subgroups.
+      P:
+        title: Poorly drained
+        description: Water is removed so slowly in relation to supply that the soil
+          remains wet for a comparatively large part of the time the soil is not frozen.
+          Excess water is evident in the soil for a large part of the time. Subsurface
+          flow or groundwater flow, or both, in addition to precipitation are the
+          main water sources; there may also be a perched water table, with precipitation
+          exceeding evapotranspiration. Soils have a wide range in available water
+          storage capacity, texture, and depth, and are gleyed subgroups, Gleysols,
+          and Organic soils.
+      VP:
+        title: Very poorly drained
+        description: Water is removed from the soil so slowly that the water table
+          remains at or on the surface for the greater part of the time the soil is
+          not frozen. Excess water is present in the soil for the greater part of
+          the time. Groundwater flow and subsurface flow are the major water sources.
+          Precipitation is less important except where there is a perched water table
+          with precipitation exceeding evapotranspiration. Soils have a wide range
+          in available water storage capacity, texture, and depth, and are either
+          Gleysolic or Organic.
+      '-':
+        title: Not applicable
+        description: Drainage not applicable (rock, ice, etc)
+    annotations:
+      imported_from: NSDBSNTv2
+      source_file: sources/NSDBSNTv2.yaml
+  NSDB_PMCHEM1:
+    name: PMCHEM1
+    title: "Parent material chemical property - first\_(uppermost)"
+    description: The chemical composition class of the upper layer parent material.
+    permissible_values:
+      UD:
+        title: Undifferentiated
+        description: Undifferentiated acidity and/or calcareousness
+      EA:
+        title: Extremely / Strongly Acidic
+        description: pH &lt; 5.6
+      AN:
+        title: Medium Acid to Neutral
+        description: pH 5.6 - 7.4
+      WC:
+        title: Weakly Calcareous
+        description: '&lt; 6 CaCO3 equivalent (%)'
+      VC:
+        title: Moderately / Very Strongly Calcareous
+        description: 6 - 40 CaCO3 equivalent (%)
+      EC:
+        title: Extremely Calcareous
+        description: '&gt; 40 CaCO3 equivalent (%)'
+      SA:
+        title: Calcareous and Saline
+        description: Calcareous and Saline
+      '-':
+        title: Not Applicable
+        description: Not Applicable
+    annotations:
+      imported_from: NSDBSNTv2
+      source_file: sources/NSDBSNTv2.yaml
+  NSDB_PMTEX1:
+    name: PMTEX1
+    title: "Parent material texture - first\_(uppermost)"
+    description: The texture class of the underlying parent material. First used in
+      SLC 3.0.
+    permissible_values:
+      VC:
+        title: Very Coarse
+        description: 'Very Coarse (USDA Texture Classes: VCS,CS,S,GS,CBS).'
+      C:
+        title: Coarse
+        description: 'Coarse (USDA Texture Classes: FS,LCS,LS,LFS,GLS,CBLS).'
+      MC:
+        title: Moderately Coarse
+        description: 'Moderately Coarse (USDA Texture Classes: VFS,LVFS,CSL,SL,FSL,GSL,CBSL,GFSL).'
+      M:
+        title: Medium
+        description: 'Medium (USDA Texture Classes: VFSL,L,SIL,SI,GL,GSIL).'
+      MF:
+        title: Moderately Fine
+        description: 'Moderately Fine (USDA Texture Classes: SCL,FSCL,VFSCL,CL,SICL,GSCL,GL,CBCL).'
+      F:
+        title: Fine
+        description: 'Fine (USDA Texture Classes: SC,SIC,C,GSIC).'
+      VF:
+        title: Very Fine
+        description: 'Very Fine (USDA Texture Classes: HC (more than 60% clay).'
+      CS:
+        title: Coarse Skeletal
+        description: 'Coarse Skeletal (USDA Texture Classes: VGS, VGLS).'
+      MS:
+        title: Medium Skeletal
+        description: 'Medium Skeletal (USDA Texture Classes: VGSL, VGL).'
+      FS:
+        title: Fine Skeletal
+        description: 'Fine Skeletal (USDA Texture Classes: VGC).'
+      FR:
+        title: Fragmental
+        description: Fragmental
+      SM:
+        title: Stratified (Mineral)
+        description: Stratified (Mineral)
+      SU:
+        title: Stratified (Mineral and Organic)
+        description: Stratified (Mineral and Organic)
+      FI:
+        title: Fibric
+        description: Fibric
+      ME:
+        title: Mesic
+        description: Mesic
+      HU:
+        title: Humic
+        description: Humic
+      UD:
+        title: Undifferentiated
+        description: Undifferentiated
+      '-':
+        title: Not Applicable
+        description: Not Applicable
+    annotations:
+      imported_from: NSDBSNTv2
+      source_file: sources/NSDBSNTv2.yaml
+  NSDB_WATERTBL:
+    name: WATERTBL
+    title: Water Table Characteristics
+    description: Indicates the presence of a water table at a depth of 100cm, and
+      identifies its temporal characteristics.
+    permissible_values:
+      YB:
+        title: Always
+        description: The water table is always present in the soil.
+      YG:
+        title: Growing season
+        description: The water table is present in the soil during the growing season.
+      YN:
+        title: Non growing season
+        description: The water table is present in the soil during the non growing
+          season.
+      YU:
+        title: Unspecified period
+        description: The water table is present in the soil during an unspecified
+          period.
+      'NO':
+        title: Never
+        description: The water table is not present in the soil at any time.
+      '-':
+        title: Not applicable
+        description: Not applicable.
+    annotations:
+      imported_from: NSDBSNTv2
+      source_file: sources/NSDBSNTv2.yaml
+  SoilSalinityClass:
+    name: SoilSalinityClass
+    title: Soil Salinity Class
+    description: Classification of soil salinity based on the electrical conductivity
+      of a saturated soil paste extract (ECe, dS/m)
+    see_also: https://www.undrr.org/understanding-disaster-risk/terminology/hips/en0303
+    permissible_values:
+      NS:
+        title: Non-saline
+        description: "ECe 0\u20132 dS/m; salinity effects mostly negligible"
+      SS:
+        title: Slightly saline
+        description: "ECe 2\u20134 dS/m; yields of very sensitive crops may be restricted"
+      MS:
+        title: Moderately saline
+        description: "ECe 4\u20138 dS/m; yields of many crops are restricted"
+      ST:
+        title: Strongly saline
+        description: "ECe 8\u201316 dS/m; only salt-tolerant crops yield satisfactorily"
+      VS:
+        title: Very strongly saline
+        description: ECe greater than 16 dS/m; only a few very salt-tolerant crops
+          yield satisfactorily
+    annotations:
+      imported_from: SoilSalinityClass
+      source_file: sources/SoilSalinityClass.yaml
+  SoilStructuralShapeScale:
+    name: SoilStructuralShapeScale
+    title: Soil Structural Shape
+    description: Classification of the shape or type of soil structural units (peds)
+      describing how soil aggregates are arranged
+    permissible_values:
+      SG:
+        title: Single grain
+        description: Soil particles exist as individual grains with no aggregation,
+          typical of sandy soils
+      MA:
+        title: Massive
+        description: Soil is coherent with no observable structural units or planes
+          of weakness
+      GR:
+        title: Granular
+        description: Small, rounded, porous aggregates not fitting together closely,
+          common in surface horizons
+      PL:
+        title: Platy
+        description: Flat, plate-like aggregates oriented horizontally and stacked
+          in layers
+      ABK:
+        title: Angular blocky
+        description: Block-like aggregates bounded by flat faces meeting at sharp
+          angles
+      SBK:
+        title: Subangular blocky
+        description: Block-like aggregates with mixed rounded and flat faces meeting
+          at less sharp angles
+      WE:
+        title: Wedge
+        description: Elliptical, interlocking lenses of peds that terminate in acute
+          angles
+      PR:
+        title: Prismatic
+        description: Vertically elongated aggregates with flat tops, bounded by vertical
+          faces
+      CO:
+        title: Columnar
+        description: Vertically elongated aggregates with rounded tops, bounded by
+          vertical faces
+    see_also: https://iastate.pressbooks.pub/introsoilscience/chapter/soilstructure/
+    annotations:
+      imported_from: SoilStructuralShape
+      source_file: sources/SoilStructuralShape.yaml
+  StandardsMaturityLevel:
+    title: Standards Development Maturity Level
+    description: Maturity levels for standards and specifications
+    status: STANDARD
+    contributors:
+      - 'orcid:0000-0002-6601-2165'
+      - https://github.com/anthropics/claude-code
+    instantiates:
+      - valuesets_meta:ReferenceEnumDefinition
+    permissible_values:
+      DRAFT:
+        description: Initial draft under development
+        title: Draft
+      WORKING_DRAFT:
+        description: Work in progress by working group
+        title: Working Draft
+      COMMITTEE_DRAFT:
+        description: Draft reviewed by committee
+        title: Committee Draft
+      CANDIDATE_RECOMMENDATION:
+        description: Mature draft ready for implementation testing
+        title: Candidate Recommendation
+      PROPOSED_STANDARD:
+        description: Stable specification ready for adoption
+        title: Proposed Standard
+      STANDARD:
+        description: Approved and published standard
+        title: Standard
+      MATURE_STANDARD:
+        description: Well-established standard with wide adoption
+        title: Mature Standard
+      SUPERSEDED:
+        description: Replaced by a newer version
+        title: Superseded
+      WITHDRAWN:
+        description: No longer valid or recommended
+        title: Withdrawn
+    annotations:
+      imported_from: StandardsMaturityLevel
+      source_file: sources/StandardsMaturityLevel.yaml
+  STATSCAN_1313722:
+    name: STATSCAN_1313722
+    description: ''
+    permissible_values:
+      '2':
+        title: Certificate, diploma or degree
+        description: This category includes persons who have obtained any certificates,
+          diplomas or degrees, or their equivalents.
+      '21':
+        title: High (secondary) school diploma or equivalency certificate (highest)
+        is_a: '2'
+      '22':
+        title: Postsecondary certificate, diploma or degree (highest)
+        is_a: '2'
+      '221':
+        title: Postsecondary certificate or diploma below bachelor level (highest)
+        is_a: '22'
+      '2211':
+        title: Apprenticeship or trades certificate or diploma (highest)
+        is_a: '221'
+      '22111':
+        title: Non-apprenticeship trades certificate or diploma (highest)
+        is_a: '2211'
+      '22112':
+        title: Apprenticeship certificate (highest)
+        is_a: '2211'
+      '2212':
+        title: College, CEGEP or other non-university certificate or diploma (highest)
+        is_a: '221'
+      '22121':
+        title: Program of 3 months to less than 1 year (College, CEGEP and other non-university
+          certificates or diplomas) (highest)
+        is_a: '2212'
+      '22122':
+        title: Program of 1 to 2 years (College, CEGEP and other non-university certificates
+          or diplomas) (highest)
+        is_a: '2212'
+      '22123':
+        title: Program of more than 2 years (College, CEGEP and other non-university
+          certificates or diplomas) (highest)
+        is_a: '2212'
+      '2213':
+        title: University certificate or diploma below bachelor level (highest)
+        is_a: '221'
+      '222':
+        title: "Bachelor's degree or higher (highest)"
+        is_a: '22'
+      '2221':
+        title: "Bachelor's degree (highest)"
+        is_a: '222'
+      '2222':
+        title: University certificate, diploma or degree above bachelor level (highest)
+        is_a: '222'
+      '22221':
+        title: University certificate or diploma above bachelor level (highest)
+        is_a: '2222'
+      '22222':
+        title: Degree in medicine, dentistry, veterinary medicine or optometry (highest)
+        is_a: '2222'
+      '22223':
+        title: "Master's degree (highest)"
+        is_a: '2222'
+      '22224':
+        title: Earned doctorate (highest)
+        is_a: '2222'
+    annotations:
+      imported_from: STATSCAN_1313722
+      source_file: sources/STATSCAN_1313722.yaml
+extensions:
+  locales:
+    tag: locales
+    value:
+      fr:
+        id: https://example.org/examples
+        name: example_name
+        title: Example title
+        description: Example description ...
+        in_language: fr
+        enums:
+          AgriFoodCA_AgreementScale:
+            permissible_values:
+              '1':
+                title: "Tout \xE0 fait d\u2019accord"
+              '2':
+                title: "D\u2019accord"
+              '3':
+                title: "Plut\xF4t d\u2019accord"
+              '4':
+                title: "Ni d\u2019accord ni en d\xE9saccord"
+              '5':
+                title: "Plut\xF4t pas d\u2019accord"
+              '6':
+                title: "Pas d\u2019accord"
+              '7':
+                title: "Tout \xE0 fait en d\xE9saccord"
+              '8':
+                title: Ne sait pas
+          AgriFoodCA_CanadianProvinces:
+            permissible_values:
+              '48':
+                title: "L'Alberta"
+              '59':
+                title: La Colombie-Britannique
+              '46':
+                title: Le Manitoba
+              '13':
+                title: Le Nouveau-Brunswick
+              '10':
+                title: La Terre-Neuve-et-Labrador
+              '12':
+                title: "La Nouvelle-\xC9cosse"
+              '61':
+                title: Les Territoires du Nord-Ouest
+              '62':
+                title: Le Nunavut
+              '35':
+                title: "L'Ontario"
+              '11':
+                title: "\xCEle-du-Prince-\xC9douard"
+              '24':
+                title: "Le Qu\xE9bec"
+              '47':
+                title: La Saskatchewan
+              '60':
+                title: Le Yukon
+          AgriFoodCA_ComfortLevel:
+            permissible_values:
+              MLC:
+                title: "Beaucoup moins \xE0 l\u2019aise avec le riz g\xE9n\xE9tiquement\
+                  \ modifi\xE9 qu\u2019avec l\u2019agriculture cellulaire"
+              LC:
+                title: "Moins \xE0 l\u2019aise"
+              LLC:
+                title: "Un peu moins \xE0 l\u2019aise"
+              SLC:
+                title: "M\xEAme niveau de confort"
+              LMC:
+                title: "Un peu plus \xE0 l\u2019aise"
+              MC:
+                title: "Plus \xE0 l\u2019aise"
+              MMC:
+                title: "Beaucoup plus \xE0 l\u2019aise avec le riz g\xE9n\xE9tiquement\
+                  \ modifi\xE9 qu\u2019avec l\u2019agriculture cellulaire"
+              DK:
+                title: Ne sait pas
+          AgriFoodCA_ConceptAwareness:
+            permissible_values:
+              Y:
+                title: Oui
+              N:
+                title: Non
+              DK:
+                title: Je ne sais pas
+          AgriFoodCA_DataQualityCodes:
+            permissible_values:
+              '1':
+                title: "Donn\xE9es non modifi\xE9es"
+              '2':
+                title: "Donn\xE9es corrig\xE9es manuellement"
+              '3':
+                title: "Donn\xE9es corrig\xE9es par \xE9talonnage"
+              '4':
+                title: "Donn\xE9es estim\xE9es"
+              '5':
+                title: "Donn\xE9es mod\xE9lis\xE9es"
+              '6':
+                title: "Donn\xE9es d\xE9riv\xE9es"
+              '7':
+                title: "Donn\xE9es agr\xE9g\xE9es"
+              '8':
+                title: "Donn\xE9es interpol\xE9es"
+              '9':
+                title: "Donn\xE9es extrapol\xE9es"
+              '10':
+                title: "Donn\xE9es arrondies"
+              '11':
+                title: "Donn\xE9es normalis\xE9es"
+              '12':
+                title: "Donn\xE9es transform\xE9es"
+              '13':
+                title: "Donn\xE9es valid\xE9es"
+              '14':
+                title: "Donn\xE9es v\xE9rifi\xE9es"
+              '15':
+                title: "Donn\xE9es provisoires"
+              '16':
+                title: "Donn\xE9es pr\xE9liminaires"
+              '17':
+                title: "Donn\xE9es finales"
+              '18':
+                title: "Donn\xE9es r\xE9vis\xE9es"
+              '19':
+                title: "Donn\xE9es d\xE9pr\xE9ci\xE9es"
+              '20':
+                title: "Donn\xE9es dupliqu\xE9es"
+              '100':
+                title: Valeur nulle
+              '101':
+                title: Valeur manquante
+              '102':
+                title: Sans objet
+              '103':
+                title: "Non mesur\xE9"
+              '104':
+                title: "Non d\xE9clar\xE9"
+              '105':
+                title: "Valeur masqu\xE9e pour des raisons de confidentialit\xE9"
+              '106':
+                title: Valeur retenue
+              '107':
+                title: "Valeur expurg\xE9e"
+              '200':
+                title: "Sous la limite de d\xE9tection"
+              '201':
+                title: "Au-dessus de la limite de d\xE9tection"
+              '202':
+                title: Sous la limite de quantification
+              '203':
+                title: Au-dessus de la limite de quantification
+              '204':
+                title: "Sous le seuil de d\xE9claration"
+              '205':
+                title: "Au-dessus du seuil de d\xE9claration"
+              '300':
+                title: "Donn\xE9es suspectes"
+              '301':
+                title: Valeur aberrante
+              '302':
+                title: "Erreur d'instrument"
+              '303':
+                title: Erreur de transcription
+              '304':
+                title: "Erreur d'\xE9chantillonnage"
+              '305':
+                title: Erreur de traitement
+              '306':
+                title: "Contamination d\xE9tect\xE9e"
+              '307':
+                title: "Erreur de saisie de donn\xE9es"
+              '308':
+                title: "Erreur de conversion d'unit\xE9"
+              '309':
+                title: "D\xE9faillance du mat\xE9riau de r\xE9f\xE9rence"
+              '400':
+                title: "Donn\xE9es en attente de r\xE9vision"
+              '401':
+                title: "Donn\xE9es sous embargo"
+              '402':
+                title: "Donn\xE9es archiv\xE9es"
+              '403':
+                title: "Donn\xE9es r\xE9tract\xE9es"
+          AgriFoodCA_Days:
+            permissible_values:
+              Monday:
+                title: Lundi
+              Tuesday:
+                title: Mardi
+              Wednesday:
+                title: Mercredi
+              Thursday:
+                title: Jeudi
+              Friday:
+                title: Vendredi
+              Saturday:
+                title: Samedi
+              Sunday:
+                title: Dimanche
+          AgriFoodCA_EducationLevel:
+            permissible_values:
+              Primary or elementary school:
+                title: "\xC9cole primaire"
+              Secondary (high school diploma or equivalent):
+                title: "\xC9cole secondaire (dipl\xF4me d\u2019\xE9tudes secondaires\
+                  \ ou \xE9quivalent)"
+              Apprenticeship or trades:
+                title: "Apprentissage ou m\xE9tiers sp\xE9cialis\xE9s"
+              College or other non-university level:
+                title: "Coll\xE8ge ou autre niveau non universitaire"
+              Professional school:
+                title: "\xC9cole professionnelle"
+              University bachelor level degree:
+                title: "Baccalaur\xE9at universitaire"
+              University graduate school:
+                title: "\xC9tudes universitaires sup\xE9rieures"
+              Prefer not to say:
+                title: "Pr\xE9f\xE8re ne pas r\xE9pondre"
+          AgriFoodCA_EightPointCardinality:
+            permissible_values:
+              N:
+                title: Nord
+              NE:
+                title: Nord-Est
+              E:
+                title: Est
+              SE:
+                title: Sud-Est
+              S:
+                title: Sud
+              SW:
+                title: Sud-Ouest
+              W:
+                title: Ouest
+              NW:
+                title: Nord-Ouest
+          AgriFoodCA_Frequency:
+            permissible_values:
+              ED:
+                title: Tous les jours
+              FTW:
+                title: Quelques fois par semaine
+              OW:
+                title: Une fois par semaine
+              OM:
+                title: Une fois par mois
+              FT:
+                title: "Quelques fois par ann\xE9e"
+              NV:
+                title: Jamais
+          AgriFoodCA_Gender:
+            permissible_values:
+              F:
+                title: Femme
+              M:
+                title: Homme
+              NB:
+                title: "Non binaire (diversit\xE9 de genre)"
+              OTH:
+                title: Autre
+              PNS:
+                title: "Pr\xE9f\xE8re ne pas r\xE9pondre"
+          AgriFoodCA_HouseholdComposition:
+            permissible_values:
+              LO:
+                title: "Je vis seul\xB7e"
+              CLT:
+                title: Couple vivant ensemble
+              FC:
+                title: Famille avec enfants
+              MLG:
+                title: "M\xE9nage multig\xE9n\xE9rationnel (deux familles ou plus\
+                  \ vivant ensemble)"
+              Oth:
+                title: Autre
+              PNS:
+                title: "Pr\xE9f\xE8re ne pas r\xE9pondre"
+          AgriFoodCA_Months:
+            permissible_values:
+              January:
+                title: janvier
+              February:
+                title: "f\xE9vrier"
+              March:
+                title: mars
+              April:
+                title: avril
+              May:
+                title: mai
+              June:
+                title: juin
+              July:
+                title: juillet
+              August:
+                title: "ao\xFBt"
+              September:
+                title: septembre
+              October:
+                title: octobre
+              November:
+                title: novembre
+              December:
+                title: "d\xE9cembre"
+          AgriFoodCA_SixteenPointCardinality:
+            permissible_values:
+              N:
+                title: Nord
+              NNE:
+                title: Nord-Nord-Est
+              NE:
+                title: Nord-Est
+              ENE:
+                title: Est-Nord-Est
+              E:
+                title: Est
+              ESE:
+                title: Est-Sud-Est
+              SE:
+                title: Sud-Est
+              SSE:
+                title: Sud-Sud-Est
+              S:
+                title: Sud
+              SSW:
+                title: Sud-Sud-Ouest
+              SW:
+                title: Sud-Ouest
+              WSW:
+                title: Ouest-Sud-Ouest
+              W:
+                title: Ouest
+              WNW:
+                title: Ouest-Nord-Ouest
+              NW:
+                title: Nord-Ouest
+              NNW:
+                title: Nord-Nord-Ouest
+          AgriFoodCA_SoilAerationStatus:
+            permissible_values:
+              AERW:
+                title: "Bien a\xE9r\xE9"
+                description: "Bonne disponibilit\xE9 en oxyg\xE8ne"
+              AERM:
+                title: "Mod\xE9r\xE9ment a\xE9r\xE9"
+                description: "Disponibilit\xE9 en oxyg\xE8ne mod\xE9r\xE9e"
+              AERP:
+                title: "Mal a\xE9r\xE9 (ana\xE9robie)"
+                description: "Faible oxyg\xE8ne; conditions ana\xE9robies"
+          AgriFoodCA_SoilBulkDensity:
+            permissible_values:
+              BDL:
+                title: Faible
+                description: "Favorable \xE0 l\u2019enracinement (selon la texture)"
+              BDM:
+                title: "Mod\xE9r\xE9"
+                description: Peut affecter la croissance (proche du restrictif)
+              BDH:
+                title: "\xC9lev\xE9"
+                description: Restrictif pour les racines (selon la texture)
+          AgriFoodCA_SoilCarbonToNitrogenRatio:
+            permissible_values:
+              CNL:
+                title: Faible
+                description: 'C:N < 10'
+              CNM:
+                title: Moyen
+                description: 'C:N 10-20'
+              CNH:
+                title: "\xC9lev\xE9"
+                description: 'C:N > 20'
+          AgriFoodCA_SoilColloidFraction:
+            permissible_values:
+              COLL:
+                title: Faible
+                description: "Faible fraction collo\xEFdale"
+              COLM:
+                title: Moyenne
+                description: "Fraction collo\xEFdale moyenne"
+              COLH:
+                title: "\xC9lev\xE9e"
+                description: "Forte fraction collo\xEFdale"
+          AgriFoodCA_SoilCompressibility:
+            permissible_values:
+              CMPL:
+                title: Faible
+                description: "Compressibilit\xE9 faible"
+              CMPM:
+                title: "Mod\xE9r\xE9e"
+                description: "Compressibilit\xE9 mod\xE9r\xE9e"
+              CMPH:
+                title: "\xC9lev\xE9e"
+                description: "Compressibilit\xE9 \xE9lev\xE9e"
+          AgriFoodCA_SoilEffectiveRootingDepth:
+            permissible_values:
+              RDVS:
+                title: "Tr\xE8s faible profondeur"
+                description: < 25 cm
+              RDSH:
+                title: Peu profond
+                description: "25\u201350 cm"
+              RDM:
+                title: "Mod\xE9r\xE9"
+                description: "50\u2013100 cm"
+              RDD:
+                title: Profond
+                description: "100\u2013150 cm"
+              RDVD:
+                title: "Tr\xE8s profond"
+                description: '> 150 cm'
+          AgriFoodCA_SoilErodibility:
+            permissible_values:
+              ERL:
+                title: Faible
+                description: "Faible susceptibilit\xE9 \xE0 l\u2019\xE9rosion"
+              ERM:
+                title: "Mod\xE9r\xE9e"
+                description: "Susceptibilit\xE9 mod\xE9r\xE9e \xE0 l\u2019\xE9rosion"
+              ERH:
+                title: "\xC9lev\xE9e"
+                description: "Forte susceptibilit\xE9 \xE0 l\u2019\xE9rosion"
+          AgriFoodCA_SoilFertility:
+            permissible_values:
+              FERL:
+                title: Faible
+                description: "Faible fertilit\xE9 intrins\xE8que"
+              FERM:
+                title: Moyen
+                description: "Fertilit\xE9 intrins\xE8que moyenne"
+              FERH:
+                title: "\xC9lev\xE9"
+                description: "Forte fertilit\xE9 intrins\xE8que"
+          AgriFoodCA_SoilMineralContentType:
+            permissible_values:
+              MINQ:
+                title: Riche en quartz
+                description: "Min\xE9ralogie domin\xE9e par le quartz"
+              MINC:
+                title: Riche en carbonates
+                description: "Teneur \xE9lev\xE9e en carbonates"
+              MINA:
+                title: Riche en argiles
+                description: "Teneur \xE9lev\xE9e en min\xE9raux argileux"
+              MINM:
+                title: "Min\xE9ralogie mixte"
+                description: "Mixte ou indiff\xE9renci\xE9e"
+          AgriFoodCA_SoilOrganicMatter:
+            permissible_values:
+              SOMVL:
+                title: "Tr\xE8s faible"
+                description: "< 1 % de mati\xE8re organique"
+              SOML:
+                title: Faible
+                description: "1\u20132 % de mati\xE8re organique"
+              SOMM:
+                title: "Mod\xE9r\xE9"
+                description: "2\u20134 % de mati\xE8re organique"
+              SOMH:
+                title: "\xC9lev\xE9"
+                description: "4\u20138 % de mati\xE8re organique"
+              SOMVH:
+                title: "Tr\xE8s \xE9lev\xE9"
+                description: "> 8 % de mati\xE8re organique"
+          AgriFoodCA_SoilPermeability:
+            permissible_values:
+              KPVS:
+                title: "Tr\xE8s lente"
+                description: "Conductivit\xE9 hydraulique satur\xE9e tr\xE8s lente"
+              KPS:
+                title: Lente
+                description: "Conductivit\xE9 hydraulique satur\xE9e lente"
+              KPM:
+                title: "Mod\xE9r\xE9e"
+                description: "Conductivit\xE9 hydraulique satur\xE9e mod\xE9r\xE9e"
+              KPR:
+                title: Rapide
+                description: "Conductivit\xE9 hydraulique satur\xE9e rapide"
+              KPVR:
+                title: "Tr\xE8s rapide"
+                description: "Conductivit\xE9 hydraulique satur\xE9e tr\xE8s rapide"
+          AgriFoodCA_SoilPh:
+            permissible_values:
+              UA:
+                title: Ultra acide
+                description: pH < 3,5
+              EA:
+                title: "Extr\xEAmement acide"
+                description: pH 3,5-4,4
+              VSA:
+                title: "Tr\xE8s fortement acide"
+                description: pH 4,5-5,0
+              SA:
+                title: Fortement acide
+                description: pH 5,1-5,5
+              MA:
+                title: "Mod\xE9r\xE9ment acide"
+                description: pH 5,6-6,0
+              SLA:
+                title: "L\xE9g\xE8rement acide"
+                description: pH 6,1-6,5
+              NE:
+                title: Neutre
+                description: pH 6,6-7,3
+              SLK:
+                title: "L\xE9g\xE8rement alcalin"
+                description: pH 7,4-7,8
+              MK:
+                title: "Mod\xE9r\xE9ment alcalin"
+                description: pH 7,9-8,4
+              SK:
+                title: Fortement alcalin
+                description: pH 8,5-9,0
+              VSK:
+                title: "Tr\xE8s fortement alcalin"
+                description: pH > 9,0
+          AgriFoodCA_SoilPlasticity:
+            permissible_values:
+              PLAL:
+                title: Faible
+                description: "Plasticit\xE9 faible"
+              PLAM:
+                title: Moyenne
+                description: "Plasticit\xE9 moyenne"
+              PLAH:
+                title: "\xC9lev\xE9e"
+                description: "Plasticit\xE9 \xE9lev\xE9e"
+          AgriFoodCA_SoilPorosity:
+            permissible_values:
+              PORVL:
+                title: "Tr\xE8s faible"
+                description: "Porosit\xE9 totale tr\xE8s faible"
+              PORL:
+                title: Faible
+                description: "Porosit\xE9 totale faible"
+              PORM:
+                title: "Mod\xE9r\xE9e"
+                description: "Porosit\xE9 totale mod\xE9r\xE9e"
+              PORH:
+                title: "\xC9lev\xE9e"
+                description: "Porosit\xE9 totale \xE9lev\xE9e"
+              PORVH:
+                title: "Tr\xE8s \xE9lev\xE9e"
+                description: "Porosit\xE9 totale tr\xE8s \xE9lev\xE9e"
+          AgriFoodCA_SoilSalinity:
+            permissible_values:
+              NS:
+                title: Non salin
+                description: ECe < 2 dS/m
+              SS:
+                title: "L\xE9g\xE8rement salin"
+                description: ECe 2-4 dS/m
+              MS:
+                title: "Mod\xE9r\xE9ment salin"
+                description: ECe 4-8 dS/m
+              STS:
+                title: Fortement salin
+                description: ECe 8-16 dS/m
+              VSS:
+                title: "Tr\xE8s fortement salin"
+                description: ECe > 16 dS/m
+          AgriFoodCA_SoilSalinityType:
+            permissible_values:
+              STCL:
+                title: "\xC0 dominante chlorure"
+                description: Sels de chlorure dominants
+              STSO:
+                title: "\xC0 dominante sulfate"
+                description: Sels de sulfate dominants
+              STCB:
+                title: "\xC0 dominante carbonate/bicarbonate"
+                description: Sels de carbonate/bicarbonate dominants
+              STMX:
+                title: "M\xE9lange de sels"
+                description: Aucun anion dominant
+          AgriFoodCA_SoilSodicity:
+            permissible_values:
+              NSD:
+                title: Non sodique
+                description: SAR < 13 and/or ESP < 15
+              SD:
+                title: Sodique
+                description: "SAR \u2265 13 and/or ESP \u2265 15"
+          AgriFoodCA_SoilStructure:
+            permissible_values:
+              GR:
+                title: Granulaire
+                description: "Agr\xE9gats arrondis; fr\xE9quents dans l\u2019horizon\
+                  \ A"
+              BL:
+                title: Blocailleux
+                description: "Blocs anguleux ou subanguleux; fr\xE9quents dans l\u2019\
+                  horizon B"
+              PL:
+                title: Planaire
+                description: "Plaques horizontales; peut freiner l\u2019\xE9coulement\
+                  \ vertical"
+              PR:
+                title: Prismatique
+                description: "Prismes verticaux \xE0 sommet plat"
+              CO:
+                title: Columnaire
+                description: "Colonnes verticales \xE0 sommet arrondi; souvent sodiques"
+              MS:
+                title: Massif
+                description: "Sans structure; masse coh\xE9rente"
+              SG:
+                title: Grains simples
+                description: Sans structure; sable meuble
+          AgriFoodCA_SoilTexture:
+            permissible_values:
+              SND:
+                title: Sable
+                description: "Sol grossier \xE0 grosses particules et drainage rapide."
+              LSA:
+                title: Sable loameux
+                description: "Sol tr\xE8s sableux avec r\xE9tention d\u2019eau l\xE9\
+                  g\xE8rement meilleure."
+              SLM:
+                title: Limon sableux
+                description: "Sol sableux retenant mieux l\u2019eau et les nutriments\
+                  \ que le sable."
+              LOM:
+                title: Limon
+                description: "M\xE9lange \xE9quilibr\xE9 sable\u2013limon\u2013argile\
+                  \ \xE0 bonne structure."
+              SIL:
+                title: Limon limoneux
+                description: "Sol lisse \xE0 bonne r\xE9tention d\u2019eau et drainage\
+                  \ lent."
+              SIT:
+                title: Limons
+                description: "Sol fin au toucher soyeux et forte r\xE9tention d\u2019\
+                  eau."
+              SCL:
+                title: Limon argilo-sableux
+                description: "M\xE9lange plus fin \xE0 drainage mod\xE9r\xE9."
+              CLM:
+                title: Limon argileux
+                description: "Texture fine; drainage lent et fertilit\xE9 \xE9lev\xE9\
+                  e."
+              SCLo:
+                title: Limon argilo-limoneux
+                description: "Texture fine; drainage lent et bonne r\xE9tention."
+              SAC:
+                title: Argile sableuse
+                description: Sol argileux avec sable; drainage lent.
+              SIC:
+                title: Argile limoneuse
+                description: Sol argileux avec limon; drainage lent.
+              CLY:
+                title: Argile
+                description: "Sol tr\xE8s fin, drainage lent et forte capacit\xE9\
+                  \ nutritive."
+          AgriFoodCA_SupportConcept:
+            permissible_values:
+              SO:
+                title: "Fermement oppos\xE9\xB7e"
+              OP:
+                title: "Oppos\xE9\xB7e"
+              MO:
+                title: "Plut\xF4t oppos\xE9\xB7e"
+              NOS:
+                title: "Ni oppos\xE9\xB7e ni favorable"
+              MS:
+                title: "Plut\xF4t favorable"
+              SU:
+                title: Favorable
+              SS:
+                title: Fermement favorable
+              DK:
+                title: Ne sait pas
+          AgriFoodCA_ThirtyTwoPointCardinality:
+            permissible_values:
+              N:
+                title: Nord
+              N by E:
+                title: Nord quart Est
+              NNE:
+                title: Nord-Nord-Est
+              NE by N:
+                title: Nord-Est quart Nord
+              NE:
+                title: Nord-Est
+              NE by E:
+                title: Nord-Est quart Est
+              ENE:
+                title: Est-Nord-Est
+              E by N:
+                title: Est quart Nord
+              E:
+                title: Est
+              E by S:
+                title: Est quart Sud
+              ESE:
+                title: Est-Sud-Est
+              SE by E:
+                title: Sud-Est quart Est
+              SE:
+                title: Sud-Est
+              SE by S:
+                title: Sud-Est quart Sud
+              SSE:
+                title: Sud-Sud-Est
+              S by E:
+                title: Sud quart Est
+              S:
+                title: Sud
+              S by W:
+                title: Sud quart Ouest
+              SSW:
+                title: Sud-Sud-Ouest
+              SW by S:
+                title: Sud-Ouest quart Sud
+              SW:
+                title: Sud-Ouest
+              SW by W:
+                title: Sud-Ouest quart Ouest
+              WSW:
+                title: Ouest-Sud-Ouest
+              W by S:
+                title: Ouest quart Sud
+              W:
+                title: Ouest
+              W by N:
+                title: Ouest quart Nord
+              WNW:
+                title: Ouest-Nord-Ouest
+              NW by W:
+                title: Nord-Ouest quart Ouest
+              NW:
+                title: Nord-Ouest
+              NW by N:
+                title: Nord-Ouest quart Nord
+              NNW:
+                title: Nord-Nord-Ouest
+              N by W:
+                title: Nord quart Ouest
+          Canada:
+            permissible_values:
+              AB:
+                title: Alberta
+              BC:
+                title: Colombie-Britannique
+              MB:
+                title: Manitoba
+              NB:
+                title: Nouveau-Brunswick
+              NL:
+                title: Terre-Neuve-et-Labrador
+              NT:
+                title: Territoires du Nord-Ouest
+              NS:
+                title: "Nouvelle-\xC9cosse"
+              NU:
+                title: Nunavut
+              'ON':
+                title: Ontario
+              PE:
+                title: "\xCEle-du-Prince-\xC9douard"
+              QC:
+                title: "Qu\xE9bec"
+              SK:
+                title: Saskatchewan
+              YT:
+                title: Yukon
+          NSDB_WATERTBL:
+            permissible_values:
+              YB:
+                title: Toujours
+                description: "La nappe phr\xE9atique est toujours pr\xE9sente dans\
+                  \ le sol."
+              YG:
+                title: Saison de croissance
+                description: "La nappe phr\xE9atique est pr\xE9sente dans le sol pendant\
+                  \ la saison de croissance."
+              YN:
+                title: En dehors de la saison de croissance
+                description: "La nappe phr\xE9atique est pr\xE9sente dans le sol en\
+                  \ dehors de la saison de croissance."
+              YU:
+                title: "P\xE9riode ind\xE9termin\xE9e"
+                description: "La nappe phr\xE9atique est pr\xE9sente dans le sol pendant\
+                  \ une p\xE9riode ind\xE9termin\xE9e."
+              'NO':
+                title: Jamais
+                description: "La nappe phr\xE9atique n'est jamais pr\xE9sente dans\
+                  \ le sol."
+              '-':
+                title: Ne s&#39;applique pas
+                description: "Ne s'applique pas."
+          NSDB_DRAINAGE:
+            permissible_values:
+              VR:
+                title: "Drainage tr\xE8s rapide"
+                description: "L'eau s'\xE9coule du sol beaucoup plus rapidement qu'elle\
+                  \ n'y p\xE9n\xE8tre.\_ Le surplus d'eau descend tr\xE8s rapidement\
+                  \ dans le cas o\xF9\_ le mat\xE9riel sous-jacent est perm\xE9able.\_\
+                  \ L'\xE9coulement souterrain peut-\xEAtre tr\xE8s rapide lorsque\
+                  \ les pluies sont intenses l\xE0 o\xF9 le gradient est abrupt.\_\
+                  \ Les sols ont une capacit\xE9 de storage tr\xE8s basse (normallement\
+                  \ moins de 2.5 cm) dans la section contr\xF4l\xE9e et sont d'une\
+                  \ texture grossi\xE8re, ou peu profond, ou les deux. L'eau provient\
+                  \ des pr\xE9cipitations."
+              R:
+                title: Drainage rapide
+                description: "L'eau s'\xE9coule du sol plus rapidement qu'elle n'y\
+                  \ p\xE9n\xE8tre.\_ Le surplus d'eau descend vers le bas dans le\
+                  \ cas o\xF9 le mat\xE9riel sous-jacent est perm\xE9able.\_ Il peut\
+                  \ se produire un \xE9coulement souterrain sur les gradients abrupts\
+                  \ lors des pluies intenses.\_ Les sols ont une capacit\xE9 de storage\
+                  \ basse (2.5-4 cm) dans la section contr\xF4l\xE9e et sont d'une\
+                  \ texture grossi\xE8re, ou peu profond, ou les deux. L'eau provient\
+                  \ des pr\xE9cipitations."
+              W:
+                title: Drainage bon
+                description: "L'eau s'\xE9coule du sol ais\xE9ment mais non rapidement.\_\
+                  \ Le surplus d'eau descend facilement dans le mat\xE9riel sous-jacent\
+                  \ perm\xE9able ou migre lat\xE9ralement sous forme d'\xE9coulement\
+                  \ souterrain.\_ Les sols ont une capacit\xE9 de storage interm\xE9\
+                  diaire (4-5 cm) dans la section contr\xF4l\xE9e, et sont d'une texture\
+                  \ et profondeur interm\xE9diaire.\_ L'eau provient des pr\xE9cipitations.\_\
+                  \ Sur des inclinaisons dans le sous-sol la descente d'eau peut se\
+                  \ produire pour un temp court mais des surplus sont \xE9gaux au\
+                  \ pertes."
+              MW:
+                title: "Drainage mod\xE9r\xE9ment bon"
+                description: "L'eau s'\xE9coule du sol un peu plus lentement qu'elle\
+                  \ n'y p\xE9n\xE8tre.\_ Le surplus d'eau s'\xE9coule un peu lentement\
+                  \ \xE0 cause de la faible perm\xE9abilit\xE9, de la surface de saturation\
+                  \ \xE9lev\xE9e, du faible gradient ou d'une combinaison de ces facteurs.\_\
+                  \ Les sols ont une capacit\xE9 de teneur en eau de l'interm\xE9\
+                  diaire \xE0 \xE9lev\xE9e (5-6 cm) dans la section contr\xF4l\xE9\
+                  e et sont \xE0 texture moyenne \xE0 fine.\_ La source d'eau dominante\
+                  \ est la pr\xE9cipitation dans les sols \xE0 texture moyenne \xE0\
+                  \ fine.\_ Dans les sols \xE0 texture grossi\xE8re, des volumes importants\
+                  \ d'\xE9coulement souterrain s'ajoutent aux pr\xE9cipitations."
+              I:
+                title: Drainage imparfait
+                description: "L'eau s'\xE9coule du sol suffisamment lentement par\
+                  \ rapport \xE0 l'apport d'eau pour que le sol reste humide durant\
+                  \ une grande partie de la saison de croissance.\_ Le surplus d'eau\
+                  \ descend lentement vers le bas l\xE0 o\xF9 les pr\xE9cipitations\
+                  \ constituent le principal apport.\_ Dans les cas o\xF9 les eaux\
+                  \ souterraines ou sub-superficielles, ou les deux, constituent la\
+                  \ principale source, le taux d'\xE9coulement peut varier, mais le\
+                  \ sol demeure humide durant une importante partie de la saison de\
+                  \ croissance.\_ La source principale est la pr\xE9cipitation quand\
+                  \ la capacit\xE9 est \xE9lev\xE9e en teneur d'eau. La contribution\
+                  \ d'\xE9coulement superficiel ou souterrain, ou les deux, augmente\
+                  \ \xE0 chaque fois que la capacit\xE9e de teneur en eau disponible\
+                  \ diminue. Les sols ont une grande capacit\xE9e en provision d'eau,\
+                  \ texture et profondeur, et ont des phases gleyifi\xE9 de sous-groupe\
+                  \ \xE0 drainage bon."
+              P:
+                title: Drainage pauvre
+                description: "\xC9tant donn\xE9 que l'eau s'\xE9coule beaucoup plus\
+                  \ lentement qu'elle y est apport\xE9e, le sol demeure humide durant\
+                  \ une grande partie de la p\xE9riode o\xF9 le sol n'est pas gel\xE9\
+                  .\_ Il y a la plupart du temps un surplus d'eau dans le sol.\_ L'\xE9\
+                  coulement superficiel ou souterrain, ou les deux, s'ajoute aux pr\xE9\
+                  cipitations comme principale source d'eau\_; il peut y avoir aussi\
+                  \ une nappe d'eau perch\xE9e, quand les pr\xE9cipitations sont plus\
+                  \ importantes que l'\xE9vapotranspiration. La capacit\xE9 de r\xE9\
+                  tention d'eau, la texture et la profondeur des sols varient fortement.\
+                  \ Ces sols appartiennent aux sous-groupe gleyifi\xE9s, aux gleysols\
+                  \ ou aux sols organiques."
+              VP:
+                title: "Drainage tr\xE8s pauvre"
+                description: "L'eau s'\xE9coule tellement lentement que la surface\
+                  \ de saturation affleure \xE0 la surface durant une large partie\
+                  \ de la p\xE9riode o\xF9 le sol n'est pas gel\xE9.\_ L'exc\xE8s\
+                  \ d'eau est pr\xE9sente dans le sol durant une grande partie du\
+                  \ temps.\_ L'\xE9coulement de la nappe souterraine et l'\xE9coulement\
+                  \ souterrain constituent les principales sources d'eau.\_ Les pr\xE9\
+                  cipitations jouent un r\xF4le moins important, sauf l\xE0 o\xF9\
+                  \ il y a une nappe d'eau perch\xE9e et o\xF9 les pr\xE9cipitations\
+                  \ exc\xE8dent l'\xE9vapotranspiration. La capacit\xE9 de r\xE9tention\
+                  \ d'eau, la texture et la profondeur de ces sols varient fortement\
+                  \ et ces derniers sont gleysoliques ou organiques."
+              '-':
+                title: Ne s&#39;applique pas
+                description: "Drainage ne s'applique pas (roche, glace, etc)"
+          NSDB_PMTEX1:
+            permissible_values:
+              VC:
+                title: "Tr\xE8s grossier"
+                description: "Tr\xE8s grossier (Cat\xE9gories de texture du USDA:\
+                  \ VCS,CS,S,GS,CBS)."
+              C:
+                title: Grossier
+                description: "Grossier (Cat\xE9gories de texture du USDA: FS,LCS,LS,LFS,GLS,CBLS)."
+              MC:
+                title: "Mod\xE9r\xE9ment grossier"
+                description: "Mod\xE9r\xE9ment grossier (Cat\xE9gories de texture\
+                  \ du USDA: VFS,LVFS,CSL,SL,FSL,GSL,CBSL,GFSL)."
+              M:
+                title: Moyen
+                description: "Moyen (Cat\xE9gories de texture du USDA: VFSL,L,SIL,SI,GL,GSIL)."
+              MF:
+                title: "Mod\xE9r\xE9ment fine"
+                description: "Mod\xE9r\xE9ment fine (Cat\xE9gories de texture du USDA:\
+                  \ SCL,FSCL,VFSCL,CL,SICL,GSCL,GL,CBCL)."
+              F:
+                title: Fine
+                description: "Fine (Cat\xE9gories de texture du USDA: SC,SIC,C,GSIC)."
+              VF:
+                title: "Tr\xE8s fine"
+                description: "Tr\xE8s fine (Cat\xE9gories de texture du USDA: HC (plus\
+                  \ que 60% d'argile)."
+              CS:
+                title: Gros squelette
+                description: "Gros squelette\_(Cat\xE9gories de texture du USDA: VGS,\
+                  \ VGLS)."
+              MS:
+                title: Moyen squelette
+                description: "Moyen squelette\_(Cat\xE9gories de texture du USDA:\
+                  \ VGSL, VGL)."
+              FS:
+                title: Fin squelette
+                description: "Fin squelette (Cat\xE9gories de texture du USDA: VGC)."
+              FR:
+                title: Fragmentaires
+                description: Fragmentaires
+              SM:
+                title: "Stratifi\xE9es (min\xE9ral)"
+                description: "Stratifi\xE9es (min\xE9ral)"
+              SU:
+                title: "Stratifi\xE9es (min\xE9ral et organique)"
+                description: "Stratifi\xE9es (min\xE9ral et organique)"
+              FI:
+                title: Fibriques
+                description: Fibriques
+              ME:
+                title: "M\xE9siques"
+                description: "M\xE9siques"
+              HU:
+                title: Humiques
+                description: Humiques
+              UD:
+                title: "Non diff\xE9renci\xE9"
+                description: "Non diff\xE9renci\xE9"
+              '-':
+                title: Ne s&#39;applique pas
+                description: "Ne s'applique pas"
+          NSDB_PMCHEM1:
+            permissible_values:
+              UD:
+                title: "Non diff\xE9renci\xE9"
+                description: "Non diff\xE9renci\xE9"
+              EA:
+                title: "Teneur acide extr\xEAme / tr\xE8s \xE9lev\xE9e"
+                description: pH &lt; 5,6
+              AN:
+                title: "Teneur acide moyenne \xE0 neutre"
+                description: pH 5,6 - 7,4
+              WC:
+                title: Faible teneur en calcaire
+                description: "&lt; 6 CaCO3 \xE9quivalent (%)"
+              VC:
+                title: "Teneur mod\xE9r\xE9e / tr\xE8s \xE9lev\xE9e en calcaire"
+                description: "6 - 40 CaCO3 \xE9quivalent (%)"
+              EC:
+                title: "Teneur extr\xEAme en calcaire"
+                description: "&gt; 40 CaCO3 \xE9quivalent (%)"
+              SA:
+                title: Saline Teneur en calcaire et teneur saline
+                description: Saline Teneur en calcaire et teneur saline
+              '-':
+                title: Ne s&#39;applique pas
+                description: "Ne s'applique pas"
+          STATSCAN_1326727:
+            permissible_values:
+              '1':
+                title: Homme
+                description: "Cette cat\xE9gorie comprend les personnes dont le genre\
+                  \ d\xE9clar\xE9 est masculin. Elle comprend les hommes cisgenres\
+                  \ (cis) et les hommes transgenres (trans)."
+              '2':
+                title: Femme
+                description: "Cette cat\xE9gorie comprend les personnes dont le genre\
+                  \ d\xE9clar\xE9 est f\xE9minin. Elle comprend les femmes cisgenres\
+                  \ (cis) et les femmes transgenres (trans)."
+              '3':
+                title: Personne non binaire
+                description: "Cette cat\xE9gorie comprend les personnes dont le genre\
+                  \ d\xE9clar\xE9 n'est pas exclusivement masculin ni f\xE9minin.Elle\
+                  \ comprend les personnes dont le genre d\xE9clar\xE9 est, par exemple,\
+                  \ agenre, pangenre, genre queer, genre fluide ou genre non conforme.\
+                  \ Elle comprend \xE9galement les personnes dont le genre d\xE9clar\xE9\
+                  \ est bispirituel \u2014 un terme propre \xE0 certains peuples autochtones\
+                  \ d'Am\xE9rique du Nord.Elle comprend les personnes dont le genre\
+                  \ d\xE9clar\xE9 est \xE0 la fois masculin et f\xE9minin, ni l'un\
+                  \ ni l'autre ou l'un ou l'autre en plus d'un autre genre. Elle peut\
+                  \ \xE9galement comprendre celles ayant indiqu\xE9 ou ayant \xE9\
+                  t\xE9 identifi\xE9es par personne interpos\xE9e comme \xE9tant en\
+                  \ questionnement ou en processus de d\xE9cision."

@@ -70,7 +70,15 @@ def _parse_credit_pdf(pdf_path):
               file=sys.stderr)
         return []
 
-    reader = pypdf.PdfReader(pdf_path)
+    try:
+        reader = pypdf.PdfReader(pdf_path)
+    except Exception as e:
+        print(
+            f"  Error reading PDF {pdf_path}: {e}\n"
+            f"  The file may be corrupt or incomplete. Try re-fetching with -f CRediT.",
+            file=sys.stderr,
+        )
+        return []
     text = " ".join((page.extract_text() or "") for page in reader.pages)
     text = re.sub(r'\s+', ' ', text).strip()
 
@@ -181,6 +189,18 @@ def match_credit(url, config_file=MENU_CONFIG):
     )
     if result.returncode != 0:
         print(f"  Error downloading PDF: {result.stderr.strip()}", file=sys.stderr)
+        return True
+
+    with open(pdf_path, 'rb') as fh:
+        first_bytes = fh.read(205)
+    if not first_bytes.startswith(b'%PDF-'):
+        preview = first_bytes[:200].decode('utf-8', errors='replace').replace('\n', ' ')
+        print(
+            f"  Error: downloaded content is not a PDF.\n"
+            f"  First bytes: {preview[:120]!r}\n"
+            f"  Check {pdf_path} and verify the URL is still valid.",
+            file=sys.stderr,
+        )
         return True
     print(f"Saved to {pdf_path}")
 

@@ -1,0 +1,234 @@
+# agrifoodca_sssom.tsv — FR translations for picklist entries not covered by schema.yaml
+#
+# subject_id patterns:
+#   agrifoodca:{picklist_key}:name            — enum name translation
+#   agrifoodca:{picklist_key}:description     — enum description translation
+#   agrifoodca:{picklist_key}:keywords:{kw}   — keyword translation (kw = EN keyword)
+#   agrifoodca:{picklist_key}:choice:{Code}   — permissible-value title translation
+#
+# object_label carries the translation with a BCP-47 language tag, e.g. "Femme"@fr
+curie_map:
+  agrifoodca: https://github.com/agrifooddatacanada/picklists_for_schemas/blob/main/picklists/
+  skos: http://www.w3.org/2004/02/skos/core#
+mapping_set_id: agrifoodca:agrifoodca_sssom
+mapping_set_description: French translations for AgriFoodCA picklist entries
+---
+subject_id	predicate_id	object_id	object_label	mapping_justification	author_id	confidence	comment
+agrifoodca:AgreementScale:name	skos:exactMatch		"Échelle d’accord"@fr				
+agrifoodca:AgreementScale:description	skos:exactMatch		"Échelle de réponses standard allant de tout à fait d’accord à tout à fait en désaccord."@fr				
+agrifoodca:AgreementScale:keywords:agreement	skos:exactMatch		"accord"@fr				
+agrifoodca:AgreementScale:keywords:likert scale	skos:exactMatch		"échelle de Likert"@fr				
+agrifoodca:AgreementScale:keywords:survey responses	skos:exactMatch		"réponses de sondage"@fr				
+agrifoodca:CanadianProvinces:name	skos:exactMatch		"Provinces canadiennes"@fr				
+agrifoodca:CanadianProvinces:description	skos:exactMatch		"Liste des provinces canadiennes et leurs codes"@fr				
+agrifoodca:CanadianProvinces:keywords:canada	skos:exactMatch		"Canada"@fr				
+agrifoodca:CanadianProvinces:keywords:province	skos:exactMatch		"province"@fr				
+agrifoodca:CanadianProvinces:keywords:geography	skos:exactMatch		"géographie"@fr				
+agrifoodca:CanadianProvinces:choice:AB	skos:exactMatch		"L'Alberta"@fr				
+agrifoodca:CanadianProvinces:choice:BC	skos:exactMatch		"La Colombie-Britannique"@fr				
+agrifoodca:CanadianProvinces:choice:MB	skos:exactMatch		"Le Manitoba"@fr				
+agrifoodca:CanadianProvinces:choice:NB	skos:exactMatch		"Le Nouveau-Brunswick"@fr				
+agrifoodca:CanadianProvinces:choice:NL	skos:exactMatch		"La Terre-Neuve-et-Labrador"@fr				
+agrifoodca:CanadianProvinces:choice:NS	skos:exactMatch		"La Nouvelle-Écosse"@fr				
+agrifoodca:CanadianProvinces:choice:NT	skos:exactMatch		"Les Territoires du Nord-Ouest"@fr				
+agrifoodca:CanadianProvinces:choice:NU	skos:exactMatch		"Le Nunavut"@fr				
+agrifoodca:CanadianProvinces:choice:ON	skos:exactMatch		"L'Ontario"@fr				
+agrifoodca:CanadianProvinces:choice:QC	skos:exactMatch		"Le Québec"@fr				
+agrifoodca:CanadianProvinces:choice:SK	skos:exactMatch		"La Saskatchewan"@fr				
+agrifoodca:CanadianProvinces:choice:YT	skos:exactMatch		"Le Yukon"@fr				
+agrifoodca:ComfortLevelScale:name	skos:exactMatch		"Échelle de niveau de confort"@fr				
+agrifoodca:ComfortLevelScale:description	skos:exactMatch		"Niveau de confort ou d’inconfort exprimé par rapport à un sujet une option ou une comparaison."@fr				
+agrifoodca:ComfortLevelScale:keywords:comfort level	skos:exactMatch		"niveau de confort"@fr				
+agrifoodca:ComfortLevelScale:keywords:attitudes	skos:exactMatch		"attitudes"@fr				
+agrifoodca:ComfortLevelScale:keywords:perceptions	skos:exactMatch		"perceptions"@fr				
+agrifoodca:ComfortLevelScale:keywords:survey responses	skos:exactMatch		"réponses de sondage"@fr				
+agrifoodca:AwarenessOfConcept:name	skos:exactMatch		"Sensibilisation à un concept"@fr				
+agrifoodca:AwarenessOfConcept:description	skos:exactMatch		"Indique si la personne répondante a déjà entendu parler ou est consciente d’un concept d’un sujet ou d’un thème."@fr				
+agrifoodca:AwarenessOfConcept:keywords:awareness	skos:exactMatch		"sensibilisation"@fr				
+agrifoodca:AwarenessOfConcept:keywords:familiarity	skos:exactMatch		"familiarité"@fr				
+agrifoodca:AwarenessOfConcept:keywords:knowledge	skos:exactMatch		"connaissance"@fr				
+agrifoodca:AwarenessOfConcept:keywords:survey responses	skos:exactMatch		"réponses de sondage"@fr				
+agrifoodca:DataQualityCodes:name	skos:exactMatch		"Codes de qualité des données"@fr				
+agrifoodca:DataQualityCodes:description	skos:exactMatch		"Une liste de choix contrôlée de codes utilisés pour décrire la qualité"@fr				
+agrifoodca:DataQualityCodes:keywords:status	skos:exactMatch		"le statut et la provenance des valeurs de données de recherche"@fr				
+agrifoodca:Days:name	skos:exactMatch		"jours"@fr				
+agrifoodca:Days:description	skos:exactMatch		"Jours de la semaine"@fr				
+agrifoodca:Highest level of education (Statistics Canada):name	skos:exactMatch		"Niveau de scolarité le plus élevé (Statistique Canada)"@fr				
+agrifoodca:Highest level of education (Statistics Canada):description	skos:exactMatch		"Certificat diplôme ou grade le plus élevé obtenu selon la classification du recensement de Statistique Canada."@fr				
+agrifoodca:Highest level of education (Statistics Canada):keywords:education level	skos:exactMatch		"niveau de scolarité"@fr				
+agrifoodca:Highest level of education (Statistics Canada):keywords:highest certificate	skos:exactMatch		"plus haut diplôme"@fr				
+agrifoodca:Highest level of education (Statistics Canada):keywords:Statistics Canada	skos:exactMatch		"Statistique Canada"@fr				
+agrifoodca:Highest level of education (Statistics Canada):keywords:census education	skos:exactMatch		"recensement"@fr				
+agrifoodca:Highest level of education (Statistics Canada):choice:NCD	skos:exactMatch		"Aucun certificat diplôme ou grade"@fr				
+agrifoodca:Highest level of education (Statistics Canada):choice:SEC	skos:exactMatch		"Diplôme d’études secondaires ou certificat d’équivalence"@fr				
+agrifoodca:Highest level of education (Statistics Canada):choice:NTC	skos:exactMatch		"Certificat ou diplôme de métiers sans apprentissage"@fr				
+agrifoodca:Highest level of education (Statistics Canada):choice:APP	skos:exactMatch		"Certificat d’apprentissage"@fr				
+agrifoodca:Highest level of education (Statistics Canada):choice:C31	skos:exactMatch		"Certificat ou diplôme collégial cégep ou autre établissement non universitaire programme de 3 mois à moins d’un an"@fr				
+agrifoodca:Highest level of education (Statistics Canada):choice:C12	skos:exactMatch		"Certificat ou diplôme collégial cégep ou autre établissement non universitaire programme de 1 à 2 ans"@fr				
+agrifoodca:Highest level of education (Statistics Canada):choice:C2P	skos:exactMatch		"Certificat ou diplôme collégial cégep ou autre établissement non universitaire programme de plus de 2 ans"@fr				
+agrifoodca:Highest level of education (Statistics Canada):choice:UCB	skos:exactMatch		"Certificat ou diplôme universitaire inférieur au baccalauréat"@fr				
+agrifoodca:Highest level of education (Statistics Canada):choice:BD	skos:exactMatch		"Baccalauréat"@fr				
+agrifoodca:Highest level of education (Statistics Canada):choice:UCA	skos:exactMatch		"Certificat ou diplôme universitaire supérieur au baccalauréat"@fr				
+agrifoodca:Highest level of education (Statistics Canada):choice:MDP	skos:exactMatch		"Diplôme en médecine dentisterie médecine vétérinaire ou optométrie"@fr				
+agrifoodca:Highest level of education (Statistics Canada):choice:MS	skos:exactMatch		"Maîtrise"@fr				
+agrifoodca:Highest level of education (Statistics Canada):choice:PHD	skos:exactMatch		"Doctorat"@fr				
+agrifoodca:EducationLevel:name	skos:exactMatch		"Niveau de scolarité"@fr				
+agrifoodca:EducationLevel:description	skos:exactMatch		"Niveau de scolarité le plus élevé atteint par la personne répondante."@fr				
+agrifoodca:EducationLevel:keywords:education level	skos:exactMatch		"niveau de scolarité"@fr				
+agrifoodca:EducationLevel:keywords:schooling	skos:exactMatch		"formation"@fr				
+agrifoodca:EducationLevel:keywords:highest education	skos:exactMatch		"scolarité"@fr				
+agrifoodca:EducationLevel:keywords:demographics	skos:exactMatch		"données démographiques"@fr				
+agrifoodca:EightPointCardinality:name	skos:exactMatch		"Cardinalité à huit points"@fr				
+agrifoodca:EightPointCardinality:description	skos:exactMatch		"La rose des vents à huit points cardinaux se compose des quatre directions cardinales — nord (N), est (E), sud (S) et ouest (O) — disposées à intervalles de 90 degrés. La bissectrice de chacun de ces angles forme les quatre directions intermédiaires : nord-est (NE), sud-est (SE), sud-ouest (SO) et nord-ouest (NO). Ces huit points constituent un système d’orientation simple, couramment utilisé en navigation et en cartographie."@fr				
+agrifoodca:FrequencyScale:name	skos:exactMatch		"Échelle de fréquence"@fr				
+agrifoodca:FrequencyScale:description	skos:exactMatch		"Fréquence à laquelle une activité un comportement ou un événement se produit sur une période typique."@fr				
+agrifoodca:FrequencyScale:keywords:frequency scale	skos:exactMatch		"échelle de fréquence"@fr				
+agrifoodca:FrequencyScale:keywords:occurrence rate	skos:exactMatch		"taux d’occurrence"@fr				
+agrifoodca:FrequencyScale:keywords:survey responses	skos:exactMatch		"réponses de sondage"@fr				
+agrifoodca:GenderIdentity:name	skos:exactMatch		"Identité de genre"@fr				
+agrifoodca:GenderIdentity:description	skos:exactMatch		"Genre avec lequel la personne répondante s’identifie."@fr				
+agrifoodca:GenderIdentity:keywords:gender identity	skos:exactMatch		"identité de genre"@fr				
+agrifoodca:GenderIdentity:keywords:demographics	skos:exactMatch		"données démographiques"@fr				
+agrifoodca:GenderIdentity:keywords:self-identification	skos:exactMatch		"auto-identification"@fr				
+agrifoodca:GenderIdentity:keywords:survey responses	skos:exactMatch		"réponses de sondage"@fr				
+agrifoodca:GenderIdentity:choice:F	skos:exactMatch		"Femme"@fr				
+agrifoodca:GenderIdentity:choice:M	skos:exactMatch		"Homme"@fr				
+agrifoodca:GenderIdentity:choice:NB	skos:exactMatch		"Non binaire (diversité de genre)"@fr				
+agrifoodca:GenderIdentity:choice:OTH	skos:exactMatch		"Autre"@fr				
+agrifoodca:GenderIdentity:choice:PNS	skos:exactMatch		"Préfère ne pas répondre"@fr				
+agrifoodca:HouseholdStructure:name	skos:exactMatch		"Structure du ménage"@fr				
+agrifoodca:HouseholdStructure:description	skos:exactMatch		"Composition et type de cohabitation du ménage."@fr				
+agrifoodca:HouseholdStructure:keywords:household structure	skos:exactMatch		"structure du ménage"@fr				
+agrifoodca:HouseholdStructure:keywords:living arrangement	skos:exactMatch		"composition du ménage"@fr				
+agrifoodca:HouseholdStructure:keywords:household composition	skos:exactMatch		"mode de vie"@fr				
+agrifoodca:HouseholdStructure:keywords:demographics	skos:exactMatch		"données démographiques"@fr				
+agrifoodca:Months:name	skos:exactMatch		"mois"@fr				
+agrifoodca:Months:description	skos:exactMatch		"Mois de l'année"@fr				
+agrifoodca:Months:keywords:date	skos:exactMatch		"date"@fr				
+agrifoodca:Months:keywords:calendar	skos:exactMatch		"calendrier"@fr				
+agrifoodca:Months:keywords:month	skos:exactMatch		"mois"@fr				
+agrifoodca:Months:choice:January	skos:exactMatch		"janv"@fr				
+agrifoodca:Months:choice:February	skos:exactMatch		"févr"@fr				
+agrifoodca:Months:choice:April	skos:exactMatch		"avr"@fr				
+agrifoodca:Months:choice:July	skos:exactMatch		"juil"@fr				
+agrifoodca:Months:choice:September	skos:exactMatch		"sept"@fr				
+agrifoodca:Months:choice:October	skos:exactMatch		"octo"@fr				
+agrifoodca:Months:choice:November	skos:exactMatch		"nov"@fr				
+agrifoodca:Months:choice:December	skos:exactMatch		"déc"@fr				
+agrifoodca:ParentMaterialChemicalProperty:name	skos:exactMatch		"Propriété chimique du matériau parental"@fr				
+agrifoodca:ParentMaterialChemicalProperty:description	skos:exactMatch		"La classe de composition chimique du matériau parental."@fr				
+agrifoodca:ParentMaterialChemicalProperty:choice:UD	skos:exactMatch		"Indifférencié"@fr				
+agrifoodca:ParentMaterialChemicalProperty:choice:EA	skos:exactMatch		"Extrêmement / fortement acide"@fr				
+agrifoodca:ParentMaterialChemicalProperty:choice:AN	skos:exactMatch		"Acide moyen à neutre"@fr				
+agrifoodca:ParentMaterialChemicalProperty:choice:WC	skos:exactMatch		"Faiblement calcaire"@fr				
+agrifoodca:ParentMaterialChemicalProperty:choice:VC	skos:exactMatch		"Modérément / très fortement calcaire"@fr				
+agrifoodca:ParentMaterialChemicalProperty:choice:EC	skos:exactMatch		"Extrêmement calcaire"@fr				
+agrifoodca:ParentMaterialChemicalProperty:choice:SA	skos:exactMatch		"Calcaire et salin"@fr				
+agrifoodca:ParentMaterialChemicalProperty:choice:-	skos:exactMatch		"Sans objet"@fr				
+agrifoodca:ParentMaterialTexture:name	skos:exactMatch		"Texture du matériau parental"@fr				
+agrifoodca:ParentMaterialTexture:description	skos:exactMatch		"La classe de texture du matériau parental sous-jacent."@fr				
+agrifoodca:ParentMaterialTexture:choice:MF	skos:exactMatch		"Modérément fin"@fr				
+agrifoodca:ParentMaterialTexture:choice:F	skos:exactMatch		"Fin"@fr				
+agrifoodca:ParentMaterialTexture:choice:VF	skos:exactMatch		"Très fin"@fr				
+agrifoodca:ParentMaterialTexture:choice:CS	skos:exactMatch		"Grossier squelettique"@fr				
+agrifoodca:ParentMaterialTexture:choice:MS	skos:exactMatch		"Moyen squelettique"@fr				
+agrifoodca:ParentMaterialTexture:choice:FS	skos:exactMatch		"Fin squelettique"@fr				
+agrifoodca:ParentMaterialTexture:choice:FR	skos:exactMatch		"Fragmentaire"@fr				
+agrifoodca:ParentMaterialTexture:choice:SM	skos:exactMatch		"Stratifié (minéral)"@fr				
+agrifoodca:ParentMaterialTexture:choice:SU	skos:exactMatch		"Stratifié (minéral et organique)"@fr				
+agrifoodca:ParentMaterialTexture:choice:FI	skos:exactMatch		"Fibrique"@fr				
+agrifoodca:ParentMaterialTexture:choice:ME	skos:exactMatch		"Mésique"@fr				
+agrifoodca:ParentMaterialTexture:choice:HU	skos:exactMatch		"Humique"@fr				
+agrifoodca:ParentMaterialTexture:choice:UD	skos:exactMatch		"Indifférencié"@fr				
+agrifoodca:ParentMaterialTexture:choice:-	skos:exactMatch		"Sans objet"@fr				
+agrifoodca:SixteenPointCardinality:name	skos:exactMatch		"Cardinalité à seize points"@fr				
+agrifoodca:SixteenPointCardinality:description	skos:exactMatch		"La rose des vents à 16 points cardinaux complète la rose des vents à 8 points en ajoutant huit demi-vents. Ces derniers sont obtenus en bissectant chaque angle de 45 degrés entre les points cardinaux et intermédiaires. Les directions ajoutées sont : nord-nord-est (NNE)"@fr				
+agrifoodca:SixteenPointCardinality:keywords:est-nord-est (ENE)	skos:exactMatch		"est-nord-est (ENE)"@fr				
+agrifoodca:SoilAerationStatus:name	skos:exactMatch		"Statut d’aération du sol"@fr				
+agrifoodca:SoilAerationStatus:description	skos:exactMatch		"Statut qualitatif de disponibilité en oxygène."@fr				
+agrifoodca:BulkDensityClass:name	skos:exactMatch		"Classe de densité apparente"@fr				
+agrifoodca:BulkDensityClass:description	skos:exactMatch		"Classes généralisées; les seuils restrictifs dépendent de la texture."@fr				
+agrifoodca:Carbon-to-Nitrogen (C:N) ratio class:name	skos:exactMatch		"Classe du rapport carbone-azote (C:N)"@fr				
+agrifoodca:Carbon-to-Nitrogen (C:N) ratio class:description	skos:exactMatch		"Catégories de C:N."@fr				
+agrifoodca:SoilColloidFractionClass:name	skos:exactMatch		"Classe de fraction colloïdale du sol"@fr				
+agrifoodca:SoilColloidFractionClass:description	skos:exactMatch		"Abondance relative des colloïdes."@fr				
+agrifoodca:SoilCompressibilityClass:name	skos:exactMatch		"Classe de compressibilité du sol"@fr				
+agrifoodca:SoilCompressibilityClass:description	skos:exactMatch		"Catégorie de compressibilité relative."@fr				
+agrifoodca:SoilDrainageClass:name	skos:exactMatch		"Classe de drainage du sol"@fr				
+agrifoodca:SoilDrainageClass:description	skos:exactMatch		"Indique le type de drainage présent dans un profil de sol."@fr				
+agrifoodca:SoilDrainageClass:choice:VR	skos:exactMatch		"Très rapidement drainé"@fr				
+agrifoodca:SoilDrainageClass:choice:R	skos:exactMatch		"Rapidement drainé"@fr				
+agrifoodca:SoilDrainageClass:choice:W	skos:exactMatch		"Bien drainé"@fr				
+agrifoodca:SoilDrainageClass:choice:MW	skos:exactMatch		"Modérément bien drainé"@fr				
+agrifoodca:SoilDrainageClass:choice:I	skos:exactMatch		"Imperfectement drainé"@fr				
+agrifoodca:SoilDrainageClass:choice:P	skos:exactMatch		"Mal drainé"@fr				
+agrifoodca:SoilDrainageClass:choice:VP	skos:exactMatch		"Très mal drainé"@fr				
+agrifoodca:SoilDrainageClass:choice:-	skos:exactMatch		"Sans objet"@fr				
+agrifoodca:EffectiveRootingDepthClass:name	skos:exactMatch		"Classe de profondeur d’enracinement efficace"@fr				
+agrifoodca:EffectiveRootingDepthClass:description	skos:exactMatch		"Profondeur disponible pour les racines."@fr				
+agrifoodca:SoilErodibilityClass:name	skos:exactMatch		"Classe d’érodibilité du sol"@fr				
+agrifoodca:SoilErodibilityClass:description	skos:exactMatch		"Susceptibilité à l’érosion (qualitative)."@fr				
+agrifoodca:SoilFertilityClass:name	skos:exactMatch		"Classe de fertilité du sol"@fr				
+agrifoodca:SoilFertilityClass:description	skos:exactMatch		"Fertilité intrinsèque générale."@fr				
+agrifoodca:SoilMineralContentType:name	skos:exactMatch		"Type de contenu minéral du sol"@fr				
+agrifoodca:SoilMineralContentType:description	skos:exactMatch		"Caractère minéralogique dominant."@fr				
+agrifoodca:SoilOrganicMatterClass:name	skos:exactMatch		"Classe de matière organique du sol"@fr				
+agrifoodca:SoilOrganicMatterClass:description	skos:exactMatch		"Classe de pourcentage de matière organique."@fr				
+agrifoodca:SoilPermeabilityClass:name	skos:exactMatch		"Classe de perméabilité du sol"@fr				
+agrifoodca:SoilPermeabilityClass:description	skos:exactMatch		"Conductivité hydraulique saturée (classes qualitatives)."@fr				
+agrifoodca:SoilPhClass:name	skos:exactMatch		"Classe de pH du sol"@fr				
+agrifoodca:SoilPhClass:description	skos:exactMatch		"Plages de pH normalisées (NRCS)"@fr				
+agrifoodca:SoilPhClass:choice:UA	skos:exactMatch		"Ultra acide"@fr				
+agrifoodca:SoilPhClass:choice:EA	skos:exactMatch		"Extrêmement acide"@fr				
+agrifoodca:SoilPhClass:choice:VSA	skos:exactMatch		"Très fortement acide"@fr				
+agrifoodca:SoilPhClass:choice:SA	skos:exactMatch		"Fortement acide"@fr				
+agrifoodca:SoilPhClass:choice:MA	skos:exactMatch		"Modérément acide"@fr				
+agrifoodca:SoilPhClass:choice:SLA	skos:exactMatch		"Légèrement acide"@fr				
+agrifoodca:SoilPhClass:choice:NE	skos:exactMatch		"Neutre"@fr				
+agrifoodca:SoilPhClass:choice:SLK	skos:exactMatch		"Légèrement alcalin"@fr				
+agrifoodca:SoilPhClass:choice:MK	skos:exactMatch		"Modérément alcalin"@fr				
+agrifoodca:SoilPhClass:choice:SK	skos:exactMatch		"Fortement alcalin"@fr				
+agrifoodca:SoilPhClass:choice:VSK	skos:exactMatch		"Très fortement alcalin"@fr				
+agrifoodca:SoilPlasticityClass:name	skos:exactMatch		"Classe de plasticité du sol"@fr				
+agrifoodca:SoilPlasticityClass:description	skos:exactMatch		"Catégorie de plasticité (liée aux limites d’Atterberg)."@fr				
+agrifoodca:SoilPorosityClass:name	skos:exactMatch		"Classe de porosité du sol"@fr				
+agrifoodca:SoilPorosityClass:description	skos:exactMatch		"Classe de porosité totale"@fr				
+agrifoodca:Soil salinity type (dominant anion):name	skos:exactMatch		"Type de salinité du sol (anion dominant)"@fr				
+agrifoodca:Soil salinity type (dominant anion):description	skos:exactMatch		"Type de sel dominant en conditions salines."@fr				
+agrifoodca:Soil salinity class (ECe):name	skos:exactMatch		"Classe de salinité du sol (ECe)"@fr				
+agrifoodca:Soil salinity class (ECe):description	skos:exactMatch		"Classes basées sur la conductivité électrique de l’extrait de pâte saturée (dS/m)."@fr				
+agrifoodca:Soil salinity class (ECe):choice:NS	skos:exactMatch		"Non salin"@fr				
+agrifoodca:Soil salinity class (ECe):choice:SS	skos:exactMatch		"Légèrement salin"@fr				
+agrifoodca:Soil salinity class (ECe):choice:MS	skos:exactMatch		"Modérément salin"@fr				
+agrifoodca:Soil salinity class (ECe):choice:STS	skos:exactMatch		"Fortement salin"@fr				
+agrifoodca:Soil salinity class (ECe):choice:VSS	skos:exactMatch		"Très fortement salin"@fr				
+agrifoodca:Soil sodicity class (SAR/ESP):name	skos:exactMatch		"Classe de sodicité du sol (SAR/ESP)"@fr				
+agrifoodca:Soil sodicity class (SAR/ESP):description	skos:exactMatch		"Classification selon le rapport d’adsorption du sodium (SAR) et/ou le pourcentage de sodium échangeable (ESP)."@fr				
+agrifoodca:SoilStructureType:name	skos:exactMatch		"Type de structure du sol"@fr				
+agrifoodca:SoilStructureType:description	skos:exactMatch		"Formes principales des agrégats (peds)."@fr				
+agrifoodca:SoilStructureType:choice:GR	skos:exactMatch		"Granulaire"@fr				
+agrifoodca:SoilStructureType:choice:BL	skos:exactMatch		"Blocailleux"@fr				
+agrifoodca:SoilStructureType:choice:PL	skos:exactMatch		"Planaire"@fr				
+agrifoodca:SoilStructureType:choice:PR	skos:exactMatch		"Prismatique"@fr				
+agrifoodca:SoilStructureType:choice:CO	skos:exactMatch		"Columnaire"@fr				
+agrifoodca:SoilStructureType:choice:MS	skos:exactMatch		"Massif"@fr				
+agrifoodca:SoilStructureType:choice:SG	skos:exactMatch		"Grains simples"@fr				
+agrifoodca:SoilTextureClass:name	skos:exactMatch		"Classe texturale du sol"@fr				
+agrifoodca:SoilTextureClass:description	skos:exactMatch		"Schéma à 12 classes de l’USDA‑NRCS"@fr				
+agrifoodca:MaturityLevels:name	skos:exactMatch		"Niveaux de maturité"@fr				
+agrifoodca:MaturityLevels:keywords:standard lifecycle	skos:exactMatch		"cycle de vie standard"@fr				
+agrifoodca:MaturityLevels:keywords:specification development	skos:exactMatch		"développement des spécifications"@fr				
+agrifoodca:MaturityLevels:keywords:version status	skos:exactMatch		"état des versions"@fr				
+agrifoodca:SupportScale:name	skos:exactMatch		"Échelle de soutien"@fr				
+agrifoodca:SupportScale:description	skos:exactMatch		"Niveau de soutien ou d’opposition exprimé à l’égard d’une proposition d’une idée d’une politique ou d’une action."@fr				
+agrifoodca:SupportScale:keywords:support	skos:exactMatch		"soutien"@fr				
+agrifoodca:SupportScale:keywords:opposition	skos:exactMatch		"opposition"@fr				
+agrifoodca:SupportScale:keywords:attitudes	skos:exactMatch		"attitudes"@fr				
+agrifoodca:SupportScale:keywords:survey responses	skos:exactMatch		"réponses de sondage"@fr				
+agrifoodca:Thirty-two Point Cardinality:name	skos:exactMatch		"Cardinalité à trente-deux points"@fr				
+agrifoodca:Thirty-two Point Cardinality:description	skos:exactMatch		"La rose des vents à 32 points subdivise davantage le cercle en ajoutant des quarts de vent, situés à mi-chemin entre chaque paire de points à 16 points. Ces directions par— comme le nord par l'est, le nord-est par le nord et le sud-ouest par l'ouest — créent un système de 32 points espacés de 11,25 degrés. Historiquement utilisée en navigation maritime, cette résolution plus fine permet une description beaucoup plus précise de la direction."@fr				
+agrifoodca:WaterTableCharacteristics:name	skos:exactMatch		"Caractéristiques de la nappe phréatique"@fr				
+agrifoodca:WaterTableCharacteristics:description	skos:exactMatch		"Indique la présence d’une nappe phréatique à une profondeur de 100 cm et précise ses caractéristiques temporelles."@fr				
+agrifoodca:WaterTableCharacteristics:choice:YN	skos:exactMatch		"Hors saison de croissance"@fr				
+agrifoodca:WaterTableCharacteristics:choice:YU	skos:exactMatch		"Période non précisée"@fr				
+agrifoodca:WaterTableCharacteristics:choice:-	skos:exactMatch		"Sans objet / Non applicable"@fr				

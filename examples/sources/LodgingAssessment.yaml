@@ -1,0 +1,46 @@
+id: https://link.springer.com/article/10.1186/s12870-025-07322-y
+name: LodgingAssessment
+title: Visual Lodging Estimation Before Harvest
+description: ''
+version: ''
+license: ''
+in_language: en
+imports:
+  - 'linkml:types'
+prefixes: {}
+default_prefix: ''
+classes: {}
+enums:
+  LodgingScale:
+    name: LodgingScale
+    title: Lodging Scale
+    description: "A visual estimation of lodging before harvest using a 1\u20139 scale"
+    permissible_values:
+      '1':
+        title: No lodging
+        description: Plants completely erect, no lodging observed
+      '2':
+        title: Very slight lodging
+        description: Very minor lodging, plants almost completely erect
+      '3':
+        title: Slight lodging
+        description: Slight lodging present
+      '4':
+        title: Below moderate lodging
+        description: Lodging slightly less than moderate
+      '5':
+        title: Moderate lodging
+        description: Intermediate level of lodging
+      '6':
+        title: Above moderate lodging
+        description: Lodging somewhat more than moderate
+      '7':
+        title: Considerable lodging
+        description: Considerable lodging present
+      '8':
+        title: Severe lodging
+        description: Severe lodging, most plants leaning or down
+      '9':
+        title: Complete lodging
+        description: Complete lodging, all plants flat
+slots: {}

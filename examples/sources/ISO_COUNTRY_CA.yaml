@@ -1,0 +1,82 @@
+id: https://www.iso.org/obp/ui/#iso:code:3166:CA
+name: ISO_COUNTRY_CA
+title: Canada
+description: ''
+version: ''
+license: ''
+in_language: en
+imports:
+  - 'linkml:types'
+prefixes: {}
+default_prefix: ''
+classes: {}
+enums:
+  Canada:
+    name: Canada
+    title: Canada
+    permissible_values:
+      AB:
+        title: Alberta
+      BC:
+        title: British Columbia
+      MB:
+        title: Manitoba
+      NB:
+        title: New Brunswick
+      NL:
+        title: Newfoundland and Labrador
+      NT:
+        title: Northwest Territories
+      NS:
+        title: Nova Scotia
+      NU:
+        title: Nunavut
+      'ON':
+        title: Ontario
+      PE:
+        title: Prince Edward Island
+      QC:
+        title: Quebec
+      SK:
+        title: Saskatchewan
+      YT:
+        title: Yukon
+slots: {}
+extensions:
+  locales:
+    tag: locales
+    value:
+      fr:
+        id: https://www.iso.org/obp/ui/#iso:code:3166:CA
+        name: ISO_COUNTRY_CA
+        version: ''
+        in_language: fr
+        enums:
+          Canada:
+            permissible_values:
+              AB:
+                title: Alberta
+              BC:
+                title: Colombie-Britannique
+              MB:
+                title: Manitoba
+              NB:
+                title: Nouveau-Brunswick
+              NL:
+                title: Terre-Neuve-et-Labrador
+              NT:
+                title: Territoires du Nord-Ouest
+              NS:
+                title: "Nouvelle-\xC9cosse"
+              NU:
+                title: Nunavut
+              'ON':
+                title: Ontario
+              PE:
+                title: "\xCEle-du-Prince-\xC9douard"
+              QC:
+                title: "Qu\xE9bec"
+              SK:
+                title: Saskatchewan
+              YT:
+                title: Yukon

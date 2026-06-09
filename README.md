@@ -23,9 +23,32 @@ The term_harvester.py script fetches vocabulary sources, processes them into Lin
 
 ---
 
+## Installation
+
+Dependencies are declared in `pyproject.toml`.  Install the core requirement
+(`pyyaml`) and whichever optional extras you need:
+
+```bash
+pip install -e .                  # core only (pyyaml)
+pip install -e ".[pdf]"           # + pypdf   (NASIS, NRCS Field Book, FreeText PDF input)
+pip install -e ".[owl]"           # + owlready2 (OWL ontologies)
+pip install -e ".[freetext]"      # + anthropic (FreeText AI extraction)
+pip install -e ".[all]"           # all optional dependencies
+```
+
+| Extra | Package | Required for |
+|---|---|---|
+| `pdf` | `pypdf` | `content_type: NASIS`, `NRCSSoilFieldBook`; FreeText PDF input |
+| `owl` | `owlready2` | `content_type: OWL` |
+| `freetext` | `anthropic` | `content_type: FreeText` |
+
+---
+
 ## Quick-start workflow
 
 **Note that some terminals access python as "python3". ALSO, term_harvester.py needs to be run within the context of the folder you want to generate schema.yaml in. If term_harvester.py location is not set in the shell environment then you will need to reference it using a relative path to the DataHarmonizer script/ folder, e.g. `python ../../../script/menu_manager/term_harvester.py`.**
+
+**The default configuration file is `harvester_config.yaml` in the current directory.  Use `-i`/`--input` to specify a different path.**
 
 ```bash
 # 1. Add sources (auto-detects type, downloads, adds to harvester_config.yaml)
@@ -57,6 +80,9 @@ Auto-detects the source type, downloads the file, adds an entry to
 ```bash
 python term_harvester.py -a https://example.org/some-valueset.json
 ```
+
+Combine with `--free_text` to extract a picklist from prose rather than a
+structured file (see [`--free_text`](#--free_text--extract-from-free-text) below).
 
 ---
 
@@ -141,6 +167,29 @@ is configured.
 
 ---
 
+### `--free_text` — Extract from free text
+
+Used with `-a` to extract enumerations from prose rather than a structured
+source file.  See the dedicated [FreeText source type](#freetext-source-type)
+section for full usage, file-input support, and API key setup.
+
+---
+
+### `-i` — Specify configuration file
+
+```bash
+python term_harvester.py -i path/to/myconfig.yaml -f all -c -b
+python term_harvester.py --input examples/agrifoodca_config.yaml -r
+```
+
+Overrides the default configuration file name (`harvester_config.yaml`).  All
+commands (`-a`, `-f`, `-c`, `-b`, `-d`, `-l`, `-r`, `-s`) read from and write to
+the specified file.  Useful when managing multiple independent schemas from the
+same working directory, or when using a pre-built config from the `examples/`
+folder as a starting point.
+
+---
+
 ## Supported source types and auto-detection
 
 | Detected as | Detection method |
@@ -158,6 +207,9 @@ is configured.
 | `LOINCValueSet` | `.json` file with `resourceType: ValueSet` |
 | `LinkML` | `.yaml`/`.yml` file that is a dict containing `enums` or `id` |
 | `STATSCAN` | URL from `statcan.gc.ca` containing `p3VD.pl` and `Function=getVD` |
+| `STATSCAN_TABLE` | URL from `www12.statcan.gc.ca/.../ref/dict/tab/index-eng.cfm?ID=` |
+| `ISO_COUNTRY` | URL from `iso.org/obp/ui/#iso:code:3166:` followed by a 2-letter country code |
+| `CRediT` | URL from `zenodo.org` matching a CRediT PDF filename pattern |
 | `NAPCSCanada` | CSV content with NAPCS-specific column headers |
 | `AgriFoodCA` | GitHub directory URL for `agrifooddatacanada/picklists_for_schemas` (pre-download) |
 | `AgriFoodCA` | CSV first row matches `,title,description,keywords,source` (content-based) |
@@ -220,6 +272,8 @@ python term_harvester.py -l AGROVOC_c_26950
 
 ### LinkML
 
+LinkML "ValueSets" are a rich source of various kinds of research dataset fields and metadata.
+
 ```bash
 python term_harvester.py -a https://raw.githubusercontent.com/linkml/valuesets/refs/heads/main/src/valuesets/merged/merged_hierarchy.yaml
 ```
@@ -242,7 +296,7 @@ python term_harvester.py -a https://terminology.hl7.org/en/valuesets.html
 
 ### OWL ontologies
 
-Requires `owlready2` (`pip install owlready2`).
+Requires the `owl` extra (see [Installation](#installation)).
 
 ```bash
 python term_harvester.py -a https://purl.obolibrary.org/obo/envo.owl
@@ -274,11 +328,134 @@ python term_harvester.py -a "https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=g
 python term_harvester.py -c STATSCAN1441857
 ```
 
+### Statistics Canada Census Dictionary tables (STATSCAN_TABLE)
+
+Census Dictionary reference tables from Statistics Canada's 2021 Census (and
+other years), e.g. province/territory abbreviation tables.
+
+```bash
+# Table 1.8 — Abbreviations and codes for provinces and territories
+python term_harvester.py -a "https://www12.statcan.gc.ca/census-recensement/2021/ref/dict/tab/index-eng.cfm?ID=T1_8"
+python term_harvester.py -c STATSCAN_TABLE_T1_8
+python term_harvester.py -b
+```
+
+The source key is `STATSCAN_TABLE_{ID}` (e.g. `STATSCAN_TABLE_T1_8`).  The
+enum key and title are derived from the first column header of the table (the
+row-stub label, e.g. `ProvinceTerritory` / `Province/Territory`).  The alpha
+code column (header containing "alpha") is used as the permissible value key;
+if absent, the row-stub text is slugified.  Both English and French pages are
+fetched automatically; French names appear in the locale extension.
+
+---
+
+### ISO 3166-2 country subdivisions (ISO_COUNTRY)
+
+Provinces, states, territories, and other first-level subdivisions for any
+country listed in ISO 3166-2.  Use the ISO Online Browsing Platform URL as the
+source identifier.
+
+```bash
+# Canada — provinces and territories (English + French)
+python term_harvester.py -a "https://www.iso.org/obp/ui/#iso:code:3166:CA"
+python term_harvester.py -c ISO_COUNTRY_CA
+python term_harvester.py -b
+```
+
+Because the ISO OBP page is a JavaScript application, data is sourced from the
+corresponding Wikipedia ISO 3166-2 article
+(`https://en.wikipedia.org/wiki/ISO_3166-2:CA`), which carries the same
+authoritative information in parseable HTML tables.  The ISO OBP URL is
+retained in `source_ontology` as the canonical citation.
+
+The enum key and name are derived from the country's short name extracted from
+the Wikipedia article (e.g. `Canada`).  The suffix of each 3166-2 code (e.g.
+`AB` from `CA-AB`) becomes the permissible value key; the English subdivision
+name is the title.  French translations are added to the locale extension when
+the Wikipedia table contains a French name column, as it does for Canada.
+
+**Config entry produced:**
+
+```yaml
+ISO_COUNTRY_CA:
+  title: Canada
+  name: ISO_COUNTRY_CA
+  content_type: ISO_COUNTRY
+  file_format: html
+  reachable_from:
+    source_ontology: https://www.iso.org/obp/ui/#iso:code:3166:CA
+  download_date: '2026-06-08'
+```
+
+**Enum in `sources/ISO_COUNTRY_CA.yaml`:**
+
+```yaml
+enums:
+  Canada:
+    name: Canada
+    title: Canada
+    permissible_values:
+      AB:
+        title: Alberta
+      BC:
+        title: British Columbia
+      MB:
+        title: Manitoba
+      NB:
+        title: New Brunswick
+      NL:
+        title: Newfoundland and Labrador
+      NT:
+        title: Northwest Territories
+      NS:
+        title: Nova Scotia
+      NU:
+        title: Nunavut
+      ON:
+        title: Ontario
+      PE:
+        title: Prince Edward Island
+      QC:
+        title: Quebec
+      SK:
+        title: Saskatchewan
+      YT:
+        title: Yukon
+extensions:
+  fr:
+    enums:
+      Canada:
+        permissible_values:
+          AB: {title: Alberta}
+          BC: {title: Colombie-Britannique}
+          MB: {title: Manitoba}
+          NB: {title: Nouveau-Brunswick}
+          NL: {title: Terre-Neuve-et-Labrador}
+          NT: {title: Territoires du Nord-Ouest}
+          NS: {title: Nouvelle-Écosse}
+          NU: {title: Nunavut}
+          ON: {title: Ontario}
+          PE: {title: Île-du-Prince-Édouard}
+          QC: {title: Québec}
+          SK: {title: Saskatchewan}
+          YT: {title: Yukon}
+```
+
+To refresh the data when Wikipedia updates:
+
+```bash
+python term_harvester.py -f ISO_COUNTRY_CA   # re-downloads Wikipedia page
+python term_harvester.py -c ISO_COUNTRY_CA   # regenerates sources/ISO_COUNTRY_CA.yaml
+python term_harvester.py -b                  # rebuilds schema.yaml
+```
+
+---
+
 ### NASIS (USDA NRCS National Soil Information System)
 
 NASIS publishes all domain tables (controlled vocabularies for every categorical
 field in the NASIS soil survey database) as a single PDF.  Each domain becomes
-one LinkML enum.  Requires `pypdf` (`pip install pypdf`).
+one LinkML enum.  Requires the `pdf` extra (see [Installation](#installation)).
 
 ```bash
 python term_harvester.py -a "https://www.nrcs.usda.gov/sites/default/files/2025-07/NASIS%207.4.3%20Domains.pdf"
@@ -303,6 +480,107 @@ the ~1,950 permissible values marked obsolete in the PDF at `-b` build time.
 
 ---
 
+### NRCS Field Book (field description enumerations)
+
+The USDA NRCS *Field Book for Describing and Sampling Soils* (Ver. 4, November 2024)
+defines the categorical vocabularies used when recording soil observations.
+`source_nrcs.py` parses selected tables from the PDF into LinkML enums.
+Requires the `pdf` extra (see [Installation](#installation)).
+
+Auto-detection via `-a` is not yet implemented for this source.  Add it to
+`harvester_config.yaml` manually, then run `-c` and `-b`:
+
+```yaml
+# harvester_config.yaml — add this entry under sources:
+NRCSSoilFieldBook:
+  title: NRCS Field Book for Describing and Sampling Soils Ver. 4
+  content_type: NRCSSoilFieldBook
+  file_format: pdf
+  version: "Ver. 4 November 2024"
+  reachable_from:
+    source_ontology: https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf
+```
+
+```bash
+# Download the PDF and generate sources/NRCSSoilFieldBook.yaml
+python term_harvester.py -c NRCSSoilFieldBook
+
+# Add enums to schema.yaml
+python term_harvester.py -b
+```
+
+Each enum's `see_also` field is set to a deep PDF link (`{url}#page=N`) that
+opens directly to the source table.
+
+#### Available enumerations (35)
+
+| Enum key | Title | PDF page(s) |
+|---|---|---|
+| `NRCSSoilFieldBook_WeatherConditions` | Weather Conditions | 19 |
+| `NRCSSoilFieldBook_DrainagePattern` | Drainage Pattern | 27–28 |
+| `NRCSSoilFieldBook_DrainageClass` | Drainage Class | 28 |
+| `NRCSSoilFieldBook_FloodingFrequency` | Flooding Frequency | 30 |
+| `NRCSSoilFieldBook_PondingFrequency` | Ponding Frequency | 31 |
+| `NRCSSoilFieldBook_BedrockWeatheringClass` | Bedrock Weathering Class | 42 |
+| `NRCSSoilFieldBook_HorizonBoundaryDistinctness` | Horizon Boundary Distinctness | 56 |
+| `NRCSSoilFieldBook_HorizonBoundaryTopography` | Horizon Boundary Topography | 57 |
+| `NRCSSoilFieldBook_ColorMoistureState` | Color Moisture State | 59 |
+| `NRCSSoilFieldBook_ColorLocationCondition` | Color Location or Condition | 59 |
+| `NRCSSoilFieldBook_ConcentrationShape` | Concentration Shape | 74 |
+| `NRCSSoilFieldBook_ConcentrationLocation` | Concentration Location | 75–76 |
+| `NRCSSoilFieldBook_ConcentrationBoundary` | Concentration Boundary | 76 |
+| `NRCSSoilFieldBook_FragmentRoundness` | Fragment Roundness | 99 |
+| `NRCSSoilFieldBook_ArtifactShape` | Artifact Shape | 101 |
+| `NRCSSoilFieldBook_ArtifactRoundness` | Artifact Roundness | 101 |
+| `NRCSSoilFieldBook_ArtifactCohesion` | Artifact Cohesion | 102 |
+| `NRCSSoilFieldBook_ArtifactPenetrability` | Artifact Penetrability | 102 |
+| `NRCSSoilFieldBook_ArtifactPersistence` | Artifact Persistence | 102 |
+| `NRCSSoilFieldBook_ArtifactSafety` | Artifact Safety | 102 |
+| `NRCSSoilFieldBook_StructureGrade` | Structure Grade | 105 |
+| `NRCSSoilFieldBook_SurfaceCrustRuptureResistance` | Surface Crust Rupture Resistance | 115 |
+| `NRCSSoilFieldBook_CementingAgentKind` | Cementing Agent Kind | 115 |
+| `NRCSSoilFieldBook_PenetrationResistanceClass` | Penetration Resistance Class | 119 |
+| `NRCSSoilFieldBook_PenetrationOrientation` | Penetration Orientation | 119 |
+| `NRCSSoilFieldBook_ExcavationDifficulty` | Excavation Difficulty | 119–120 |
+| `NRCSSoilFieldBook_PoreShape` | Pore Shape | 125 |
+| `NRCSSoilFieldBook_SoilCrustsKind` | Soil Crusts Kind | 131 |
+| `NRCSSoilFieldBook_PermeabilityClass` | Permeability Class | 137 |
+| `NRCSSoilFieldBook_ReactionPH` | Reaction (pH) | 137–138 |
+| `NRCSSoilFieldBook_EffervescenceClass` | Effervescence Class | 139 |
+| `NRCSSoilFieldBook_SalinityClass` | Salinity Class | 141 |
+| `NRCSSoilFieldBook_OdorKind` | Odor Kind | 142 |
+| `NRCSSoilFieldBook_OdorIntensity` | Odor Intensity | 142 |
+| `NRCSSoilFieldBook_ObservationMethod` | Observation Method | 154 |
+
+#### To-do — enumerations requiring specialized parsers (18)
+
+The generic `_parse_generic` table parser covers standard two- and three-column
+layouts.  The following enumerations need hand-written parsers in
+`sources/source_nrcs.py` due to unusual PDF layout:
+
+| Enum key | Title | Pages | Parsing challenge |
+|---|---|---|---|
+| `NRCSSoilFieldBook_FloodingDuration` | Flooding Duration | 30 | Dual code columns (Conv. + NASIS); codes differ for "brief" |
+| `NRCSSoilFieldBook_PondingDuration` | Ponding Duration | 31 | Dual code columns (Conv. + NASIS) |
+| `NRCSSoilFieldBook_ErosionKind` | Erosion Kind | 42 | Hierarchical: `water: —` parent with `sheet/rill/gully/tunnel` sub-entries |
+| `NRCSSoilFieldBook_ErosionDegreeClass` | Erosion Degree Class | 42–43 | Numeric codes in `None 0 / 1 1 / 2 2 …` format; table spans page break |
+| `NRCSSoilFieldBook_RedoxContrastClass` | Redox Contrast Class | 64 | Criteria expressed as Munsell delta expressions (Δh, Δv, Δc) |
+| `NRCSSoilFieldBook_StructureType` | Structure Type | 103–104 | Dual code columns (Conv. + NASIS); spans two pages |
+| `NRCSSoilFieldBook_MannerOfFailureBrittleness` | Manner of Failure – Brittleness | 116 | Three sub-tables share one page; sub-section anchoring required |
+| `NRCSSoilFieldBook_MannerOfFailureFluidity` | Manner of Failure – Fluidity | 116 | Compound table; title wraps across lines (`moderately \nfluid MF`) |
+| `NRCSSoilFieldBook_MannerOfFailureSmeariness` | Manner of Failure – Smeariness | 116 | Compound table; footnote superscripts inside title text |
+| `NRCSSoilFieldBook_RootPoreQuantity` | Root and Pore Quantity | 120 | `#` NASIS codes (record actual count); Conv. codes are `1/2/3` but with optional subclasses |
+| `NRCSSoilFieldBook_PoreVerticalContinuity` | Pore Vertical Continuity | 125 | Conv. code column is `—` (no formal codes); only NASIS codes present |
+| `NRCSSoilFieldBook_CrackKind` | Crack Kind | 128 | Title fragments across 4 lines in PDF column layout |
+| `NRCSSoilFieldBook_SpecialFeaturesKind` | Special Features Kind | 132 | Title severely fragmented across multiple lines |
+| `NRCSSoilFieldBook_KsatClass` | Ksat Class | 136 | Multi-column table; each cell on its own line in pypdf output |
+| `NRCSSoilFieldBook_pHMethod` | pH Method | 138 | Grouped sub-tables; titles include pH ranges; mixed-case method names |
+| `NRCSSoilFieldBook_EffervescenceAgent` | Effervescence Agent | 139–140 | Chemical notation (`HCl (1N)`) starts uppercase; grouped sub-headers |
+| `NRCSSoilFieldBook_ReducedConditions` | Reduced Conditions | 140 | Row title starts with Greek letter α |
+| `NRCSSoilFieldBook_FluidityClass` | Fluidity Class | 160 | Title wraps mid-word across two lines (`moderately \nfluid MF`) |
+
+---
+
 ### NAPCS Canada
 
 See https://www.statcan.gc.ca/en/subjects/standard/napcs/2022/index and
@@ -313,6 +591,37 @@ https://www.statcan.gc.ca/en/media/5274 for the CSV download.
 python term_harvester.py -a "https://www.statcan.gc.ca/en/media/5274"
 python term_harvester.py -c NAPCSCanada2022
 ```
+
+### CRediT (Contributor Roles Taxonomy)
+
+The [CRediT taxonomy](https://credit.niso.org/) defines 14 standardised roles for
+contributors to scholarly output (Conceptualization, Data Curation, Formal
+Analysis, …).  The source PDF is published on Zenodo.
+
+```bash
+python term_harvester.py -a "https://zenodo.org/records/18421449/files/CRediT%20roles%20and%20example%20research%20tasks%20that%20could%20be%20attributed%20to%20them.pdf?download=1"
+```
+
+The URL is detected as `CRediT` pre-download.  The PDF is saved to
+`sources/CRediT.pdf`, processed immediately via `pypdf`, and a
+`sources/CRediT.yaml` file is written in one step — no separate `-c` or `-b`
+call is required for the initial add.  Each permissible value carries a
+`meaning` URI pointing to the role's canonical page on `credit.niso.org`.
+
+Requires the `pdf` extra:
+
+```bash
+pip install -e ".[pdf]"
+```
+
+To rebuild from an already-downloaded PDF:
+
+```bash
+python term_harvester.py -c CRediT
+python term_harvester.py -b
+```
+
+---
 
 ### AgriFoodCA picklists
 
@@ -335,6 +644,198 @@ Source keys are derived from filenames: `AFC` + PascalCase(stem), e.g.
 
 When a source document URL is found in the CSV metadata (the `source` column of the
 `general` row), it is stored as `see_also` in `harvester_config.yaml`.
+
+---
+
+### FreeText
+
+For picklists described in free prose — inline text, a `.txt` file, or a `.pdf`
+document.  Requires the Anthropic API (see [FreeText source type](#freetext-source-type)).
+
+```bash
+# Register the source. With a short topic string Claude draws on its training
+# knowledge rather than the source document — useful as a quick placeholder.
+# The source URL is stored in source_ontology and added as see_also in the
+# generated enum YAML. A #page or section anchor is preserved if supplied.
+python term_harvester.py \
+  -a "https://static.ixambee.com/public/miscellaneous-pdf/physical_and_chemical_properties_of_soil1720241418.pdf" \
+  --free_text "soil aeration status"
+
+# Download the source PDF, then re-extract from its actual text so the enum
+# reflects the document rather than Claude's general knowledge.
+python term_harvester.py -f SoilAerationStatus
+python term_harvester.py -c SoilAerationStatus
+
+# Web page source with a section anchor — anchor stored in config and enum see_also
+python3 ../term_harvester.py --input agrifoodca_config.yaml \
+  -a "https://www.undrr.org/understanding-disaster-risk/terminology/hips/en0303" \
+  --free_text "Soil sodicity class (SAR/ESP)"
+```
+
+---
+
+## FreeText source type
+
+The `FreeText` content type lets you extract picklist enumerations from
+unstructured text — method-section descriptions, field-book prose, PDF
+appendices, or any passage that describes a scale or classification — using
+Claude (`claude-opus-4-8`) as the extraction engine.
+
+### When to use
+
+Use FreeText when a controlled vocabulary exists only in human-readable form:
+no machine-readable OWL ontology, no LOINC JSON, no STATSCAN classification
+page.  Examples: a crop lodging scale described in a journal article, a soil
+pH interpretation table in a field guide PDF, a grain quality rating in a
+grower's manual.
+
+### How it works
+
+1. You supply a citation URL and the relevant text (inline or as a file).
+2. Claude reads the text and returns a JSON structure containing one or more
+   named enumerations, each with ordinal permissible values ordered from
+   lowest/worst to highest/best.
+3. The extracted enums are written to `sources/{key}.yaml` and a
+   `content_type: FreeText` entry is added to `harvester_config.yaml`.
+4. The original text is stored in the `description` field of the config entry
+   so extraction can be repeated without re-supplying the text.
+
+### Input forms
+
+| Form | Example |
+|---|---|
+| Inline text | `--free_text "Scale of 1–9 where 9 = no lodging"` |
+| Plain-text file | `--free_text methods.txt` |
+| PDF file | `--free_text /path/to/appendix.pdf` (requires `pdf` extra) |
+
+Text extracted from files is capped at 10 000 characters before being sent to
+Claude.  For long documents, paste only the relevant excerpt as inline text or
+a small `.txt` file.
+
+### Code assignment
+
+Claude chooses permissible-value codes according to these rules:
+
+| Source condition | Code strategy |
+|---|---|
+| Source provides explicit codes (letters, numbers, abbreviations) | Codes are reproduced exactly as they appear |
+| Source has no explicit codes | 2–3 letter uppercase abbreviation from each label's significant words (e.g. "Poorly aerated" → `PA`, "Moderately aerated" → `MA`, "Well aerated" → `WA`, "None" → `NO`) |
+| Source uses an explicit numeric rating scale (e.g. 1–9) | Integers are used as codes; a label is supplied for each |
+
+Abbreviations within one enum must be distinct — a third letter is added to
+resolve clashes.  Sequential integers are only used when the source document
+itself uses them; they are not invented for non-numeric vocabularies.
+
+### Workflow
+
+**Initial setup** — `-a` with `--free_text` is self-contained: Claude runs
+immediately, `sources/{key}.yaml` is written, and the entry is registered in
+`harvester_config.yaml`.  Go straight to `-b` from there.
+
+> **Note:** Claude only receives the `--free_text` string during `-a` — the
+> source URL is stored as a citation but the document is not fetched or read.
+> A short topic string (e.g. `"soil aeration status"`) produces a plausible
+> enum drawn from Claude's training knowledge, not extracted from the source.
+> For extraction grounded in the actual document, run `-f [key]` then `-c [key]`
+> after the initial `-a`.
+
+```bash
+# Step 1 — add the source (Claude runs immediately, writes sources/SoilAerationStatus.yaml)
+python term_harvester.py \
+  -a "https://static.ixambee.com/public/miscellaneous-pdf/physical_and_chemical_properties_of_soil1720241418.pdf" \
+  --free_text "soil aeration status"
+
+# Step 2 — build schema.yaml from the generated sources/SoilAerationStatus.yaml
+python term_harvester.py -b
+```
+
+To ground the enum in the actual source document rather than Claude's general knowledge:
+
+**Later, to keep a FreeText source up-to-date**, `-f` and `-c` have distinct,
+separated roles:
+
+| Command | What it does |
+|---|---|
+| `python term_harvester.py -f SoilAerationStatus` | Downloads the source PDF to `sources/SoilAerationStatus.pdf`. No Claude. No YAML change. |
+| `python term_harvester.py -c SoilAerationStatus` | Runs Claude on the best available text (downloaded file → temp URI fetch → stored description). Prints a diff. Writes `sources/SoilAerationStatus.yaml`. |
+
+A typical refresh cycle is therefore:
+
+```bash
+python term_harvester.py -f SoilAerationStatus   # download fresh copy of the PDF
+python term_harvester.py -c SoilAerationStatus   # extract enums, review diff
+python term_harvester.py -b                       # rebuild schema.yaml
+```
+
+`-f` and `-c` may also be used independently:
+
+- `-c SoilAerationStatus` without a prior `-f` will fetch the URI temporarily
+  (without saving to disk) or fall back to the stored `description` text.
+- `-f SoilAerationStatus` without a subsequent `-c` simply archives the document
+  locally for inspection; `sources/SoilAerationStatus.yaml` is unchanged.
+
+**`-f all` and `-c` with no arguments both silently skip FreeText sources.**
+FreeText sources must always be updated consciously via explicit `[key]`.
+
+When `-c [key]` runs, text is sourced in this priority order:
+
+1. Locally downloaded file `sources/{key}.{ext}` (saved by a prior `-f [key]`)
+2. URI fetched temporarily — not saved to disk
+3. Stored `description` text from `harvester_config.yaml`
+
+### Config entry
+
+```yaml
+SoilAerationStatus:
+  title: Soil Aeration Status
+  name: SoilAerationStatus
+  version: null
+  content_type: FreeText
+  file_format: yaml
+  reachable_from:
+    source_ontology: https://static.ixambee.com/public/miscellaneous-pdf/physical_and_chemical_properties_of_soil1720241418.pdf
+  download_date: '2026-06-08'
+  description: soil aeration status
+```
+
+### Setting up `ANTHROPIC_API_KEY`
+
+FreeText extraction requires a key from [console.anthropic.com](https://console.anthropic.com/)
+→ **API Keys** → **Create Key**.
+
+**Current session only** (forgotten when the terminal closes):
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+**Permanently** — add to your shell profile and reload it:
+
+```bash
+# macOS (zsh)
+echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc && source ~/.zshrc
+
+# Linux (bash)
+echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.bashrc && source ~/.bashrc
+```
+
+**Verify the key is visible to the shell:**
+
+```bash
+echo $ANTHROPIC_API_KEY
+```
+
+Install the required packages via the `freetext` extra (and `pdf` if you will
+pass PDF files):
+
+```bash
+pip install -e ".[freetext]"       # anthropic only
+pip install -e ".[freetext,pdf]"   # anthropic + pypdf
+```
+
+> **Note:** keep your API key out of `harvester_config.yaml` and out of version
+> control.  The environment variable approach above is the standard and safest
+> method.
 
 ---
 
@@ -558,18 +1059,20 @@ specifications.
 
 ## Module structure
 
-| Module | Responsibility |
-|---|---|
-| `term_harvester.py` | CLI entry point; `build_schema`, `add_source`, `process_sources`, `expand_reachable_from` |
-| `source_utils.py` | Shared utilities: HTML parsing, YAML output, config management, prefix helpers |
-| `source_linkml.py` | `content_type: LinkML` — YAML schema processing and `match_linkml` detection |
-| `source_owl.py` | `content_type: OWL` — owlready2 class traversal and `match_owl` detection |
-| `source_ontologyapi.py` | `content_type: OntologyAPI` — OLS4 / BioPortal / AGROVOC graph fetching and processing |
-| `source_agrovoc.py` | AGROVOC SPARQL fetchers and `match_agrovoc` detection |
-| `source_loinc.py` | LOINC CodeSystem / ValueSet JSON conversion and HL7 table parsing |
-| `source_nasis.py` | `content_type: NASIS` — USDA NRCS NASIS Domains PDF parsing (requires `pypdf`) |
-| `source_nrcs.py` | `content_type: NRCSSoilFieldBook` — USDA NRCS Field Book for Describing and Sampling Soils PDF parsing (requires `pypdf`) |
-| `source_nsdb.py` | National Soil DataBase HTML parsing |
-| `source_statscan.py` | Statistics Canada classification page scraping |
-| `source_napcscanada.py` | NAPCS Canada CSV parsing |
-| `source_agrifoodca.py` | AgriFoodCA picklist CSV parsing and GitHub directory import |
+| Module | Responsibility | Source |
+|---|---|---|
+| `term_harvester.py` | CLI entry point; `build_schema`, `add_source`, `process_sources`, `expand_reachable_from` | |
+| `source_utils.py` | Shared utilities: HTML parsing, YAML output, config management, prefix helpers | |
+| `source_linkml.py` | `content_type: LinkML` — YAML schema processing and `match_linkml` detection | |
+| `source_owl.py` | `content_type: OWL` — owlready2 class traversal and `match_owl` detection | |
+| `source_ontologyapi.py` | `content_type: OntologyAPI` — OLS4 / BioPortal / AGROVOC graph fetching and processing | |
+| `source_agrovoc.py` | AGROVOC SPARQL fetchers and `match_agrovoc` detection | [SPARQL endpoint](https://agrovoc.fao.org/sparql/) |
+| `source_loinc.py` | LOINC CodeSystem / ValueSet JSON conversion and HL7 table parsing | [HTML / JSON files](https://terminology.hl7.org/) |
+| `source_nasis.py` | `content_type: NASIS` — USDA NRCS NASIS Domains PDF parsing (`pdf` extra) | [PDF file](https://www.nrcs.usda.gov/sites/default/files/2025-07/NASIS%207.4.3%20Domains.pdf) |
+| `source_nrcs.py` | `content_type: NRCSSoilFieldBook` — USDA NRCS Field Book PDF parsing (`pdf` extra) | [PDF file](https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf) |
+| `source_nsdb.py` | National Soil DataBase HTML parsing | [index](https://sis.agr.gc.ca/cansis/nsdb/index.html) |
+| `source_statscan.py` | Statistics Canada classification page scraping | |
+| `source_napcscanada.py` | NAPCS Canada CSV parsing | [CSV file](https://www.statcan.gc.ca/en/media/5274) |
+| `source_agrifoodca.py` | AgriFoodCA picklist CSV parsing and GitHub directory import | [CSV files](https://github.com/agrifooddatacanada/picklists_for_schemas/tree/main/picklists) |
+| `source_credit.py` | `content_type: CRediT` — CRediT contributor roles Zenodo PDF parsing | |
+| `source_freetext.py` | `content_type: FreeText` — Claude API enum extraction from free text (`freetext` extra) | |
