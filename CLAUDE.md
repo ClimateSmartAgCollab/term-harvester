@@ -66,9 +66,12 @@ Each `sources/source_*.py` exposes a `match_*` detection function and a `process
 | `source_nrcs.py` | `NRCSSoilFieldBook` — USDA NRCS Field Book PDF (requires pypdf) |
 | `source_nsdb.py` | `NSDB`, `NSDBSNT`, `NSDBSLT`, `NSDBSLC` — Canadian National Soil DataBase HTML |
 | `source_statscan.py` | `STATSCAN` — Statistics Canada classification pages |
+| `source_statscan_table.py` | `STATSCANTable` — Statistics Canada Census Dictionary table pages; auto-fetches FR from `index-fra.cfm` |
+| `source_iso_country.py` | `ISOCountry` — ISO 3166-2 country subdivision codes via Wikipedia (ISO OBP is not directly fetchable) |
 | `source_napcscanada.py` | `NAPCSCanada` — NAPCS Canada CSV |
 | `source_agrifoodca.py` | `AgriFoodCA` — GitHub directory or individual CSV picklists |
 | `source_credit.py` | Attribution/credit metadata utilities |
+| `source_freetext.py` | `FreeText` — Claude API enum extraction from free text (`freetext` extra) |
 
 ### `-b` build filtering (minus/include/concise)
 

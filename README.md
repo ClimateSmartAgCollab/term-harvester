@@ -798,6 +798,8 @@ SoilAerationStatus:
   description: soil aeration status
 ```
 
+The `--free_text` string is stored verbatim as the `description` field in `harvester_config.yaml` so that future `-c [key]` runs send the same topic prompt to the LLM.  This is intended to encourage — but not guarantee — determinism and reproducibility: given the same source document and the same description string, LLM re-extraction should produce a structurally similar enum.  LLM output is inherently non-deterministic, so treat the stored description as a best-effort reproducibility seed rather than a strict specification.
+
 ### Setting up `ANTHROPIC_API_KEY`
 
 FreeText extraction requires a key from [console.anthropic.com](https://console.anthropic.com/)
@@ -1072,6 +1074,8 @@ specifications.
 | `source_nrcs.py` | `content_type: NRCSSoilFieldBook` — USDA NRCS Field Book PDF parsing (`pdf` extra) | [PDF file](https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf) |
 | `source_nsdb.py` | National Soil DataBase HTML parsing | [index](https://sis.agr.gc.ca/cansis/nsdb/index.html) |
 | `source_statscan.py` | Statistics Canada classification page scraping | |
+| `source_statscan_table.py` | `content_type: STATSCANTable` — Statistics Canada Census Dictionary table pages; auto-fetches French translations from the corresponding `index-fra.cfm` page | |
+| `source_iso_country.py` | `content_type: ISOCountry` — ISO 3166-2 country subdivision codes; data sourced from the corresponding Wikipedia ISO 3166-2 article (ISO OBP is a Vaadin SPA, not directly fetchable) | [ISO OBP](https://www.iso.org/obp/ui/) |
 | `source_napcscanada.py` | NAPCS Canada CSV parsing | [CSV file](https://www.statcan.gc.ca/en/media/5274) |
 | `source_agrifoodca.py` | AgriFoodCA picklist CSV parsing and GitHub directory import | [CSV files](https://github.com/agrifooddatacanada/picklists_for_schemas/tree/main/picklists) |
 | `source_credit.py` | `content_type: CRediT` — CRediT contributor roles Zenodo PDF parsing | |
