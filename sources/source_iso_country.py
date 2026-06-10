@@ -129,28 +129,35 @@ def _json_path(key):
 # ---------------------------------------------------------------------------
 
 def _fetch_wikidata(alpha2, locales=None):
-    """Query Wikidata for country name and ISO 3166-2 subdivisions.
+    """Query Wikidata for country name, description, and ISO 3166-2 subdivisions.
 
     Returns:
         country_name (str)
+        country_desc (str)        — Wikidata schema:description in English
         subdivisions (list[dict]) — each: {code, suffix, qid, labels: {lang: str}}
     """
     locales = locales or ["en"]
 
-    # Country name via P297 (ISO 3166-1 alpha-2 code)
+    # Country name and description via P297 (ISO 3166-1 alpha-2 code)
     country_sparql = f"""
-SELECT ?item ?label WHERE {{
+SELECT ?item ?label ?desc WHERE {{
   ?item wdt:P297 "{alpha2}" .
   ?item rdfs:label ?label .
   FILTER(LANG(?label) = "en")
+  OPTIONAL {{
+    ?item schema:description ?desc .
+    FILTER(LANG(?desc) = "en")
+  }}
 }}
 LIMIT 1
 """
     country_name = ""
+    country_desc = ""
     try:
         bindings = _sparql_query(country_sparql)
         if bindings:
             country_name = bindings[0].get("label", {}).get("value", "")
+            country_desc = bindings[0].get("desc", {}).get("value", "")
     except Exception as e:
         print(f"  Warning: could not get country name for {alpha2}: {e}", file=sys.stderr)
 
@@ -188,15 +195,16 @@ ORDER BY ?iso_code
     except Exception as e:
         print(f"  Error querying subdivisions for {alpha2}: {e}", file=sys.stderr)
 
-    return country_name, subdivisions
+    return country_name, country_desc, subdivisions
 
 
-def _save_json(key, alpha2, country_name, subdivisions, config_file=MENU_CONFIG):
+def _save_json(key, alpha2, country_name, country_desc, subdivisions, config_file=MENU_CONFIG):
     """Persist fetched data as JSON and stamp download_date in config."""
     today = datetime.date.today().isoformat()
     payload = {
         "alpha2": alpha2,
         "country_name": country_name,
+        "country_desc": country_desc,
         "download_date": today,
         "subdivisions": subdivisions,
     }
@@ -222,11 +230,11 @@ def fetch_iso_country_source(key, source, config_file=MENU_CONFIG):
 
     locales = _get_project_locales(config_file)
     print(f"  Querying Wikidata for ISO 3166-2:{alpha2} (locales: {locales}) ...")
-    country_name, subdivisions = _fetch_wikidata(alpha2, locales=locales)
+    country_name, country_desc, subdivisions = _fetch_wikidata(alpha2, locales=locales)
     if not subdivisions:
         print(f"  Warning: no subdivisions found for {alpha2}", file=sys.stderr)
         return
-    _save_json(key, alpha2, country_name, subdivisions, config_file)
+    _save_json(key, alpha2, country_name, country_desc, subdivisions, config_file)
 
 
 def process_iso_country_source(key, source, config_file=MENU_CONFIG, locales=None):
@@ -241,6 +249,7 @@ def process_iso_country_source(key, source, config_file=MENU_CONFIG, locales=Non
         data = json.load(f)
 
     country_name = data.get("country_name", "")
+    country_desc = data.get("country_desc", "")
     subdivisions = data.get("subdivisions", [])
 
     if not subdivisions:
@@ -275,16 +284,16 @@ def process_iso_country_source(key, source, config_file=MENU_CONFIG, locales=Non
                 add_permissible_value(pv_fr, suffix, title=title_fr)
 
     source_url = (source.get("reachable_from") or {}).get("source_ontology", "")
+    enum_entry = {"name": enum_key, "title": enum_title, "permissible_values": pv_en}
+    if country_desc:
+        enum_entry["description"] = country_desc
+
     schema = make_config_schema(
         id=source_url,
         name=key,
         title=source.get("title") or enum_title,
         prefixes=_SOURCE_PREFIXES,
-        enums={enum_key: {
-            "name":               enum_key,
-            "title":              enum_title,
-            "permissible_values": pv_en,
-        }},
+        enums={enum_key: enum_entry},
     )
     if pv_fr:
         schema["extensions"] = _make_locale_extensions(
@@ -323,7 +332,7 @@ def match_iso_country(url, tmp_path, config_file=MENU_CONFIG):
 
     locales = config.get("locales") or ["en", "fr"]
     print(f"  Querying Wikidata for ISO 3166-2:{alpha2} (locales: {locales}) ...")
-    country_name, subdivisions = _fetch_wikidata(alpha2, locales=locales)
+    country_name, country_desc, subdivisions = _fetch_wikidata(alpha2, locales=locales)
     if not subdivisions:
         print(f"  Error: no subdivisions found for ISO 3166-2:{alpha2}", file=sys.stderr)
         return True
@@ -336,7 +345,8 @@ def match_iso_country(url, tmp_path, config_file=MENU_CONFIG):
     path = _json_path(key)
     with open(path, "w", encoding="utf-8") as f:
         json.dump({"alpha2": alpha2, "country_name": country_name,
-                   "download_date": today, "subdivisions": subdivisions},
+                   "country_desc": country_desc, "download_date": today,
+                   "subdivisions": subdivisions},
                   f, ensure_ascii=False, indent=2)
     print(f"  Saved {len(subdivisions)} subdivisions to {path}")
 

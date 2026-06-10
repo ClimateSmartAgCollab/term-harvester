@@ -372,6 +372,9 @@ code extracted from the ISO OBP URL (e.g. `CA`) drives two queries:
    subdivisions with `rdfs:label` for every project locale listed in
    `harvester_config.yaml`.
 
+The enum itself receives a `description:` drawn from Wikidata's `schema:description`
+for the country entity (e.g. *"country in North America"* for Canada).
+
 Each permissible value carries:
 - `meaning: wd:Q…` — the Wikidata QID (e.g. `wd:Q1951` for Alberta), a stable
   semantic anchor that links to the full Wikidata entity.
@@ -411,6 +414,7 @@ enums:
   Canada:
     name: Canada
     title: Canada
+    description: country in North America
     permissible_values:
       AB:
         title: Alberta
