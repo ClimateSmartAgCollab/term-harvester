@@ -853,39 +853,6 @@ enums:
     annotations:
       imported_from: AgriFoodCA_Picklists
       source_file: sources/AgriFoodCA_Picklists.yaml
-  Canada:
-    name: Canada
-    title: Canada
-    permissible_values:
-      AB:
-        title: Alberta
-      BC:
-        title: British Columbia
-      MB:
-        title: Manitoba
-      NB:
-        title: New Brunswick
-      NL:
-        title: Newfoundland and Labrador
-      NT:
-        title: Northwest Territories
-      NS:
-        title: Nova Scotia
-      NU:
-        title: Nunavut
-      'ON':
-        title: Ontario
-      PE:
-        title: Prince Edward Island
-      QC:
-        title: Quebec
-      SK:
-        title: Saskatchewan
-      YT:
-        title: Yukon
-    annotations:
-      imported_from: ISO_COUNTRY_CA
-      source_file: sources/ISO_COUNTRY_CA.yaml
   CRediT:
     permissible_values:
       conceptualization:

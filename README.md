@@ -363,16 +363,27 @@ python term_harvester.py -b
 ```
 
 Because the ISO OBP page is a JavaScript application, data is sourced from the
-corresponding Wikipedia ISO 3166-2 article
-(`https://en.wikipedia.org/wiki/ISO_3166-2:CA`), which carries the same
-authoritative information in parseable HTML tables.  The ISO OBP URL is
-retained in `source_ontology` as the canonical citation.
+[Wikidata Query Service](https://query.wikidata.org/) via SPARQL.  The alpha-2
+code extracted from the ISO OBP URL (e.g. `CA`) drives two queries:
 
-The enum key and name are derived from the country's short name extracted from
-the Wikipedia article (e.g. `Canada`).  The suffix of each 3166-2 code (e.g.
-`AB` from `CA-AB`) becomes the permissible value key; the English subdivision
-name is the title.  French translations are added to the locale extension when
-the Wikipedia table contains a French name column, as it does for Canada.
+1. **P297** (ISO 3166-1 alpha-2) — resolves the country's English name, used
+   as the enum key (e.g. `Canada`).
+2. **P300** (ISO 3166-2 code) filtered by the alpha-2 prefix — fetches all
+   subdivisions with `rdfs:label` for every project locale listed in
+   `harvester_config.yaml`.
+
+Each permissible value carries:
+- `meaning: wd:Q…` — the Wikidata QID (e.g. `wd:Q1951` for Alberta), a stable
+  semantic anchor that links to the full Wikidata entity.
+- `exact_mappings: [iso:CA-AB]` — the canonical ISO 3166-2 code as a CURIE.
+
+Both `wd:` and `iso:` prefixes are written to the source YAML and to the config
+entry's `prefixes:` block so that `-b` can sync them into `schema.yaml`.
+Results are cached in `sources/{key}.json`; the ISO OBP URL is retained in
+`source_ontology` as the canonical citation.
+
+The suffix of each 3166-2 code (e.g. `AB` from `CA-AB`) becomes the
+permissible value key.
 
 **Config entry produced:**
 
@@ -381,15 +392,21 @@ ISO_COUNTRY_CA:
   title: Canada
   name: ISO_COUNTRY_CA
   content_type: ISO_COUNTRY
-  file_format: html
+  file_format: json
   reachable_from:
     source_ontology: https://www.iso.org/obp/ui/#iso:code:3166:CA
-  download_date: '2026-06-08'
+  download_date: '2026-06-09'
+  prefixes:
+    iso: https://www.iso.org/iso-3166-country-codes/
+    wd: http://www.wikidata.org/entity/
 ```
 
 **Enum in `sources/ISO_COUNTRY_CA.yaml`:**
 
 ```yaml
+prefixes:
+  iso: https://www.iso.org/iso-3166-country-codes/
+  wd: http://www.wikidata.org/entity/
 enums:
   Canada:
     name: Canada
@@ -397,30 +414,20 @@ enums:
     permissible_values:
       AB:
         title: Alberta
+        meaning: wd:Q1951
+        exact_mappings:
+        - iso:CA-AB
       BC:
         title: British Columbia
+        meaning: wd:Q1974
+        exact_mappings:
+        - iso:CA-BC
       MB:
         title: Manitoba
-      NB:
-        title: New Brunswick
-      NL:
-        title: Newfoundland and Labrador
-      NT:
-        title: Northwest Territories
-      NS:
-        title: Nova Scotia
-      NU:
-        title: Nunavut
-      ON:
-        title: Ontario
-      PE:
-        title: Prince Edward Island
-      QC:
-        title: Quebec
-      SK:
-        title: Saskatchewan
-      YT:
-        title: Yukon
+        meaning: wd:Q1948
+        exact_mappings:
+        - iso:CA-MB
+      # … remaining provinces and territories …
 extensions:
   fr:
     enums:
@@ -431,8 +438,8 @@ extensions:
           MB: {title: Manitoba}
           NB: {title: Nouveau-Brunswick}
           NL: {title: Terre-Neuve-et-Labrador}
-          NT: {title: Territoires du Nord-Ouest}
           NS: {title: Nouvelle-Écosse}
+          NT: {title: Territoires du Nord-Ouest}
           NU: {title: Nunavut}
           ON: {title: Ontario}
           PE: {title: Île-du-Prince-Édouard}
@@ -441,12 +448,12 @@ extensions:
           YT: {title: Yukon}
 ```
 
-To refresh the data when Wikipedia updates:
+To refresh the data when Wikidata updates:
 
 ```bash
-python term_harvester.py -f ISO_COUNTRY_CA   # re-downloads Wikipedia page
+python term_harvester.py -f ISO_COUNTRY_CA   # re-queries Wikidata SPARQL, updates sources/ISO_COUNTRY_CA.json
 python term_harvester.py -c ISO_COUNTRY_CA   # regenerates sources/ISO_COUNTRY_CA.yaml
-python term_harvester.py -b                  # rebuilds schema.yaml
+python term_harvester.py -b                  # rebuilds schema.yaml, syncs wd: and iso: prefixes
 ```
 
 ---
@@ -1075,7 +1082,7 @@ specifications.
 | `source_nsdb.py` | National Soil DataBase HTML parsing | [index](https://sis.agr.gc.ca/cansis/nsdb/index.html) |
 | `source_statscan.py` | Statistics Canada classification page scraping | |
 | `source_statscan_table.py` | `content_type: STATSCANTable` — Statistics Canada Census Dictionary table pages; auto-fetches French translations from the corresponding `index-fra.cfm` page | |
-| `source_iso_country.py` | `content_type: ISOCountry` — ISO 3166-2 country subdivision codes; data sourced from the corresponding Wikipedia ISO 3166-2 article (ISO OBP is a Vaadin SPA, not directly fetchable) | [ISO OBP](https://www.iso.org/obp/ui/) |
+| `source_iso_country.py` | `content_type: ISO_COUNTRY` — ISO 3166-2 country subdivision codes via Wikidata SPARQL (P297 for country name, P300 prefix filter for subdivisions); each PV carries its Wikidata QID as `meaning`; ISO OBP is a Vaadin SPA, not directly fetchable | [ISO OBP](https://www.iso.org/obp/ui/) |
 | `source_napcscanada.py` | NAPCS Canada CSV parsing | [CSV file](https://www.statcan.gc.ca/en/media/5274) |
 | `source_agrifoodca.py` | AgriFoodCA picklist CSV parsing and GitHub directory import | [CSV files](https://github.com/agrifooddatacanada/picklists_for_schemas/tree/main/picklists) |
 | `source_credit.py` | `content_type: CRediT` — CRediT contributor roles Zenodo PDF parsing | |

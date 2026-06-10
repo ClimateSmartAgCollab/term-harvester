@@ -38,11 +38,10 @@ sources:
         - AgriFoodCA_StandardsStages
         - AgriFoodCA_WaterTableCharacteristics
         - AgriFoodCA_CanadianProvinces
-        - AgriFoodCA_Gender   
-        - AgriFoodCA_SoilPh 
-        - AgriFoodCA_SoilSalinity #  minor code differences (STS→ST, VSS→VS)
-        - AgriFoodCA_SoilStructure  
-
+        - AgriFoodCA_Gender
+        - AgriFoodCA_SoilPh
+        - AgriFoodCA_SoilSalinity
+        - AgriFoodCA_SoilStructure
   CRediT:
     title: CRediT Contributor Roles Taxonomy
     name: CRediT
@@ -61,10 +60,13 @@ sources:
     name: ISO_COUNTRY_CA
     version: null
     content_type: ISO_COUNTRY
-    file_format: html
+    file_format: json
     reachable_from:
       source_ontology: https://www.iso.org/obp/ui/#iso:code:3166:CA
-    download_date: '2026-06-08'
+    download_date: '2026-06-09'
+    prefixes:
+      iso: https://www.iso.org/iso-3166-country-codes/
+      wd: http://www.wikidata.org/entity/
   LodgingAssessment:
     title: Visual Lodging Estimation Before Harvest
     name: LodgingAssessment

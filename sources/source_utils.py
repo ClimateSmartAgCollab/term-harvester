@@ -65,19 +65,20 @@ _CURIE_PATTERN = re.compile(r'^[A-Za-z][A-Za-z0-9]*:[A-Za-z0-9]')
 def _represent_str(dumper, data):
     """Single-quote strings that require it for safe YAML output.
 
-    CURIE-pattern strings (e.g. ENVO:00000428) are single-quoted to prevent
-    the embedded colon from being misread as a key-value separator.
-
     Strings containing a single-quote character are double-quoted to avoid the
     ugly '' escaping that YAML single-quote style requires.
 
     Strings containing a double-quote character are single-quoted: PyYAML may
     emit them as plain block scalars that wrap to a new line, and a continuation
     line starting with '"' is rejected by many YAML parsers.
+
+    CURIEs (e.g. wd:Q1951, ENVO:00000428) are left as plain scalars — a colon
+    is only a YAML key-value separator when followed by a space, so these are
+    unambiguous without quotes.
     """
     if "'" in data and '"' not in data:
         return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='"')
-    if _CURIE_PATTERN.match(data) or '"' in data:
+    if '"' in data:
         return dumper.represent_scalar('tag:yaml.org,2002:str', data, style="'")
     return dumper.represent_scalar('tag:yaml.org,2002:str', data)
 
@@ -100,7 +101,7 @@ def fetch_html(url):
 
 def add_permissible_value(permissible_values, code, *, title=None, description=None,
                           is_a=None, status=None, comments=None,
-                          meaning=None, prefixes=None):
+                          meaning=None, prefixes=None, exact_mappings=None):
     """Add one permissible value entry to *permissible_values* in-place.
 
     All keyword arguments are optional; a field is only written to the entry
@@ -109,14 +110,15 @@ def add_permissible_value(permissible_values, code, *, title=None, description=N
     the text value.  Returns the entry.
 
     permissible_values: dict to mutate.
-    code:        The permissible value code (used as the dict key).
-    title:       Human-readable label.
-    description: Free-text definition.
-    is_a:        Parent code for hierarchy.
-    status:      Status string (e.g. 'ACTIVE').
-    comments:    Additional commentary (LOINC-specific).
-    meaning:     IRI for the concept; compressed to a CURIE when prefixes is provided.
-    prefixes:    Dict of prefix→URI used to compress meaning to a CURIE.
+    code:           The permissible value code (used as the dict key).
+    title:          Human-readable label.
+    description:    Free-text definition.
+    is_a:           Parent code for hierarchy.
+    status:         Status string (e.g. 'ACTIVE').
+    comments:       Additional commentary (LOINC-specific).
+    meaning:        IRI for the concept; compressed to a CURIE when prefixes is provided.
+    prefixes:       Dict of prefix→URI used to compress meaning to a CURIE.
+    exact_mappings: List of CURIEs/IRIs that are exact matches for this concept.
     """
     entry = {}
     if title and title.lower() != code.lower():
@@ -132,6 +134,8 @@ def add_permissible_value(permissible_values, code, *, title=None, description=N
                     meaning = f"{pfx}:{meaning[len(uri):]}"
                     break
         entry["meaning"] = meaning
+    if exact_mappings:
+        entry["exact_mappings"] = list(exact_mappings)
     permissible_values[code] = entry
     return entry
 

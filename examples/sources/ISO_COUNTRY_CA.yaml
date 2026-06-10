@@ -6,8 +6,10 @@ version: ''
 license: ''
 in_language: en
 imports:
-  - 'linkml:types'
-prefixes: {}
+  - linkml:types
+prefixes:
+  iso: https://www.iso.org/iso-3166-country-codes/
+  wd: http://www.wikidata.org/entity/
 default_prefix: ''
 classes: {}
 enums:
@@ -17,30 +19,69 @@ enums:
     permissible_values:
       AB:
         title: Alberta
+        meaning: wd:Q1951
+        exact_mappings:
+          - iso:CA-AB
       BC:
         title: British Columbia
+        meaning: wd:Q1973
+        exact_mappings:
+          - iso:CA-BC
       MB:
         title: Manitoba
+        meaning: wd:Q1948
+        exact_mappings:
+          - iso:CA-MB
       NB:
         title: New Brunswick
+        meaning: wd:Q1965
+        exact_mappings:
+          - iso:CA-NB
       NL:
         title: Newfoundland and Labrador
-      NT:
-        title: Northwest Territories
+        meaning: wd:Q2003
+        exact_mappings:
+          - iso:CA-NL
       NS:
         title: Nova Scotia
+        meaning: wd:Q1952
+        exact_mappings:
+          - iso:CA-NS
+      NT:
+        title: Northwest Territories
+        meaning: wd:Q2007
+        exact_mappings:
+          - iso:CA-NT
       NU:
         title: Nunavut
+        meaning: wd:Q2023
+        exact_mappings:
+          - iso:CA-NU
       'ON':
         title: Ontario
+        meaning: wd:Q1904
+        exact_mappings:
+          - iso:CA-ON
       PE:
         title: Prince Edward Island
+        meaning: wd:Q1978
+        exact_mappings:
+          - iso:CA-PE
       QC:
         title: Quebec
+        meaning: wd:Q176
+        exact_mappings:
+          - iso:CA-QC
       SK:
         title: Saskatchewan
+        meaning: wd:Q1989
+        exact_mappings:
+          - iso:CA-SK
       YT:
         title: Yukon
+        meaning: wd:Q2009
+        exact_mappings:
+          - iso:CA-YT
 slots: {}
 extensions:
   locales:
@@ -64,10 +105,10 @@ extensions:
                 title: Nouveau-Brunswick
               NL:
                 title: Terre-Neuve-et-Labrador
-              NT:
-                title: Territoires du Nord-Ouest
               NS:
                 title: "Nouvelle-\xC9cosse"
+              NT:
+                title: Territoires du Nord-Ouest
               NU:
                 title: Nunavut
               'ON':

@@ -132,6 +132,32 @@
 #   To build without concise filtering (keep all nodes), omit the attribute
 #   or set concise: false.
 #
+#   Add ISO 3166-2 country subdivision codes (content_type: ISO_COUNTRY) by supplying
+#   the ISO Online Browsing Platform (OBP) URL for any country.  Because the OBP page
+#   is a Vaadin single-page application that cannot be fetched directly, the handler
+#   queries the Wikidata Query Service (SPARQL) instead using two queries:
+#     1. Property P297 (ISO 3166-1 alpha-2) to resolve the country's English name and
+#        use it as the enum key (e.g. "Canada").
+#     2. Property P300 (ISO 3166-2 code) filtered by the alpha-2 prefix to retrieve
+#        all subdivisions.  rdfs:label is fetched for every project locale (from the
+#        top-level locales: list in harvester_config.yaml).
+#   Each permissible value carries:
+#     meaning:        wd:Q…  (Wikidata QID, e.g. wd:Q1951 for Alberta)
+#     exact_mappings: [iso:CA-AB]
+#   Results are cached in sources/{key}.json; re-run -f {key} to refresh from Wikidata.
+#
+#     # Canada — provinces and territories
+#     python term_harvester.py -a "https://www.iso.org/obp/ui/#iso:code:3166:CA"
+#     python term_harvester.py -c ISO_COUNTRY_CA
+#
+#     # United States — states and territories
+#     python term_harvester.py -a "https://www.iso.org/obp/ui/#iso:code:3166:US"
+#     python term_harvester.py -c ISO_COUNTRY_US
+#
+#     # Refresh after Wikidata updates
+#     python term_harvester.py -f ISO_COUNTRY_CA
+#     python term_harvester.py -c ISO_COUNTRY_CA
+#
 #   OWL ontologies (content_type: OWL) require owlready2 (pip install owlready2).
 #   The source file is saved as sources/{key}.text regardless of original suffix.
 #   Auto-detected from URL extension (.owl, .ofn, .rdf, .ttl) or file content:
@@ -938,6 +964,9 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
     - AgriFoodCA GitHub directory URL                      -> content_type: AgriFoodCA
     - AgriFoodCA individual picklist CSV (content-based)   -> content_type: AgriFoodCA
     - URL matching https://sis.agr.gc.ca/cansis/nsdb/soil  -> content_type: NSDB
+    - ISO OBP URL (iso.org/obp/ui/#iso:code:3166:XX)       -> content_type: ISO_COUNTRY
+      (OBP is a Vaadin SPA; data is fetched from Wikidata SPARQL using P297/P300;
+       saved as sources/{key}.json with wd: meanings and iso: exact_mappings)
     - URL from terminology.hl7.org with .html extension (not a single ValueSet/
       CodeSystem detail page)             -> content_type: LOINC
     - JSON with resourceType CodeSystem   -> content_type: LOINCCodeSystem
@@ -1487,6 +1516,10 @@ def main():
     args = parser.parse_args()
 
     config_file = args.input if args.input else MENU_CONFIG
+
+    if args.input and not os.path.isfile(config_file):
+        parser.error(f"config file not found: {config_file!r}\n"
+                     f"  Check the path passed to -i/--input, or omit it to use the default '{MENU_CONFIG}'.")
 
     if args.add:
         add_source(args.add, config_file, free_text=args.free_text)
