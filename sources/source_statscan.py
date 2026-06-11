@@ -4,10 +4,28 @@ Provides HTML parsing utilities and processing functions for StatsCan IMDB
 classification pages used by process_sources() and the add_source() detection
 block.
 
+Download/process split
+----------------------
+*  -a  URL  (match_statscan)         — downloads the main TVD page, adds the
+   config entry, then calls _crawl_and_save_statscan_zip to fetch every linked
+   page (CPV, structure, definitions, EN + FR) into sources/{key}.zip.
+*  -f  key  (fetch_statscan_source)  — same crawl, rebuilds sources/{key}.zip
+   and updates download_date in the config.
+*  -c  key  (process_statscan_source) — reads sources/{key}.zip only; no
+   network access.  Falls back to sources/{key}.html + live fetches with a
+   warning for sources added before the zip format was introduced.
+
+Zip format
+----------
+sources/{key}.zip contains:
+  manifest.json   — {url: entry_filename} mapping
+  0000.html …     — raw HTML for each URL, UTF-8 encoded
+
 Public API used by term_harvester.py:
     statscan_fr_url(url)
     parse_statscan_definitions(html_text)
     parse_statscan_structure(html_text)
+    fetch_statscan_source(key, source, config_file, locales)
     process_statscan_source(key, source, config_file=None, locales=None)
     match_statscan(url, tmp_path, config_file)
 
@@ -32,11 +50,14 @@ To add any entry directly to a project:
     python term_harvester.py -a {url}
 """
 
+import datetime
 import html
+import json
 import os
 import re
 import sys
 import yaml
+import zipfile
 from source_utils import (
     strip_tags as _strip_tags,
     strip_tags,
@@ -46,6 +67,7 @@ from source_utils import (
     _make_locale_extensions,
     IndentedDumper,
     make_source_entry,
+    update_source_config,
     write_config,
     MENU_CONFIG,
 )
@@ -62,7 +84,7 @@ CLASSIFICATIONS_SEARCH_URL_FR = (
     "https://www.statcan.gc.ca/fr/concepts/recherche?show=all"
 )
 
-_DEFAULT_CATALOG_PATH = "sources/statscan_classifications.yaml"
+_DEFAULT_CATALOG_PATH = "sources/sources_statscan_terms.yaml"
 
 
 def parse_classification_catalog(html_text):
@@ -177,7 +199,7 @@ def _load_enum_definitions():
 
 # Available Statistics Canada classification enumerations.
 # Empty until fetch_classification_catalog() has been called at least once.
-# After the first fetch the cache at sources/statscan_classifications.yaml is
+# After the first fetch the cache at sources/sources_statscan_terms.yaml is
 # loaded automatically on every subsequent import.
 ENUM_DEFINITIONS = _load_enum_definitions()
 
@@ -274,14 +296,14 @@ def parse_statscan_structure(html_text):
 def process_statscan_source(key, source, config_file=None, locales=None):
     """Build a LinkML enum YAML for a STATSCAN source.
 
-    Reads sources/{key}.html (the main variable definition page).  For each
-    top-level classification code linked from that page it:
-      1. Fetches the code's detail page.
-      2. Fetches the 'Display structure' page → builds the full code hierarchy.
-      3. Fetches the 'Display definitions' page → collects code definitions.
+    Reads sources/{key}.zip (built by -a or -f [key]).  For each top-level
+    classification code linked from the main page it:
+      1. Reads the code's detail page.
+      2. Reads the 'Display structure' page → builds the full code hierarchy.
+      3. Reads the 'Display definitions' page → collects code definitions.
 
-    Also fetches the source-level 'Display definitions' page for top-level
-    code definitions.
+    Falls back to sources/{key}.html + live fetches with a warning for sources
+    added before the zip format was introduced.
 
     For codes that appear in the source page table without a hyperlink (i.e.
     leaf codes with no child entries), a permissible_value is created directly
@@ -292,9 +314,29 @@ def process_statscan_source(key, source, config_file=None, locales=None):
     Writes sources/{key}.yaml with a single enum whose permissible_values carry
     name, title, optional description, and is_a.
     """
-    html_path = f"sources/{key}.html"
-    with open(html_path) as f:
-        source_html = f.read()
+    source_url = (source.get("reachable_from") or {}).get("source_ontology", "")
+
+    # Prefer zip; fall back to individual HTML files for backward compat
+    zip_path = f"sources/{key}.zip"
+    page_cache = _load_statscan_zip(zip_path)
+
+    if page_cache is not None:
+        print(f"  Reading {len(page_cache)} pages from {zip_path}")
+        source_html = page_cache.get(source_url, "")
+        if not source_html:
+            print(f"  Warning: main page not in {zip_path} — fetching live", file=sys.stderr)
+            source_html = fetch_html(source_url) if source_url else ""
+    else:
+        html_path = f"sources/{key}.html"
+        if os.path.exists(html_path):
+            print(f"  Warning: {zip_path} not found — using {html_path} with live fetches."
+                  f" Run '-f {key}' to build the offline archive.", file=sys.stderr)
+            with open(html_path) as f:
+                source_html = f.read()
+        else:
+            print(f"  Error: neither {zip_path} nor {html_path} found."
+                  f" Run '-f {key}' to download.", file=sys.stderr)
+            return
 
     # ---- 1. Source-level Display definitions (top-level codes) ----------
     definitions = {}
@@ -304,32 +346,28 @@ def process_statscan_source(key, source, config_file=None, locales=None):
     if src_def_m:
         src_def_url = html.unescape(src_def_m.group(1))
         try:
-            print(f"  Fetching source-level definitions {src_def_url} ...")
-            definitions.update(parse_statscan_definitions(fetch_html(src_def_url)))
+            if page_cache is None:
+                print(f"  Fetching source-level definitions {src_def_url} ...")
+            definitions.update(parse_statscan_definitions(_html_get(src_def_url, page_cache)))
         except Exception as e:
             print(f"  Warning: could not fetch source definitions: {e}", file=sys.stderr)
 
     # ---- 2. Find each top-level CPV link on the source page --------------
-    # Links with CPV= parameter represent individual classification items
     seen_urls = set()
     cpv_urls = []
     for m in re.finditer(
             r'href=["\']([^"\']*Function=getVD[^"\']*&amp;CPV=[^"\']+)["\']',
             source_html, re.IGNORECASE):
-        url = html.unescape(m.group(1))
-        if url not in seen_urls:
-            seen_urls.add(url)
-            cpv_urls.append(url)
+        u = html.unescape(m.group(1))
+        if u not in seen_urls:
+            seen_urls.add(u)
+            cpv_urls.append(u)
 
     # ---- 2b. Collect unlinked (leaf) codes directly from source table ---
-    # Rows whose Code <th> has no <a> link are flat leaf codes; their title
-    # comes from the Category/Group column and descriptions come from the
-    # source-level definitions dict (already populated in step 1).
     permissible_values = {}
     table_m = re.search(r'<table\b[^>]*>(.*?)</table>', source_html, re.IGNORECASE | re.DOTALL)
     if table_m:
-        cat_td_index = 0  # index into the <td> cells of a data row (default: first)
-        # Identify the Category/Group column from the header row
+        cat_td_index = 0
         header_m = (
             re.search(r'<thead\b[^>]*>(.*?)</thead>', table_m.group(1), re.IGNORECASE | re.DOTALL)
             or re.search(r'<tr\b[^>]*>(.*?)</tr>', table_m.group(1), re.IGNORECASE | re.DOTALL)
@@ -337,19 +375,19 @@ def process_statscan_source(key, source, config_file=None, locales=None):
         if header_m:
             header_cells = re.findall(
                 r'<t[hd]\b[^>]*>(.*?)</t[hd]>', header_m.group(1), re.IGNORECASE | re.DOTALL)
-            for i, cell in enumerate(header_cells[1:], start=1):  # skip first (Code) column
+            for i, cell in enumerate(header_cells[1:], start=1):
                 cell_text = html.unescape(strip_tags(cell)).strip().lower()
                 if any(w in cell_text for w in ('category', 'group', 'class', 'name')):
-                    cat_td_index = i - 1  # data rows: td index = header index minus the th cell
+                    cat_td_index = i - 1
                     break
         data_rows = re.findall(r'<tr\b[^>]*>(.*?)</tr>', table_m.group(1), re.IGNORECASE | re.DOTALL)
-        for row_html in data_rows[1:]:  # skip header row
+        for row_html in data_rows[1:]:
             th_m = re.search(r'<th\b[^>]*>(.*?)</th>', row_html, re.IGNORECASE | re.DOTALL)
             if not th_m:
                 continue
             th_content = th_m.group(1)
             if re.search(r'<a\b', th_content, re.IGNORECASE):
-                continue  # linked code — handled via CPV urls in step 3
+                continue
             code = html.unescape(strip_tags(th_content)).strip()
             if not code:
                 continue
@@ -360,26 +398,26 @@ def process_statscan_source(key, source, config_file=None, locales=None):
                 title = html.unescape(strip_tags(td_cells[idx])).strip()
             add_permissible_value(permissible_values, code, title=title)
 
-    # ---- 3. For each CPV page: fetch structure + definitions -------------
+    # ---- 3. For each CPV page: read structure + definitions -------------
     for cpv_url in cpv_urls:
-        print(f"  Fetching CPV page {cpv_url} ...")
+        if page_cache is None:
+            print(f"  Fetching CPV page {cpv_url} ...")
         try:
-            cpv_html = fetch_html(cpv_url)
+            cpv_html = _html_get(cpv_url, page_cache)
         except Exception as e:
             print(f"  Warning: could not fetch {cpv_url}: {e}", file=sys.stderr)
             continue
 
-        # Display structure link  (Function=getVDStruct)
         struct_m = re.search(
             r'href=["\']([^"\']*Function=getVDStruct[^"\']*)["\']',
             cpv_html, re.IGNORECASE)
         if struct_m:
             struct_url = html.unescape(struct_m.group(1))
             try:
-                print(f"    Fetching structure {struct_url} ...")
-                struct_items = parse_statscan_structure(fetch_html(struct_url))
-                # Build permissible_values from the ordered (code, name, indent) list
-                processed = []  # [(code, indent)] for is_a lookup
+                if page_cache is None:
+                    print(f"    Fetching structure {struct_url} ...")
+                struct_items = parse_statscan_structure(_html_get(struct_url, page_cache))
+                processed = []
                 for code, title, indent in struct_items:
                     is_a = None
                     if indent > 1:
@@ -392,15 +430,15 @@ def process_statscan_source(key, source, config_file=None, locales=None):
             except Exception as e:
                 print(f"    Warning: structure fetch failed: {e}", file=sys.stderr)
 
-        # Display definitions link (D=1 on the CPV page)
         def_m = re.search(
             r'href=["\']([^"\']*Function=getVD[^"\']*&amp;D=1[^"\']*)["\']',
             cpv_html, re.IGNORECASE)
         if def_m:
             def_url = html.unescape(def_m.group(1))
             try:
-                print(f"    Fetching definitions {def_url} ...")
-                definitions.update(parse_statscan_definitions(fetch_html(def_url)))
+                if page_cache is None:
+                    print(f"    Fetching definitions {def_url} ...")
+                definitions.update(parse_statscan_definitions(_html_get(def_url, page_cache)))
             except Exception as e:
                 print(f"    Warning: definitions fetch failed: {e}", file=sys.stderr)
 
@@ -409,28 +447,37 @@ def process_statscan_source(key, source, config_file=None, locales=None):
         if code in definitions:
             entry["description"] = definitions[code]
 
-    # ---- 5. Build French permissible_values from sources/{key}_fr.html --
+    # ---- 5. Build French permissible_values -----------------------------
     fr_permissible_values = {}
     fr_definitions = {}
-    fr_html_path = f"sources/{key}_fr.html"
 
-    if "fr" in (locales or ["en"]) and os.path.exists(fr_html_path):
-        with open(fr_html_path) as f:
-            fr_source_html = f.read()
+    fr_source_html = ""
+    if "fr" in (locales or ["en"]):
+        if page_cache is not None:
+            fr_source_html = page_cache.get(statscan_fr_url(source_url), "")
+            if not fr_source_html:
+                print(f"  Warning: French main page not in {zip_path} — skipping FR.",
+                      file=sys.stderr)
+        else:
+            fr_html_path = f"sources/{key}_fr.html"
+            if os.path.exists(fr_html_path):
+                with open(fr_html_path) as f:
+                    fr_source_html = f.read()
 
-        # French source-level definitions
+    if fr_source_html:
         src_def_m = re.search(
             r'href=["\']([^"\']*Function=getVD[^"\']*&amp;D=1[^"\']*)["\']',
             fr_source_html, re.IGNORECASE)
         if src_def_m:
             fr_src_def_url = html.unescape(src_def_m.group(1))
             try:
-                print(f"  Fetching French source definitions {fr_src_def_url} ...")
-                fr_definitions.update(parse_statscan_definitions(fetch_html(fr_src_def_url)))
+                if page_cache is None:
+                    print(f"  Fetching French source definitions {fr_src_def_url} ...")
+                fr_definitions.update(
+                    parse_statscan_definitions(_html_get(fr_src_def_url, page_cache)))
             except Exception as e:
                 print(f"  Warning: could not fetch French source definitions: {e}", file=sys.stderr)
 
-        # French unlinked codes from the French source table
         fr_table_m = re.search(r'<table\b[^>]*>(.*?)</table>', fr_source_html, re.IGNORECASE | re.DOTALL)
         if fr_table_m:
             cat_td_index = 0
@@ -463,12 +510,12 @@ def process_statscan_source(key, source, config_file=None, locales=None):
                     title = html.unescape(strip_tags(td_cells[idx])).strip()
                 add_permissible_value(fr_permissible_values, code, title=title)
 
-        # French CPV pages — convert each English CPV URL to its French equivalent
         for cpv_url in cpv_urls:
             fr_cpv_url = statscan_fr_url(cpv_url)
-            print(f"  Fetching French CPV page {fr_cpv_url} ...")
+            if page_cache is None:
+                print(f"  Fetching French CPV page {fr_cpv_url} ...")
             try:
-                fr_cpv_html = fetch_html(fr_cpv_url)
+                fr_cpv_html = _html_get(fr_cpv_url, page_cache)
             except Exception as e:
                 print(f"  Warning: could not fetch French CPV {fr_cpv_url}: {e}", file=sys.stderr)
                 continue
@@ -479,8 +526,10 @@ def process_statscan_source(key, source, config_file=None, locales=None):
             if struct_m:
                 fr_struct_url = html.unescape(struct_m.group(1))
                 try:
-                    print(f"    Fetching French structure {fr_struct_url} ...")
-                    fr_struct_items = parse_statscan_structure(fetch_html(fr_struct_url))
+                    if page_cache is None:
+                        print(f"    Fetching French structure {fr_struct_url} ...")
+                    fr_struct_items = parse_statscan_structure(
+                        _html_get(fr_struct_url, page_cache))
                     for code, title, indent in fr_struct_items:
                         add_permissible_value(fr_permissible_values, code, title=title)
                 except Exception as e:
@@ -492,18 +541,18 @@ def process_statscan_source(key, source, config_file=None, locales=None):
             if def_m:
                 fr_def_url = html.unescape(def_m.group(1))
                 try:
-                    print(f"    Fetching French definitions {fr_def_url} ...")
-                    fr_definitions.update(parse_statscan_definitions(fetch_html(fr_def_url)))
+                    if page_cache is None:
+                        print(f"    Fetching French definitions {fr_def_url} ...")
+                    fr_definitions.update(
+                        parse_statscan_definitions(_html_get(fr_def_url, page_cache)))
                 except Exception as e:
                     print(f"    Warning: French definitions fetch failed: {e}", file=sys.stderr)
 
-        # Merge French definitions into fr_permissible_values
         for code, fr_entry in fr_permissible_values.items():
             if code in fr_definitions:
                 fr_entry["description"] = fr_definitions[code]
 
     # ---- 6. Write YAML --------------------------------------------------
-    source_url = (source.get("reachable_from") or {}).get("source_ontology", "")
     schema = make_config_schema(
         id=source_url, name=key, title=source.get("title", ""),
         description=source.get("description", ""), version=source.get("version", ""),
@@ -528,6 +577,153 @@ def process_statscan_source(key, source, config_file=None, locales=None):
           + (f" ({len(fr_permissible_values)} French translations)" if fr_permissible_values else ""))
 
 
+# ---------------------------------------------------------------------------
+# Zip helpers (shared by -a match function and -f fetch function)
+# ---------------------------------------------------------------------------
+
+def _load_statscan_zip(zip_path):
+    """Load all HTML pages from a sources zip.
+
+    Returns a {url: html_text} dict, or None if the zip does not exist.
+    """
+    if not os.path.exists(zip_path):
+        return None
+    try:
+        cache = {}
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            manifest = json.loads(zf.read('manifest.json').decode('utf-8'))
+            for url, entry in manifest.items():
+                cache[url] = zf.read(entry).decode('utf-8', errors='replace')
+        return cache
+    except Exception as e:
+        print(f"  Warning: could not load {zip_path}: {e}", file=sys.stderr)
+        return None
+
+
+def _html_get(url, cache, indent="  "):
+    """Return HTML for url from cache dict, falling back to a live fetch."""
+    if cache is not None:
+        if url in cache:
+            return cache[url]
+        print(f"{indent}Warning: {url} not in local archive — fetching live",
+              file=sys.stderr)
+    return fetch_html(url)
+
+
+def _crawl_and_save_statscan_zip(key, url, locales, index_html=None):
+    """Crawl all pages for a STATSCAN source and save to sources/{key}.zip.
+
+    Starting from the main TVD page, discovers and fetches:
+      - Source-level definitions page (Function=getVD … &D=1)
+      - Each top-level CPV page (Function=getVD … &CPV=…)
+        - Its structure sub-page (Function=getVDStruct)
+        - Its definitions sub-page (Function=getVD … &D=1)
+      - French equivalents of all the above (when 'fr' in locales)
+    """
+    zip_path = f"sources/{key}.zip"
+    pages = {}  # {url: html_text}
+    fetch_fr = "fr" in (locales or ["en"])
+
+    def _get(u, label=""):
+        if u in pages:
+            return pages[u]
+        try:
+            h = fetch_html(u)
+            pages[u] = h
+            return h
+        except Exception as e:
+            tag = f" ({label})" if label else ""
+            print(f"  Warning: failed to fetch {u}{tag}: {e}", file=sys.stderr)
+            pages[u] = None
+            return None
+
+    # Main page
+    if index_html is not None:
+        pages[url] = index_html
+    else:
+        index_html = _get(url, "main page")
+    if not index_html:
+        print(f"  Error: could not fetch {url} — zip not saved.", file=sys.stderr)
+        return
+
+    if fetch_fr:
+        _get(statscan_fr_url(url), "FR main page")
+
+    # Source-level definitions page
+    src_def_m = re.search(
+        r'href=["\']([^"\']*Function=getVD[^"\']*&amp;D=1[^"\']*)["\']',
+        index_html, re.IGNORECASE)
+    if src_def_m:
+        src_def_url = html.unescape(src_def_m.group(1))
+        _get(src_def_url, "source definitions")
+        if fetch_fr:
+            _get(statscan_fr_url(src_def_url), "FR source definitions")
+
+    # CPV pages and their sub-pages
+    seen_cpv: set = set()
+    for m in re.finditer(
+            r'href=["\']([^"\']*Function=getVD[^"\']*&amp;CPV=[^"\']+)["\']',
+            index_html, re.IGNORECASE):
+        cpv_url = html.unescape(m.group(1))
+        if cpv_url in seen_cpv:
+            continue
+        seen_cpv.add(cpv_url)
+        cpv_html = _get(cpv_url, "CPV")
+        if fetch_fr:
+            _get(statscan_fr_url(cpv_url), "FR CPV")
+        if cpv_html:
+            struct_m = re.search(
+                r'href=["\']([^"\']*Function=getVDStruct[^"\']*)["\']',
+                cpv_html, re.IGNORECASE)
+            if struct_m:
+                struct_url = html.unescape(struct_m.group(1))
+                _get(struct_url, "structure")
+                if fetch_fr:
+                    _get(statscan_fr_url(struct_url), "FR structure")
+            def_m = re.search(
+                r'href=["\']([^"\']*Function=getVD[^"\']*&amp;D=1[^"\']*)["\']',
+                cpv_html, re.IGNORECASE)
+            if def_m:
+                def_url = html.unescape(def_m.group(1))
+                _get(def_url, "definitions")
+                if fetch_fr:
+                    _get(statscan_fr_url(def_url), "FR definitions")
+
+    manifest = {}
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for i, (u, h) in enumerate(pages.items()):
+            entry = f"{i:04d}.html"
+            zf.writestr(entry, (h or "").encode('utf-8'))
+            manifest[u] = entry
+        zf.writestr('manifest.json', json.dumps(manifest, indent=2))
+
+    ok = sum(1 for h in pages.values() if h)
+    print(f"  Saved {ok}/{len(pages)} pages to {zip_path}")
+
+
+def fetch_statscan_source(key, source, config_file=MENU_CONFIG, locales=None):
+    """Re-download all pages for a STATSCAN source and save to sources/{key}.zip.
+
+    Called by explicit -f [key].  Rebuilds the zip and updates download_date.
+    """
+    url = (source.get("reachable_from") or {}).get("source_ontology", "")
+    if not url:
+        print(f"  Skipping {key}: no source_ontology URL.", file=sys.stderr)
+        return
+    if locales is None:
+        try:
+            with open(config_file) as f:
+                locales = (yaml.safe_load(f) or {}).get("locales") or ["en"]
+        except Exception:
+            locales = ["en"]
+    print(f"  Crawling all pages for '{key}' ...")
+    _crawl_and_save_statscan_zip(key, url, locales)
+    update_source_config(key, {
+        "download_date": datetime.date.today().isoformat(),
+        "file_format": "zip",
+    }, config_file)
+
+
 def match_statscan_catalog(url, config_file=MENU_CONFIG):
     """Pre-download handler for the StatsCan classifications catalog search page.
 
@@ -536,7 +732,7 @@ def match_statscan_catalog(url, config_file=MENU_CONFIG):
         https://www.statcan.gc.ca/fr/concepts/recherche?datatype=classification...
 
     Fetches (or refreshes) the catalog, prints a subject-grouped summary, and
-    caches the result to sources/statscan_classifications.yaml.  Does NOT add
+    caches the result to sources/sources_statscan_terms.yaml.  Does NOT add
     any entry to harvester_config.yaml — this is a discovery tool.  To add a
     classification after browsing the list, run:
         python term_harvester.py -a "{url}"
@@ -578,6 +774,9 @@ def match_statscan(url, tmp_path, config_file=MENU_CONFIG):
 
     Matches URLs like:
       https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1441857
+
+    Reads the already-downloaded main page, then crawls all linked pages
+    (CPV, structure, definitions, EN + FR) into sources/{key}.zip.
     """
     if not ("statcan.gc.ca" in url and "p3VD.pl" in url and "Function=getVD" in url):
         return False
@@ -594,12 +793,10 @@ def match_statscan(url, tmp_path, config_file=MENU_CONFIG):
         os.unlink(tmp_path)
         return True
 
-    output_path = f"sources/{key}.html"
-    os.rename(tmp_path, output_path)
-    print(f"Saved to {output_path}")
-
-    with open(output_path) as f:
+    # Read the main page from the temp file, then discard it (goes into the zip)
+    with open(tmp_path, encoding="utf-8", errors="replace") as f:
         html_text = f.read()
+    os.unlink(tmp_path)
 
     # Extract title from <meta name="dcterms.title" content="..."> (attr order varies)
     title = ""
@@ -616,17 +813,12 @@ def match_statscan(url, tmp_path, config_file=MENU_CONFIG):
     version_m = re.search(r'\bversion\s+([A-Za-z0-9][A-Za-z0-9._-]*)', title, re.IGNORECASE)
     version = version_m.group(1) if version_m else None
 
-    entry = make_source_entry(key, url, "STATSCAN", "html", title=title, version=version)
+    entry = make_source_entry(key, url, "STATSCAN", "zip", title=title, version=version)
+    entry["download_date"] = datetime.date.today().isoformat()
     config.setdefault("sources", {})[key] = entry
     write_config(config, config_file)
     print(f"Added source '{key}' to {config_file}")
 
-    fr_html_path = f"sources/{key}_fr.html"
-    try:
-        print(f"  Fetching French source page {statscan_fr_url(url)} ...")
-        with open(fr_html_path, "w", encoding="utf-8") as fr_f:
-            fr_f.write(fetch_html(statscan_fr_url(url)))
-        print(f"Saved to {fr_html_path}")
-    except Exception as e:
-        print(f"  Warning: could not fetch French source page: {e}", file=sys.stderr)
+    locales = config.get("locales") or ["en"]
+    _crawl_and_save_statscan_zip(key, url, locales, index_html=html_text)
     return True

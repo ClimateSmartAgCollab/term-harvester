@@ -4,6 +4,23 @@ Provides HTML-parsing, URL utilities, and processing functions for NSDB
 classification pages used by the add_source() NSDB detection blocks and
 process_sources().
 
+Download/process split
+----------------------
+*  -a  URL  (match_nsdb_*)     — downloads the index page, adds the config
+   entry, then calls _crawl_and_save_nsdb_zip to fetch every linked attribute
+   page (EN + FR) into sources/{key}.zip.
+*  -f  key  (fetch_nsdb_*)     — same crawl, rebuilds sources/{key}.zip from
+   scratch and updates download_date in the config.
+*  -c  key  (process_nsdb_*)   — reads sources/{key}.zip only; no network
+   access.  Falls back to live fetches with a warning when no zip exists
+   (backward compatibility with sources added before this change).
+
+Zip format
+----------
+sources/{key}.zip contains:
+  manifest.json     — {url: entry_filename} mapping
+  0000.html …       — raw HTML for each URL, UTF-8 encoded
+
 Public API used by term_harvester.py:
     nsdb_fr_url(url)
     find_section_paragraph(html_text, section_name)
@@ -12,19 +29,25 @@ Public API used by term_harvester.py:
     find_contents_table_links(html_text, base_url)
     find_list_section_links(html_text, section_text, base_url)
     parse_attribute_page(html_text)
-    process_nsdb_html_source(key, source, enum_prefix, locales=None)
-    process_nsdb_source(key, source, locales=None)
+    fetch_nsdb_html_source(key, source, config_file, locales)
+    fetch_nsdb_source(key, source, config_file, locales)
+    process_nsdb_html_source(key, source, enum_prefix, locales)
+    process_nsdb_source(key, source, locales)
     match_nsdb_snt(url, tmp_path, config_file)
     match_nsdb_slt(url, tmp_path, config_file)
     match_nsdb_soil(url, tmp_path, config_file)
     match_nsdb_slc(url, tmp_path, config_file)
 """
 
+import datetime
+import json
 import os
 import re
 import sys
 import urllib.parse
 import yaml
+import zipfile
+
 from source_utils import (
     strip_tags as _strip_tags,
     strip_tags,
@@ -34,6 +57,7 @@ from source_utils import (
     IndentedDumper,
     make_config_schema,
     make_source_entry,
+    update_source_config,
     write_config,
     MENU_CONFIG,
 )
@@ -220,6 +244,185 @@ def parse_attribute_page(html_text):
 
 
 # ---------------------------------------------------------------------------
+# Zip cache helpers
+# ---------------------------------------------------------------------------
+
+def _load_zip_cache(zip_path):
+    """Load all HTML pages from a sources zip.
+
+    Returns a {url: html_text} dict, or None if the zip does not exist.
+    Prints a warning and returns None if the zip is unreadable.
+    """
+    if not os.path.exists(zip_path):
+        return None
+    try:
+        cache = {}
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            manifest = json.loads(zf.read('manifest.json').decode('utf-8'))
+            for url, entry in manifest.items():
+                cache[url] = zf.read(entry).decode('utf-8', errors='replace')
+        return cache
+    except Exception as e:
+        print(f"  Warning: could not load {zip_path}: {e}", file=sys.stderr)
+        return None
+
+
+def _html_get(url, cache, indent="  "):
+    """Return HTML for url from cache dict, falling back to a live fetch.
+
+    When cache is not None but the URL is absent, a warning is printed and a
+    live fetch is attempted so that processing is resilient to partial zips.
+    """
+    if cache is not None:
+        if url in cache:
+            return cache[url]
+        print(f"{indent}Warning: {url} not in local archive — fetching live", file=sys.stderr)
+    return fetch_html(url)
+
+
+# ---------------------------------------------------------------------------
+# Zip builder (shared by -a match functions and -f fetch functions)
+# ---------------------------------------------------------------------------
+
+def _crawl_and_save_nsdb_zip(key, base_url, content_type, locales, index_html=None):
+    """Crawl all NSDB pages for a source and save them to sources/{key}.zip.
+
+    Parameters
+    ----------
+    key : str
+        Source key (used for the zip filename).
+    base_url : str
+        The source_ontology URL (the entry/index page).
+    content_type : str
+        One of 'NSDBSNT', 'NSDBSLT', 'NSDBSLC', 'NSDB'.
+    locales : list[str]
+        Project locales; French pages are fetched when 'fr' is in the list.
+    index_html : str or None
+        Already-fetched HTML for base_url (avoids a redundant request during
+        -a, which has already downloaded the page).  When None the index is
+        fetched.
+    """
+    zip_path = f"sources/{key}.zip"
+    pages = {}   # {url: html_text}
+    fetch_fr = "fr" in locales
+
+    def _cache(url, html):
+        pages[url] = html
+        return html
+
+    def _get(url, label=""):
+        if url in pages:
+            return pages[url]
+        try:
+            html = fetch_html(url)
+            pages[url] = html
+            return html
+        except Exception as e:
+            tag = f" ({label})" if label else ""
+            print(f"  Warning: failed to fetch {url}{tag}: {e}", file=sys.stderr)
+            return None
+
+    # -- Index page ----------------------------------------------------------
+    if index_html is not None:
+        _cache(base_url, index_html)
+    else:
+        index_html = _get(base_url, "index")
+    if index_html is None:
+        print(f"  Error: could not fetch index page {base_url} — zip not saved.",
+              file=sys.stderr)
+        return
+
+    if fetch_fr:
+        _get(nsdb_fr_url(base_url), "FR index")
+
+    # -- Discover and fetch sub-pages ----------------------------------------
+    if content_type in ("NSDBSNT", "NSDBSLT"):
+        attr_links = find_contents_table_links(index_html, base_url)
+        print(f"  {key}: found {len(attr_links)} attribute links")
+        for name, url in attr_links:
+            _get(url, name)
+            if fetch_fr:
+                _get(nsdb_fr_url(url), f"FR {name}")
+
+    elif content_type == "NSDBSLC":
+        _slc_sections = ["SLC attribute tables", "Ecological Framework Tables"]
+        comp_links = []
+        for sect in _slc_sections:
+            comp_links.extend(find_list_section_links(index_html, sect, base_url))
+        print(f"  {key}: found {len(comp_links)} component links")
+        for comp_name, comp_url in comp_links:
+            comp_html = _get(comp_url, comp_name)
+            if fetch_fr:
+                _get(nsdb_fr_url(comp_url), f"FR {comp_name}")
+            if comp_html:
+                attr_links = find_contents_table_links(comp_html, comp_url)
+                for attr_name, attr_url in attr_links:
+                    _get(attr_url, attr_name)
+                    if fetch_fr:
+                        _get(nsdb_fr_url(attr_url), f"FR {attr_name}")
+
+    elif content_type == "NSDB":
+        table_links = find_links_by_text(
+            index_html, ["Soil Name Table", "Soil Layer Table"], base_url)
+        for table_name, table_url in table_links.items():
+            table_html = _get(table_url, table_name)
+            if fetch_fr:
+                _get(nsdb_fr_url(table_url), f"FR {table_name}")
+            if table_html:
+                attr_links = find_contents_table_links(table_html, table_url)
+                for attr_name, attr_url in attr_links:
+                    _get(attr_url, attr_name)
+                    if fetch_fr:
+                        _get(nsdb_fr_url(attr_url), f"FR {attr_name}")
+
+    # -- Write zip -----------------------------------------------------------
+    manifest = {}
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for i, (url, html) in enumerate(pages.items()):
+            entry = f"{i:04d}.html"
+            zf.writestr(entry, html.encode('utf-8'))
+            manifest[url] = entry
+        zf.writestr('manifest.json', json.dumps(manifest, indent=2))
+
+    ok = sum(1 for h in pages.values() if h)
+    print(f"  Saved {ok}/{len(pages)} pages to {zip_path}")
+
+
+# ---------------------------------------------------------------------------
+# Public fetch functions (called from -f handler in term_harvester.py)
+# ---------------------------------------------------------------------------
+
+def fetch_nsdb_html_source(key, source, config_file=MENU_CONFIG, locales=None):
+    """Re-download all NSDB HTML pages for an NSDBSNT/SLT/SLC source.
+
+    Builds sources/{key}.zip and updates download_date in the config.
+    """
+    base_url = (source.get("reachable_from") or {}).get("source_ontology", "")
+    if not base_url:
+        print(f"  Skipping {key}: no source_ontology URL.", file=sys.stderr)
+        return
+    content_type = source.get("content_type", "")
+    if locales is None:
+        try:
+            with open(config_file) as f:
+                locales = (yaml.safe_load(f) or {}).get("locales") or ["en"]
+        except Exception:
+            locales = ["en"]
+    print(f"  Fetching all pages for '{key}' ({content_type}) ...")
+    _crawl_and_save_nsdb_zip(key, base_url, content_type, locales)
+    update_source_config(key, {"download_date": datetime.date.today().isoformat()}, config_file)
+
+
+def fetch_nsdb_source(key, source, config_file=MENU_CONFIG, locales=None):
+    """Re-download all NSDB HTML pages for an NSDB-type source.
+
+    Builds sources/{key}.zip and updates download_date in the config.
+    Alias for fetch_nsdb_html_source — the crawl logic is content_type-aware.
+    """
+    fetch_nsdb_html_source(key, source, config_file, locales=locales)
+
+
+# ---------------------------------------------------------------------------
 # Processing functions (called from menu_manager.process_sources)
 # ---------------------------------------------------------------------------
 
@@ -263,45 +466,6 @@ def _build_nsdb_enum(attr_html, enum_prefix, require_qualifying=True):
     return enum_key, enum_dict
 
 
-def _fetch_fr_attr_pvs(attr_url_by_enum, schema_enums, indent="  "):
-    """Fetch French permissible values for each enum in *attr_url_by_enum*.
-
-    Parameters
-    ----------
-    attr_url_by_enum : dict
-        ``{enum_key: english_attr_url}`` mapping built during the EN pass.
-    schema_enums : dict
-        The ``schema["enums"]`` dict, used to look up existing EN codes.
-    indent : str
-        Leading whitespace for progress/warning messages (default ``"  "``).
-
-    Returns
-    -------
-    dict
-        ``{enum_key: {code: {text, title?, description?}}}``
-    """
-    fr_enums_pvs = {}
-    for enum_key, attr_url in attr_url_by_enum.items():
-        fr_attr_url = nsdb_fr_url(attr_url)
-        try:
-            print(f"{indent}Fetching French attr page {fr_attr_url} ...")
-            fr_attr_html = fetch_html(fr_attr_url)
-            _, _, _, fr_pv_tables = parse_attribute_page(fr_attr_html)
-            en_codes = set(schema_enums[enum_key].get("permissible_values") or {})
-            fr_pvs = {}
-            for rows in fr_pv_tables:
-                for row in rows:
-                    code = row['code']
-                    if code in en_codes:
-                        add_permissible_value(fr_pvs, code,
-                                              title=row['class_'], description=row['description'])
-            if fr_pvs:
-                fr_enums_pvs[enum_key] = fr_pvs
-                print(f"{indent}French: {len(fr_pvs)} translations for {enum_key}")
-        except Exception as e:
-            print(f"{indent}Warning: French attr fetch failed for {enum_key}: {e}",
-                  file=sys.stderr)
-    return fr_enums_pvs
 
 
 def _write_nsdb_yaml(schema, yaml_path, base_url, key, source, fr_enums_pvs, fr_description):
@@ -329,29 +493,20 @@ def _write_nsdb_yaml(schema, yaml_path, base_url, key, source, fr_enums_pvs, fr_
           + (f" (French: {', '.join(fr_parts)})" if fr_parts else ""))
 
 
-def _fetch_and_build_enums(attr_links, schema_enums, enum_prefix, indent="  "):
+def _fetch_and_build_enums(attr_links, schema_enums, enum_prefix, indent="  ",
+                            page_cache=None, fetch_fr=False):
     """Fetch each attribute URL, build its enum, populate *schema_enums* in-place.
 
-    Parameters
-    ----------
-    attr_links : list of (name, url)
-        Attribute links from find_contents_table_links.
-    schema_enums : dict
-        The ``schema["enums"]`` dict to populate in-place.
-    enum_prefix : str
-        Prefix for the enum key, e.g. ``"NSDB"`` or ``"NSDBSLC"``.
-    indent : str
-        Leading whitespace for progress/warning messages (default ``"  "``).
+    When *fetch_fr* is True, French translations are fetched immediately after
+    each EN enum so the count can be reported on the same log line.
 
-    Returns
-    -------
-    dict
-        ``{enum_key: attr_url}`` for qualifying enums, used by _fetch_fr_attr_pvs.
+    Returns ``({enum_key: attr_url}, {enum_key: fr_pvs})``.
     """
     attr_url_by_enum = {}
+    fr_enums_pvs = {}
     for attr_name, attr_url in attr_links:
         try:
-            attr_html = fetch_html(attr_url)
+            attr_html = _html_get(attr_url, page_cache, indent=indent)
         except Exception as e:
             print(f"{indent}Error fetching {attr_url}: {e}", file=sys.stderr)
             continue
@@ -360,12 +515,37 @@ def _fetch_and_build_enums(attr_links, schema_enums, enum_prefix, indent="  "):
             continue
         schema_enums[enum_key] = enum_dict
         attr_url_by_enum[enum_key] = attr_url
-        print(f"{indent}Added enum {enum_key} ({len(enum_dict['permissible_values'])} values)")
-    return attr_url_by_enum
+        en_count = len(enum_dict['permissible_values'])
+
+        lang_suffix = ""
+        if fetch_fr:
+            try:
+                fr_attr_html = _html_get(nsdb_fr_url(attr_url), page_cache, indent=indent)
+                _, _, _, fr_pv_tables = parse_attribute_page(fr_attr_html)
+                en_codes = set(enum_dict['permissible_values'])
+                fr_pvs = {}
+                for rows in fr_pv_tables:
+                    for row in rows:
+                        if row['code'] in en_codes:
+                            add_permissible_value(fr_pvs, row['code'],
+                                                  title=row['class_'],
+                                                  description=row['description'])
+                if fr_pvs:
+                    fr_enums_pvs[enum_key] = fr_pvs
+                    lang_suffix = f" + fr({len(fr_pvs)})"
+            except Exception as e:
+                print(f"{indent}Warning: French attr fetch failed for {enum_key}: {e}",
+                      file=sys.stderr)
+
+        print(f"{indent}Extracting enum {enum_key} ({en_count} values){lang_suffix}")
+    return attr_url_by_enum, fr_enums_pvs
 
 
 def process_nsdb_html_source(key, source, enum_prefix, locales=None):
     """Build a LinkML enum YAML for an NSDB HTML source.
+
+    Reads all HTML from sources/{key}.zip (built by -a or -f).  Falls back to
+    live fetches with a warning when no zip exists (legacy support).
 
     Supports three URL forms for source_ontology, detected by page content:
 
@@ -389,6 +569,17 @@ def process_nsdb_html_source(key, source, enum_prefix, locales=None):
     yaml_path = f"sources/{key}.yaml"
     base_url  = (source.get("reachable_from") or {}).get("source_ontology", "")
     html_path = f"sources/{key}.html"
+    zip_path  = f"sources/{key}.zip"
+
+    # Load page cache from zip; fall back to legacy html + live fetches with a warning.
+    page_cache = _load_zip_cache(zip_path)
+    if page_cache is None:
+        if not os.path.exists(html_path):
+            print(f"  Skipping {key}: no archive or HTML file found"
+                  f" — run '-f {key}' to download first.", file=sys.stderr)
+            return
+        print(f"  Warning: {zip_path} not found — using {html_path} with live fetches."
+              f" Run '-f {key}' to build a local archive.", file=sys.stderr)
 
     if os.path.exists(yaml_path):
         with open(yaml_path) as f:
@@ -400,8 +591,15 @@ def process_nsdb_html_source(key, source, enum_prefix, locales=None):
     schema["enums"] = {}
     schema.pop("extensions", None)
 
-    with open(html_path, encoding="utf-8", errors="replace") as f:
-        page_html = f.read()
+    # Get the index page HTML
+    if page_cache is not None and base_url in page_cache:
+        page_html = page_cache[base_url]
+    elif os.path.exists(html_path):
+        with open(html_path, encoding="utf-8", errors="replace") as f:
+            page_html = f.read()
+    else:
+        print(f"  Error: index HTML not available for {key}.", file=sys.stderr)
+        return
 
     # Default description from first <p>
     p_m = re.search(r'<p[^>]*>(.*?)</p>', page_html, re.IGNORECASE | re.DOTALL)
@@ -425,7 +623,7 @@ def process_nsdb_html_source(key, source, enum_prefix, locales=None):
         for comp_name, comp_url in component_links:
             print(f"  Processing component '{comp_name}' ...")
             try:
-                comp_html = fetch_html(comp_url)
+                comp_html = _html_get(comp_url, page_cache)
             except Exception as e:
                 print(f"  Error fetching {comp_url}: {e}", file=sys.stderr)
                 continue
@@ -441,17 +639,17 @@ def process_nsdb_html_source(key, source, enum_prefix, locales=None):
             if "fr" in (locales or ["en"]):
                 fr_comp_url = nsdb_fr_url(comp_url)
                 try:
-                    print(f"    Fetching French component page {fr_comp_url} ...")
-                    fr_comp_html = fetch_html(fr_comp_url)
+                    fr_comp_html = _html_get(fr_comp_url, page_cache, indent="    ")
                     fr_desc = find_section_paragraph(fr_comp_html, "Description")
                     if fr_desc:
                         fr_description = (fr_description + "\n" + fr_desc).strip() if fr_description else fr_desc
                 except Exception as e:
-                    print(f"    Warning: French component page fetch failed: {e}", file=sys.stderr)
+                    print(f"    Warning: French component page failed: {e}", file=sys.stderr)
 
-            attr_url_by_enum = _fetch_and_build_enums(attr_links, schema["enums"], enum_prefix, indent="    ")
-            if "fr" in (locales or ["en"]):
-                fr_enums_pvs.update(_fetch_fr_attr_pvs(attr_url_by_enum, schema["enums"], indent="    "))
+            _, new_fr_pvs = _fetch_and_build_enums(
+                attr_links, schema["enums"], enum_prefix, indent="    ", page_cache=page_cache,
+                fetch_fr="fr" in (locales or ["en"]))
+            fr_enums_pvs.update(new_fr_pvs)
 
     else:
         # ---- Component/index page or direct attribute page ------------------
@@ -479,15 +677,14 @@ def process_nsdb_html_source(key, source, enum_prefix, locales=None):
             if "fr" in (locales or ["en"]):
                 fr_page_url = nsdb_fr_url(base_url)
                 try:
-                    print(f"  Fetching French page {fr_page_url} ...")
-                    fr_page_html = fetch_html(fr_page_url)
+                    fr_page_html = _html_get(fr_page_url, page_cache)
                     fr_description = find_section_paragraph(fr_page_html, "Description") or ""
                 except Exception as e:
-                    print(f"  Warning: French page fetch failed: {e}", file=sys.stderr)
+                    print(f"  Warning: French page failed: {e}", file=sys.stderr)
 
-            attr_url_by_enum = _fetch_and_build_enums(attr_links, schema["enums"], enum_prefix, indent="  ")
-            if "fr" in (locales or ["en"]):
-                fr_enums_pvs = _fetch_fr_attr_pvs(attr_url_by_enum, schema["enums"], indent="  ")
+            _, fr_enums_pvs = _fetch_and_build_enums(
+                attr_links, schema["enums"], enum_prefix, indent="  ", page_cache=page_cache,
+                fetch_fr="fr" in (locales or ["en"]))
 
         else:
             # ---- Direct attribute page: one enum ----------------------------
@@ -497,26 +694,26 @@ def process_nsdb_html_source(key, source, enum_prefix, locales=None):
                 return
             schema["enums"][enum_key] = enum_dict
             schema["description"] = source.get("description") or enum_dict["description"]
-            print(f"  Added enum {enum_key} ({len(enum_dict['permissible_values'])} values)")
 
+            lang_suffix = ""
             if "fr" in (locales or ["en"]):
-                fr_url = nsdb_fr_url(base_url)
                 try:
-                    print(f"  Fetching French attr page {fr_url} ...")
-                    fr_html = fetch_html(fr_url)
+                    fr_html = _html_get(nsdb_fr_url(base_url), page_cache)
                     _, _, fr_description, fr_pv_tables = parse_attribute_page(fr_html)
                     en_codes = set(enum_dict["permissible_values"])
                     fr_pvs = {}
                     for rows in fr_pv_tables:
                         for row in rows:
-                            code = row['code']
-                            if code in en_codes:
-                                add_permissible_value(fr_pvs, code,
-                                                      title=row['class_'], description=row['description'])
+                            if row['code'] in en_codes:
+                                add_permissible_value(fr_pvs, row['code'],
+                                                      title=row['class_'],
+                                                      description=row['description'])
                     if fr_pvs:
                         fr_enums_pvs[enum_key] = fr_pvs
+                        lang_suffix = f" + fr({len(fr_pvs)})"
                 except Exception as e:
-                    print(f"  Warning: French attr page fetch failed: {e}", file=sys.stderr)
+                    print(f"  Warning: French attr page failed: {e}", file=sys.stderr)
+            print(f"  Extracting enum {enum_key} ({len(enum_dict['permissible_values'])} values){lang_suffix}")
 
     _write_nsdb_yaml(schema, yaml_path, base_url, key, source, fr_enums_pvs, fr_description)
 
@@ -524,12 +721,21 @@ def process_nsdb_html_source(key, source, enum_prefix, locales=None):
 def process_nsdb_source(key, source, locales=None):
     """Build a combined LinkML enum YAML by merging SNT and SLT enums.
 
+    Reads all HTML from sources/{key}.zip (built by -a or -f).  Falls back to
+    live fetches with a warning when no zip exists (legacy support).
+
     Fetches the NSDB index page (source_ontology), finds the "Soil Name Table"
     and "Soil Layer Table" component links, and for each processes all
     attribute pages using the shared NSDB helpers.
     """
     yaml_path = f"sources/{key}.yaml"
     base_url = (source.get("reachable_from") or {}).get("source_ontology", "")
+    zip_path  = f"sources/{key}.zip"
+
+    page_cache = _load_zip_cache(zip_path)
+    if page_cache is None:
+        print(f"  Warning: {zip_path} not found — fetching live."
+              f" Run '-f {key}' to build a local archive.", file=sys.stderr)
 
     if os.path.exists(yaml_path):
         with open(yaml_path) as f:
@@ -538,17 +744,14 @@ def process_nsdb_source(key, source, locales=None):
         schema = make_config_schema(id=base_url, name=key, title=source.get("title", ""),
                              description=source.get("description", ""),
                              version=source.get("version", ""))
-    # Reset description, enums, and extensions before each run so repeated -c invocations
-    # are idempotent.
     schema["description"] = source.get("description", "")
     schema["enums"] = {}
     schema.pop("extensions", None)
 
-    print(f"  Fetching NSDB index {base_url} ...")
     try:
-        index_html = fetch_html(base_url)
+        index_html = _html_get(base_url, page_cache)
     except Exception as e:
-        print(f"  Error fetching {base_url}: {e}", file=sys.stderr)
+        print(f"  Error fetching NSDB index {base_url}: {e}", file=sys.stderr)
         return
 
     table_links = find_links_by_text(index_html, ["Soil Name Table", "Soil Layer Table"], base_url)
@@ -561,7 +764,7 @@ def process_nsdb_source(key, source, locales=None):
     for table_name, table_url in table_links.items():
         print(f"  Processing '{table_name}' ...")
         try:
-            table_html = fetch_html(table_url)
+            table_html = _html_get(table_url, page_cache)
         except Exception as e:
             print(f"  Error fetching {table_url}: {e}", file=sys.stderr)
             continue
@@ -575,20 +778,19 @@ def process_nsdb_source(key, source, locales=None):
         print(f"    Found {len(attr_links)} attribute links")
 
         if "fr" in (locales or ["en"]):
-            # French table description
             fr_table_url = nsdb_fr_url(table_url)
             try:
-                print(f"    Fetching French table page {fr_table_url} ...")
-                fr_table_html = fetch_html(fr_table_url)
+                fr_table_html = _html_get(fr_table_url, page_cache, indent="    ")
                 fr_desc = find_section_paragraph(fr_table_html, "Description")
                 if fr_desc:
                     fr_description = (fr_description + "\n" + fr_desc).strip() if fr_description else fr_desc
             except Exception as e:
-                print(f"    Warning: French table page fetch failed: {e}", file=sys.stderr)
+                print(f"    Warning: French table page failed: {e}", file=sys.stderr)
 
-        attr_url_by_enum = _fetch_and_build_enums(attr_links, schema["enums"], "NSDB", indent="    ")
-        if "fr" in (locales or ["en"]):
-            fr_enums_pvs.update(_fetch_fr_attr_pvs(attr_url_by_enum, schema["enums"], indent="    "))
+        _, new_fr_pvs = _fetch_and_build_enums(
+            attr_links, schema["enums"], "NSDB", indent="    ", page_cache=page_cache,
+            fetch_fr="fr" in (locales or ["en"]))
+        fr_enums_pvs.update(new_fr_pvs)
 
     _write_nsdb_yaml(schema, yaml_path, base_url, key, source, fr_enums_pvs, fr_description)
 
@@ -651,6 +853,7 @@ def match_nsdb_snt(url, tmp_path, config_file=MENU_CONFIG):
     write_config(config, config_file)
     print(f"Added source '{key}' to {config_file}")
 
+    locales = config.get("locales", ["en"])
     if is_index:
         yaml_path = f"sources/{key}.yaml"
         schema = make_config_schema(id=url, name=key, title=title,
@@ -658,8 +861,8 @@ def match_nsdb_snt(url, tmp_path, config_file=MENU_CONFIG):
         with open(yaml_path, "w") as f:
             yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
         print(f"Created {yaml_path}")
+        _crawl_and_save_nsdb_zip(key, url, "NSDBSNT", locales, index_html=html_text)
     else:
-        locales = config.get("locales", ["en"])
         process_nsdb_html_source(key, entry, enum_prefix="NSDB", locales=locales)
     return True
 
@@ -710,6 +913,7 @@ def match_nsdb_slt(url, tmp_path, config_file=MENU_CONFIG):
     write_config(config, config_file)
     print(f"Added source '{key}' to {config_file}")
 
+    locales = config.get("locales", ["en"])
     if is_index:
         yaml_path = f"sources/{key}.yaml"
         schema = make_config_schema(id=url, name=key, title=title,
@@ -717,8 +921,8 @@ def match_nsdb_slt(url, tmp_path, config_file=MENU_CONFIG):
         with open(yaml_path, "w") as f:
             yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
         print(f"Created {yaml_path}")
+        _crawl_and_save_nsdb_zip(key, url, "NSDBSLT", locales, index_html=html_text)
     else:
-        locales = config.get("locales", ["en"])
         process_nsdb_html_source(key, entry, enum_prefix="NSDB", locales=locales)
     return True
 
@@ -767,6 +971,11 @@ def match_nsdb_soil(url, tmp_path, config_file=MENU_CONFIG):
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
     print(f"Created {yaml_path}")
+
+    with open(output_path, encoding="utf-8", errors="replace") as f:
+        index_html = f.read()
+    locales = config.get("locales", ["en"])
+    _crawl_and_save_nsdb_zip(key, url, "NSDB", locales, index_html=index_html)
     return True
 
 
@@ -812,4 +1021,7 @@ def match_nsdb_slc(url, tmp_path, config_file=MENU_CONFIG):
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
     print(f"Created {yaml_path}")
+
+    locales = config.get("locales", ["en"])
+    _crawl_and_save_nsdb_zip(key, url, "NSDBSLC", locales, index_html=html_text)
     return True

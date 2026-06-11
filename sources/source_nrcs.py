@@ -33,12 +33,12 @@ NRCS_FIELD_BOOK_PDF = (
 _NRCS_PDF_CACHE = "sources/NRCSSoilFieldBook.pdf"
 
 _ENUM_DEFS_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "nrcs_enum_definitions.yaml"
+    os.path.dirname(os.path.abspath(__file__)), "sources_nrcs_terms.yaml"
 )
 
 
 def _load_enum_definitions():
-    """Load enum extraction registry from nrcs_enum_definitions.yaml."""
+    """Load enum extraction registry from sources/sources_nrcs_terms.yaml."""
     try:
         with open(_ENUM_DEFS_PATH) as f:
             data = yaml.safe_load(f) or {}
@@ -63,6 +63,8 @@ def _require_pypdf():
     """Import and return the pypdf module, exiting with a helpful message if absent."""
     try:
         import pypdf
+        import logging
+        logging.getLogger("pypdf").setLevel(logging.ERROR)
         return pypdf
     except ImportError:
         print(
@@ -469,6 +471,8 @@ def process_nrcs_source(key, source, locales=None):
 
     pdf_base = base_url.split("#")[0]
 
+    _missing_parsers = []
+
     for defn in ENUM_DEFINITIONS:
         enum_key    = defn["enum_key"]
         title       = defn["title"]
@@ -477,12 +481,17 @@ def process_nrcs_source(key, source, locales=None):
         parser_name = defn["table_parser"]
         see_also    = f"{pdf_base}#page={pdf_pages[0]}"
 
+        parser = _PARSERS.get(parser_name)
+        if parser is None:
+            _missing_parsers.append(enum_key.rsplit("_", 1)[-1])
+            continue
+
         page_label = (
             f"pages {pdf_pages[0]}–{pdf_pages[-1]}"
             if len(pdf_pages) > 1
             else f"page {pdf_pages[0]}"
         )
-        print(f"  Extracting {enum_key} from PDF {page_label} ...")
+        print(f"  Extracting enum {enum_key} from PDF {page_label} ...", end="", flush=True)
         page_text = "\n".join(extract_page_text(pdf_path, p) for p in pdf_pages)
 
         if "description" in defn:
@@ -490,15 +499,9 @@ def process_nrcs_source(key, source, locales=None):
         else:
             description = _extract_discussion(page_text, disc_marker)
 
-        parser = _PARSERS.get(parser_name)
-        if parser is None:
-            print(f"  Warning: no parser '{parser_name}' defined for {enum_key}",
-                  file=sys.stderr)
-            continue
-
         rows = parser(page_text, defn)
         if not rows:
-            print(f"  Warning: no table rows parsed for {enum_key}", file=sys.stderr)
+            print(f" Warning: no table rows parsed", file=sys.stderr)
             continue
 
         permissible_values = {}
@@ -516,7 +519,10 @@ def process_nrcs_source(key, source, locales=None):
             "see_also":           see_also,
             "permissible_values": permissible_values,
         }
-        print(f"  Added enum {enum_key} ({len(permissible_values)} values)")
+        print(f" added ({len(permissible_values)} values)")
+
+    if _missing_parsers:
+        print(f"  Warning: no parser(s) for: {', '.join(_missing_parsers)}", file=sys.stderr)
 
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)

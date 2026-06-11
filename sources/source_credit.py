@@ -65,6 +65,8 @@ def _parse_credit_pdf(pdf_path):
     """
     try:
         import pypdf
+        import logging
+        logging.getLogger("pypdf").setLevel(logging.ERROR)
     except ImportError:
         print("Error: pypdf is required — install with: pip install pypdf",
               file=sys.stderr)

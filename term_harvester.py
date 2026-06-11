@@ -236,6 +236,7 @@ from source_statscan import (
     statscan_fr_url,
     parse_statscan_definitions,
     parse_statscan_structure,
+    fetch_statscan_source,
     process_statscan_source,
     match_statscan,
     match_statscan_catalog,
@@ -270,6 +271,8 @@ from source_nsdb import (
     find_contents_table_links,
     find_list_section_links,
     parse_attribute_page,
+    fetch_nsdb_html_source,
+    fetch_nsdb_source,
     process_nsdb_html_source,
     process_nsdb_source,
     match_nsdb_snt,
@@ -957,6 +960,50 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
 
 
 
+def _fetch_to_file(url, dest_path, timeout=60):
+    """Download *url* (fragment stripped) to *dest_path*.
+
+    Tries curl first — it handles more server configurations (TLS quirks,
+    redirects, government CDNs) than Python's urllib.  Falls back to urllib
+    if curl is not on PATH or exits non-zero.
+
+    Returns (success: bool, content_disposition: str).
+    content_disposition is only populated by the urllib path.
+    """
+    import shutil as _shutil, subprocess as _subprocess
+    fetch_url = url.split("#")[0]
+
+    curl = _shutil.which("curl")
+    if curl:
+        result = _subprocess.run(
+            [curl, "-L",
+             "--max-time", str(timeout),
+             "--connect-timeout", "15",
+             "--silent", "--show-error", "--fail",
+             "-A", "Mozilla/5.0 (compatible; term-harvester/1.0)",
+             "-o", dest_path,
+             fetch_url],
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0 and os.path.getsize(dest_path) > 0:
+            return True, ""
+        if result.returncode != 0:
+            print(f"  curl failed (exit {result.returncode})"
+                  f" — falling back to urllib", file=sys.stderr)
+            if result.stderr.strip():
+                print(f"  {result.stderr.strip()}", file=sys.stderr)
+
+    try:
+        req = urllib.request.Request(fetch_url, headers=BROWSER_HEADERS)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            cd = resp.headers.get("Content-Disposition", "")
+            with open(dest_path, "wb") as f:
+                f.write(resp.read())
+        return True, cd
+    except Exception as e:
+        return False, str(e)
+
+
 def add_source(urls, config_file=MENU_CONFIG, free_text=None):
     """Add sources from URLs to harvester_config.yaml and process them.
 
@@ -1011,7 +1058,19 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
         # Always stop after the call; do not fall through to other matchers
         # even if the API key is missing or extraction fails.
         if free_text:
+            try:
+                with open(config_file) as _pf:
+                    _pre_keys = set((yaml.safe_load(_pf) or {}).get("sources", {}).keys())
+            except Exception:
+                _pre_keys = set()
             match_freetext(url, free_text, config_file)
+            try:
+                with open(config_file) as _pf:
+                    _post_keys = set((yaml.safe_load(_pf) or {}).get("sources", {}).keys())
+            except Exception:
+                _post_keys = set()
+            for _new_key in (_post_keys - _pre_keys):
+                _upsert_source_in_index(_new_key)
             continue
 
         # Pre-download detectors: handle their own download (or need none)
@@ -1030,24 +1089,49 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
         if match_statscan_catalog(url, config_file):
             continue
 
+        # Check if base URL already matches an existing source; skip download if so.
+        _base_add_url = url.split("#")[0]
+        _dup_key = None
+        _dup_local = None
+        try:
+            with open(config_file) as _cf:
+                _cfcfg = yaml.safe_load(_cf) or {}
+            for _ek, _es in (_cfcfg.get("sources") or {}).items():
+                _eo = ((_es.get("reachable_from") or {}).get("source_ontology", "")).split("#")[0]
+                if _eo and _eo == _base_add_url:
+                    _dup_key = _ek
+                    for _ext in ("pdf", "html", "htm", "txt", "yaml", "yml", "json", "csv", "zip"):
+                        _cand = f"sources/{_ek}.{_ext}"
+                        if os.path.exists(_cand):
+                            _dup_local = _cand
+                            break
+                    break
+        except Exception:
+            pass
+        if _dup_key:
+            _msg = f"  URL already registered as source '{_dup_key}'"
+            if _dup_local:
+                _msg += f" (local file: {_dup_local})"
+            print(_msg + " — skipping.", file=sys.stderr)
+            if _dup_local:
+                print(f"  Tip: to extract enumerations from this file via Claude, use"
+                      f" -a 'URL' --free_text 'topic'", file=sys.stderr)
+            continue
+
         print(f"Fetching {url} ...")
         tmp_fd, tmp_path = tempfile.mkstemp()
         os.close(tmp_fd)
         downloaded_filename = ""
-        try:
-            req = urllib.request.Request(url, headers=BROWSER_HEADERS)
-            with urllib.request.urlopen(req) as response:
-                cd = response.headers.get('Content-Disposition', '')
-                if cd:
-                    fn_m = re.search(r'filename\s*=\s*["\']?([^"\';\r\n]+)["\']?', cd, re.IGNORECASE)
-                    if fn_m:
-                        downloaded_filename = fn_m.group(1).strip().strip('"\'')
-                with open(tmp_path, "wb") as tmp_f:
-                    tmp_f.write(response.read())
-        except Exception as e:
-            print(f"  Error fetching {url}: {e}", file=sys.stderr)
+        ok, cd_or_err = _fetch_to_file(url, tmp_path)
+        if not ok:
+            print(f"  Error fetching {url}: {cd_or_err}", file=sys.stderr)
             os.unlink(tmp_path)
             continue
+        if cd_or_err:
+            fn_m = re.search(r'filename\s*=\s*["\']?([^"\';\r\n]+)["\']?',
+                             cd_or_err, re.IGNORECASE)
+            if fn_m:
+                downloaded_filename = fn_m.group(1).strip().strip('"\'')
 
         if os.path.getsize(tmp_path) == 0:
             print(f"  Error: downloaded file is empty — skipping {url}", file=sys.stderr)
@@ -1140,7 +1224,7 @@ def _require_source_file(key, ext):
 
 
 
-def process_sources(source_keys=None, config_file=MENU_CONFIG):
+def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
     """Store per-source prefix dicts into harvester_config.yaml from fetched source files.
 
     For OntologyAPI sources: fetches the concept hierarchy via the configured API
@@ -1171,10 +1255,17 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG):
         print(f"Unknown source key(s): {', '.join(invalid)}", file=sys.stderr)
         sys.exit(1)
 
+    _freetext_ran = 0   # FreeText sources explicitly processed
+    _freetext_wrote = 0  # of those, how many wrote a YAML
+    _non_freetext_ran = False  # whether any non-FreeText source was processed
+
     for key in keys_to_process:
         source = all_sources[key]
         file_format = source.get("file_format", "yaml")
         content_type = source.get("content_type", "")
+
+        if content_type != "FreeText":
+            _non_freetext_ran = True
 
         if content_type == "OWL":
             if not _require_source_file(key, source.get("file_format", "owl")): continue
@@ -1211,17 +1302,32 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG):
             continue
 
         if content_type in ("NSDBSNT", "NSDBSLT"):
-            if not _require_source_file(key, "html"): continue
+            _zip = f"sources/{key}.zip"
+            _html = f"sources/{key}.html"
+            if not os.path.exists(_zip) and not os.path.exists(_html):
+                print(f"Skipping {key}: no archive found — run '-f {key}' to download first",
+                      file=sys.stderr)
+                continue
             process_nsdb_html_source(key, source, enum_prefix="NSDB", locales=locales)
             continue
 
         if content_type == "NSDB":
-            if not _require_source_file(key, "html"): continue
+            _zip = f"sources/{key}.zip"
+            _html = f"sources/{key}.html"
+            if not os.path.exists(_zip) and not os.path.exists(_html):
+                print(f"Skipping {key}: no archive found — run '-f {key}' to download first",
+                      file=sys.stderr)
+                continue
             process_nsdb_source(key, source, locales=locales)
             continue
 
         if content_type == "NSDBSLC":
-            if not _require_source_file(key, "html"): continue
+            _zip = f"sources/{key}.zip"
+            _html = f"sources/{key}.html"
+            if not os.path.exists(_zip) and not os.path.exists(_html):
+                print(f"Skipping {key}: no archive found — run '-f {key}' to download first",
+                      file=sys.stderr)
+                continue
             process_nsdb_html_source(key, source, enum_prefix="NSDBSLC", locales=locales)
             continue
 
@@ -1266,12 +1372,18 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG):
         if content_type == "FreeText":
             if not source_keys:
                 continue  # skip on -c with no args; only process when explicitly named
-            process_freetext_source(key, source, config_file, locales=locales)
+            _freetext_ran += 1
+            if process_freetext_source(key, source, config_file, locales=locales, debug=debug):
+                _freetext_wrote += 1
             continue
 
         process_linkml_source(key, source, config_file)
 
-    _rebuild_fts_index(config_file)
+    # Skip index rebuild only when every explicitly-run source was FreeText and none wrote a YAML
+    if _freetext_ran and _freetext_wrote == 0 and not _non_freetext_ran:
+        pass
+    else:
+        _rebuild_fts_index(config_file)
 
 
 def expand_reachable_from(yaml_path, enum_filter=None, apis=None, locales=None):
@@ -1678,9 +1790,89 @@ def _rebuild_fts_index(config_file=MENU_CONFIG):
         )
         total += len(rows)
 
+    # Also index the StatsCan classification catalog for discovery
+    _STATSCAN_CATALOG = "sources/sources_statscan_terms.yaml"
+    if os.path.exists(_STATSCAN_CATALOG):
+        try:
+            with open(_STATSCAN_CATALOG) as f:
+                cat_data = yaml.safe_load(f) or {}
+            cat_rows = []
+            for entry in cat_data.get("classifications", []):
+                cat_rows.append((
+                    "__statscan_catalog__",
+                    entry.get("key", ""),
+                    "catalog",
+                    entry.get("subject", ""),
+                    entry.get("url", ""),
+                    entry.get("title", ""),
+                    entry.get("entry_type", ""),
+                ))
+            conn.executemany(
+                "INSERT INTO terms(source_key,id,type,parent,term_uri,label,definition) "
+                "VALUES(?,?,?,?,?,?,?)",
+                cat_rows,
+            )
+            total += len(cat_rows)
+        except Exception as e:
+            print(f"  Warning: could not index StatsCan catalog: {e}", file=sys.stderr)
+
     conn.commit()
     conn.close()
     print(f"  Search index: {total} terms indexed in {_SEARCH_INDEX_DB}")
+
+
+def _upsert_source_in_index(key):
+    """Add or replace rows for one source in the FTS5 index.
+
+    Creates the DB/table if they don't exist yet (first call after -a before
+    any -c has been run).  Silently no-ops if FTS5 is unavailable.
+    """
+    yaml_path = f"sources/{key}.yaml"
+    if not os.path.exists(yaml_path):
+        return
+    try:
+        with open(yaml_path) as f:
+            data = yaml.safe_load(f)
+        if not isinstance(data, dict):
+            return
+    except Exception:
+        return
+
+    try:
+        conn = sqlite3.connect(_SEARCH_INDEX_DB)
+        conn.execute(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS terms USING fts5("
+            "source_key UNINDEXED, id UNINDEXED, type UNINDEXED, "
+            "parent UNINDEXED, term_uri UNINDEXED, label, definition, "
+            "tokenize='porter ascii')"
+        )
+        conn.execute("DELETE FROM terms WHERE source_key=?", (key,))
+    except Exception as e:
+        print(f"  Warning: FTS5 index unavailable ({e}) — --search may miss new terms.",
+              file=sys.stderr)
+        return
+
+    rows = []
+    for enum_name, enum_def in (data.get("enums") or {}).items():
+        enum_def = enum_def or {}
+        enum_title = enum_def.get("title") or enum_name
+        enum_desc = enum_def.get("description") or ""
+        rows.append((key, enum_name, "enum", "", "", enum_title, enum_desc))
+        for pv_code, pv_def in (enum_def.get("permissible_values") or {}).items():
+            pv_def = pv_def or {}
+            pv_label = pv_def.get("title") or str(pv_code)
+            pv_desc = pv_def.get("description") or ""
+            pv_uri = pv_def.get("meaning") or ""
+            rows.append((key, str(pv_code), "term", enum_title, pv_uri, pv_label, pv_desc))
+
+    conn.executemany(
+        "INSERT INTO terms(source_key,id,type,parent,term_uri,label,definition) "
+        "VALUES(?,?,?,?,?,?,?)",
+        rows,
+    )
+    conn.commit()
+    conn.close()
+    print(f"  Search index: {len(rows)} terms added for '{key}'")
 
 
 def _fts5_search_local(queries, config_file=MENU_CONFIG, top_n=10):
@@ -1809,6 +2001,69 @@ def _dedup_matches_by_id(matches):
     return deduped
 
 
+def _ai_expand_queries(queries, model="claude-haiku-4-5-20251001"):
+    """Use Claude to generate close synonyms for each query term.
+
+    Returns a list of (orig_idx, sub_query) pairs — one per original query plus
+    one per generated synonym.  The orig_idx links each sub-query back to its
+    parent so results can be pooled.  Synonyms share the original description
+    (if any) so that API searches receive the same semantic context.
+
+    Requires the ``anthropic`` package and ``ANTHROPIC_API_KEY``.  Falls back
+    to the original queries unchanged if either is missing.
+    """
+    try:
+        import anthropic as _anthropic
+    except ImportError:
+        return [(i, q) for i, q in enumerate(queries)]
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return [(i, q) for i, q in enumerate(queries)]
+
+    client = _anthropic.Anthropic(api_key=api_key)
+    pairs = []
+
+    for i, query in enumerate(queries):
+        pairs.append((i, query))
+        term = query["term"]
+        desc = query.get("description") or ""
+        context = f" — {desc}" if desc else ""
+
+        prompt = (
+            f'For the controlled-vocabulary search term "{term}"{context}, '
+            f'list 3 to 5 close synonyms or alternative phrasings as they would '
+            f'appear in scientific ontologies (e.g. for "flash freezing" you might '
+            f'suggest "quick freezing", "cryogenic freezing", "rapid freeze"). '
+            f'Include domain-specific alternatives and common variant phrasings. '
+            f'Return ONLY a compact JSON array of strings, no explanation:\n'
+            f'["synonym1", "synonym2", ...]'
+        )
+        try:
+            resp = client.messages.create(
+                model=model,
+                max_tokens=120,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = resp.content[0].text.strip()
+            m = re.search(r'\[.*?\]', raw, re.DOTALL)
+            if not m:
+                continue
+            synonyms = [
+                s.strip() for s in json.loads(m.group())
+                if isinstance(s, str) and s.strip()
+                and s.strip().lower() != term.lower()
+            ][:5]
+            if synonyms:
+                print(f"  Expanding \"{term}\" → {', '.join(synonyms)}", file=sys.stderr)
+                for syn in synonyms:
+                    pairs.append((i, {"term": syn, "description": desc or None}))
+        except Exception as e:
+            print(f"  Warning: query expansion failed for '{term}': {e}", file=sys.stderr)
+
+    return pairs
+
+
 def _ai_rescore(results, model="claude-haiku-4-5-20251001"):
     """Re-score search results using Claude for semantic relevance.
 
@@ -1853,7 +2108,9 @@ def _ai_rescore(results, model="claude-haiku-4-5-20251001"):
             f'  1.00 = the term is precisely what was searched for\n'
             f'  0.80–0.99 = highly relevant (e.g. a domain synonym or directly related concept)\n'
             f'  0.50–0.79 = moderately relevant (shares meaningful subject matter)\n'
-            f'  0.00–0.49 = tangential (only incidentally mentions the query words)\n\n'
+            f'  0.30–0.49 = tangential (peripheral connection, not really about the query)\n'
+            f'  0.00–0.29 = irrelevant (coincidentally matches a word but is clearly about '
+            f'something else — these will be excluded from results)\n\n'
             f'Terms:\n' + '\n'.join(term_lines) + '\n\n'
             f'Respond with ONLY a JSON array of objects, one per term in order:\n'
             f'[{{"index": 0, "score": 0.95}}, {{"index": 1, "score": 0.72}}, ...]\n'
@@ -1907,12 +2164,9 @@ def _format_search_report(results, fmt="text", tsv=False):
         s = f"{m['score']:.2f}"
         return s + "*" if m.get("score_source") == "ai" else s
 
-    def _children_tsv(m):
-        kids = m.get("children") or []
-        return "; ".join(
-            f"{c['id']}: {c['label']}" if c.get("label") else str(c["id"])
-            for c in kids
-        )
+    def _type_with_count(m):
+        n = len(m.get("children") or [])
+        return m["type"] + (f" ({n})" if n else "")
 
     # ------------------------------------------------------------------ TSV --
     if fmt == "tsv":
@@ -1926,10 +2180,11 @@ def _format_search_report(results, fmt="text", tsv=False):
                 lines.append("\t".join([qs, "(no matches)", *[""] * 10]))
                 continue
             for m in result["matches"]:
+                n_ch = len(m.get("children") or [])
                 lines.append("\t".join([
                     qs,
                     m["source"],
-                    m["type"],
+                    _type_with_count(m),
                     f"{m['score']:.2f}",
                     m.get("score_source") or "token",
                     m.get("parent") or "",
@@ -1938,7 +2193,7 @@ def _format_search_report(results, fmt="text", tsv=False):
                     m.get("label") or "",
                     m.get("definition") or "",
                     m.get("def_source") or "",
-                    _children_tsv(m),
+                    str(n_ch) if n_ch else "",
                 ]))
         return "\n".join(lines)
 
@@ -1963,12 +2218,16 @@ def _format_search_report(results, fmt="text", tsv=False):
             if not kids:
                 return ""
             n = len(kids)
+            _MAX_SHOWN = 20
+            shown = kids[:_MAX_SHOWN]
             items = " · ".join(
                 f"[{_cell(c.get('label') or c['id'])}]({c['uri']})"
                 if c.get("uri", "").startswith(("http://", "https://", "urn:"))
                 else _cell(c.get("label") or c["id"])
-                for c in kids
+                for c in shown
             )
+            if n > _MAX_SHOWN:
+                items += " · …"
             return f"<details><summary>{n} children</summary>{items}</details>"
 
         def _type_md(m):
@@ -2003,9 +2262,16 @@ def _format_search_report(results, fmt="text", tsv=False):
         # Pad narrow column headers to enforce minimum visual width in renderers.
         _NB = "&nbsp;"
         type_header = "Type" + _NB * 26   # ~30 chars
-        def_header  = "Definition" + _NB * 20   # ~30 chars
+        def_header  = "Definition" + _NB * 45   # ~55 chars
 
-        lines = []
+        lines = [
+            "<style>",
+            "body, .markdown-body {",
+            "    max-width: 100% !important;",
+            "    padding: 20px !important;",
+            "}",
+            "</style>",
+        ]
         for result in results:
             qs = _query_str(result["query"])
             lines.append(f"\n## Search: {qs}\n")
@@ -2031,20 +2297,19 @@ def _format_search_report(results, fmt="text", tsv=False):
     # --------------------------------------------------------- Space-padded --
     lines = []
     col_source = 24
-    col_type   = 18
+    col_type   = 24
     col_score  =  6
     col_parent = 28
     col_id     = 24
     col_label  = 28
-    col_ch     =  8   # just the count
 
     header_row = (
         f"  {'Source':<{col_source}}  {'Type':<{col_type}}  {'Score':>{col_score}}"
         f"  {'Parent':<{col_parent}}  {'ID':<{col_id}}  {'Label':<{col_label}}"
-        f"  {'Ch':>{col_ch}}  Definition"
+        f"  Definition"
     )
     rule = "  " + "-" * (col_source + col_type + col_score + col_parent +
-                          col_id + col_label + col_ch + 28)
+                          col_id + col_label + 24)
 
     for result in results:
         qs = _query_str(result["query"])
@@ -2062,12 +2327,11 @@ def _format_search_report(results, fmt="text", tsv=False):
                     defn_str += f" [{m['def_source']}]"
             parent = m.get("parent") or "—"
             label  = m.get("label") or ""
-            n_ch   = len(m.get("children") or [])
-            ch_str = str(n_ch) if n_ch else ""
+            type_str = _type_with_count(m)
             lines.append(
-                f"  {m['source']:<{col_source}}  {m['type']:<{col_type}}  {_score_str(m):>{col_score}}"
+                f"  {m['source']:<{col_source}}  {type_str:<{col_type}}  {_score_str(m):>{col_score}}"
                 f"  {parent:<{col_parent}}  {str(m['id']):<{col_id}}  {label:<{col_label}}"
-                f"  {ch_str:>{col_ch}}  {defn_str}"
+                f"  {defn_str}"
             )
 
     return "\n".join(lines)
@@ -2271,7 +2535,7 @@ def _search_ols4(query, api_conf, api_name, top_n=10, ai_mode=False):
         description = (desc_raw[0] if isinstance(desc_raw, list) and desc_raw else desc_raw) or ""
         term_id = doc.get("obo_id") or doc.get("short_form") or doc.get("iri") or ""
         ontology = doc.get("ontology_name") or ""
-        score = _match_score(q_tokens, query_text, label, description)
+        score = _match_score(q_tokens, term_text, label, description)
         if score <= 0:
             continue
         candidates.append({
@@ -2422,6 +2686,199 @@ def _search_bioportal(query, api_conf, api_name, top_n=10):
 _OLS4_URI_MARKERS = ("ols4", "ebi.ac.uk/ols")
 
 
+def _combined_q_and_tokens(queries):
+    """Return (or_query_str, all_tokens_list) for a list of query dicts.
+
+    Produces a Lucene-style OR expression:  "soil acidity" OR "soil pH" OR ...
+    Tokens are the union of all per-term tokens, used for local match scoring.
+    """
+    or_q = " OR ".join(f'"{q["term"]}"' for q in queries)
+    tokens = frozenset(t for q in queries for t in _tokenize(q["term"]))
+    return or_q, tokens
+
+
+def _search_bioportal_combined(queries, api_conf, api_name, top_n=10):
+    """Single BioPortal request for multiple synonym queries joined with OR.
+
+    Returns a flat list of match dicts (no per-query attribution needed —
+    caller broadcasts these to all query slots).
+    """
+    rest_conf = ((api_conf or {}).get("type") or {}).get("rest") or {}
+    base_uri = (rest_conf.get("uri") or "https://data.bioontology.org").rstrip("/")
+    apikey = rest_conf.get("apikey") or ""
+    if not apikey:
+        return []
+
+    combined_q, all_tokens = _combined_q_and_tokens(queries)
+    ontologies = api_conf.get("ontologies") or []
+    pagesize = min(top_n * max(len(queries), 2), 60)
+    params = {
+        "q": combined_q,
+        "pagesize": str(pagesize),
+        "include": "prefLabel,definition",
+        "apikey": apikey,
+    }
+    if ontologies:
+        params["ontologies"] = ",".join(o.upper() for o in ontologies)
+
+    url = f"{base_uri}/search?" + urllib.parse.urlencode(params)
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"  Warning: BioPortal combined search failed: {e}", file=sys.stderr)
+        return []
+
+    combined_term_text = " ".join(q["term"] for q in queries)
+    matches = []
+    for item in (data.get("collection") or []):
+        label = item.get("prefLabel") or ""
+        def_raw = item.get("definition") or ""
+        description = (def_raw[0] if isinstance(def_raw, list) and def_raw else def_raw) or ""
+        ont_url = (item.get("links") or {}).get("ontology") or ""
+        ontology = ont_url.rstrip("/").rsplit("/", 1)[-1] if ont_url else ""
+        iri = item.get("@id") or ""
+        term_id = iri.rsplit("/", 1)[-1].replace("_", ":") if iri else ""
+        score = _match_score(all_tokens, combined_term_text, label, description)
+        if score <= 0:
+            continue
+        matches.append({
+            "source":     f"{api_name}:{ontology}" if ontology else api_name,
+            "id":         term_id,
+            "term_uri":   iri,
+            "label":      label,
+            "type":       "term",
+            "parent":     ontology.upper() if ontology else "",
+            "parent_uri": "",
+            "definition": description,
+            "def_source": "",
+            "score":      score,
+            "children":   [],
+        })
+
+    matches = matches[:top_n]
+    if not matches:
+        return matches
+
+    iris = [m.get("term_uri", "") for m in matches]
+    onts = [m["parent"] for m in matches]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(matches) * 2, 12)) as ex:
+        parent_futs = [ex.submit(_fetch_bioportal_parent, base_uri, apikey, ont, iri)
+                       for ont, iri in zip(onts, iris)]
+        child_futs  = [ex.submit(_fetch_bioportal_children, base_uri, apikey, ont, iri)
+                       for ont, iri in zip(onts, iris)]
+        for m, pfut, cfut in zip(matches, parent_futs, child_futs):
+            try:
+                parent_str, parent_uri = pfut.result()
+                if parent_str:
+                    m["parent"] = parent_str
+                    m["parent_uri"] = parent_uri
+            except Exception:
+                pass
+            try:
+                m["children"] = cfut.result()
+            except Exception:
+                pass
+
+    matches.sort(key=lambda m: (-m["score"], str(m["id"]).lower()))
+    return matches
+
+
+def _search_ols4_combined(queries, api_conf, api_name, top_n=10, ai_mode=False):
+    """Single OLS4 request for multiple synonym queries joined with OR.
+
+    Returns a flat list of match dicts (caller broadcasts to all query slots).
+    """
+    combined_q, all_tokens = _combined_q_and_tokens(queries)
+    combined_term_text = " ".join(q["term"] for q in queries)
+
+    rest_conf = ((api_conf or {}).get("type") or {}).get("rest") or {}
+    uri_template = rest_conf.get("uri") or f"{_OLS4_DEFAULT_SEARCH_URI}/ontologies/{{ontology}}/terms/{{double_encoded}}/graph"
+    api_base = uri_template.split("/ontologies/")[0].rstrip("/")
+
+    ontologies = api_conf.get("ontologies") or []
+    pagesize = min(top_n * max(len(queries), 2), 60)
+    params = {
+        "q": combined_q,
+        "rows": str(pagesize),
+        "fieldList": "label,description,short_form,iri,obo_id,ontology_name,type",
+    }
+    if ontologies:
+        params["ontology"] = ",".join(o.lower() for o in ontologies)
+    if ai_mode:
+        params["searchModel"] = _OLS4_AI_SEARCH_MODEL
+
+    url = f"{api_base}/search?" + urllib.parse.urlencode(params)
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"  Warning: OLS4 combined search failed: {e}", file=sys.stderr)
+        return []
+
+    candidates = []
+    for doc in (data.get("response") or {}).get("docs") or []:
+        label = doc.get("label") or ""
+        desc_raw = doc.get("description") or ""
+        description = (desc_raw[0] if isinstance(desc_raw, list) and desc_raw else desc_raw) or ""
+        term_id = doc.get("obo_id") or doc.get("short_form") or doc.get("iri") or ""
+        ontology = doc.get("ontology_name") or ""
+        score = _match_score(all_tokens, combined_term_text, label, description)
+        if score <= 0:
+            continue
+        candidates.append({
+            "source":     f"{api_name}:{ontology}" if ontology else api_name,
+            "id":         term_id,
+            "term_uri":   doc.get("iri") or "",
+            "label":      label,
+            "type":       "term",
+            "parent":     ontology.upper() if ontology else "",
+            "parent_uri": "",
+            "definition": description,
+            "def_source": "",
+            "score":      score,
+            "children":   [],
+        })
+
+    seen: dict = {}
+    for c in candidates:
+        tid = c["id"]
+        id_prefix = tid.split(":")[0].upper() if ":" in str(tid) else ""
+        if tid not in seen:
+            seen[tid] = c
+        elif id_prefix and c["parent"] == id_prefix and seen[tid]["parent"] != id_prefix:
+            seen[tid] = c
+    matches = list(seen.values())[:top_n]
+
+    if not matches:
+        return matches
+
+    iris = [m.get("term_uri", "") for m in matches]
+    onts = [m["parent"].lower() for m in matches]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(matches) * 2, 12)) as ex:
+        parent_futs = [ex.submit(_fetch_ols4_parent, api_base, ont, iri)
+                       for ont, iri in zip(onts, iris)]
+        child_futs  = [ex.submit(_fetch_ols4_children, api_base, ont, iri)
+                       for ont, iri in zip(onts, iris)]
+        for m, pfut, cfut in zip(matches, parent_futs, child_futs):
+            try:
+                parent_str, parent_uri = pfut.result()
+                if parent_str:
+                    m["parent"] = parent_str
+                    m["parent_uri"] = parent_uri
+            except Exception:
+                pass
+            try:
+                m["children"] = cfut.result()
+            except Exception:
+                pass
+
+    matches.sort(key=lambda m: (-m["score"], str(m["id"]).lower()))
+    return matches
+
+
 def _search_apis(queries, apis, top_n=10, ai_mode=False):
     """Search configured REST APIs (OLS4, BioPortal) for each query.
 
@@ -2430,6 +2887,10 @@ def _search_apis(queries, apis, top_n=10, ai_mode=False):
     OLS4: detected by uri containing 'ols4'/'ebi.ac.uk/ols', or no uri (uses default).
     Other REST endpoints (e.g. agrovoc browse API) are skipped — use sparql type for those.
     When ai_mode=True, OLS4 requests use the llama-embed-nemotron embedding model.
+
+    When multiple queries are given (e.g. AI synonym expansion), a single OR-combined
+    request is made per API instead of N sequential requests, avoiding rate-limit errors.
+    The combined results are broadcast to all query slots; downstream dedup handles overlap.
     """
     results = [{"query": q, "matches": []} for q in queries]
     for api_name, api_conf in (apis or {}).items():
@@ -2442,12 +2903,21 @@ def _search_apis(queries, apis, top_n=10, ai_mode=False):
         is_ols4 = not is_bioportal and (not uri or any(m in uri for m in _OLS4_URI_MARKERS))
         if not is_bioportal and not is_ols4:
             continue  # non-OLS4, non-BioPortal REST endpoint — skip for search
-        for i, query in enumerate(queries):
+
+        if len(queries) > 1:
+            # Multiple synonym queries: one combined OR request, broadcast to all slots.
             if is_bioportal:
-                api_matches = _search_bioportal(query, api_conf, api_name, top_n)
+                combined = _search_bioportal_combined(queries, api_conf, api_name, top_n)
             else:
-                api_matches = _search_ols4(query, api_conf, api_name, top_n, ai_mode=ai_mode)
-            results[i]["matches"].extend(api_matches)
+                combined = _search_ols4_combined(queries, api_conf, api_name, top_n, ai_mode=ai_mode)
+            for r in results:
+                r["matches"].extend(combined)
+        else:
+            if is_bioportal:
+                api_matches = _search_bioportal(queries[0], api_conf, api_name, top_n)
+            else:
+                api_matches = _search_ols4(queries[0], api_conf, api_name, top_n, ai_mode=ai_mode)
+            results[0]["matches"].extend(api_matches)
     return results
 
 
@@ -2531,6 +3001,8 @@ def main():
                         help="Output format for --search results: text (default), tsv, or markdown.")
     parser.add_argument("--ai", action="store_true",
         help="Use Claude AI to semantically rank search results and synthesize missing definitions (requires ANTHROPIC_API_KEY; reserved for future implementation).")
+    parser.add_argument("--debug", action="store_true",
+        help="Print extra diagnostic output. For FreeText -c: shows the full new extraction when the size-guard rejects it.")
     args = parser.parse_args()
 
     config_file = args.input if args.input else MENU_CONFIG
@@ -2579,6 +3051,19 @@ def main():
         not_found = [k for k in args.delete if k not in acted_on]
         if not_found:
             print(f"Warning: key(s) not found in {config_file} or {schema_file}: {', '.join(not_found)}", file=sys.stderr)
+
+        # Remove deleted keys from the search index
+        if os.path.exists(_SEARCH_INDEX_DB):
+            try:
+                _conn = sqlite3.connect(_SEARCH_INDEX_DB)
+                for _key in acted_on:
+                    _conn.execute("DELETE FROM terms WHERE source_key=?", (_key,))
+                _conn.commit()
+                _conn.close()
+                if acted_on:
+                    print(f"  Search index: removed entries for {', '.join(sorted(acted_on))}")
+            except Exception as _e:
+                print(f"  Warning: could not update search index: {_e}", file=sys.stderr)
     if args.fetch is not None:
         with open(config_file, "r") as f:
             config = yaml.safe_load(f)
@@ -2616,9 +3101,20 @@ def main():
                 else:
                     print(f"  Skipping {key}: NRCSSoilFieldBook PDF already downloaded this run")
                 continue
+            # STATSCAN: multi-page crawl — build sources/{key}.zip.
+            if content_type == "STATSCAN":
+                fetch_statscan_source(key, source, config_file, locales=locales_cfg)
+                continue
             # ISO_COUNTRY: source_ontology is a Vaadin SPA URL; fetch Wikipedia instead.
             if content_type == "ISO_COUNTRY":
                 fetch_iso_country_source(key, source, config_file)
+                continue
+            # NSDB sources: multi-page crawl — build sources/{key}.zip, not a single HTML.
+            if content_type in ("NSDBSNT", "NSDBSLT", "NSDBSLC"):
+                fetch_nsdb_html_source(key, source, config_file, locales=locales_cfg)
+                continue
+            if content_type == "NSDB":
+                fetch_nsdb_source(key, source, config_file, locales=locales_cfg)
                 continue
             # AgriFoodCA directory sources (file_format: yaml) are built from
             # multiple CSVs fetched via the GitHub API — raw urlretrieve would
@@ -2669,7 +3165,7 @@ def main():
                 if file_format == "yaml":
                     generate_enum_report(output_path, tsv=args.tabformat)
     if args.config is not None:
-        process_sources(args.config, config_file)
+        process_sources(args.config, config_file, debug=getattr(args, "debug", False))
     if args.build is not None:
         build_schema(keys=[args.build] if isinstance(args.build, str) else None, config_file=config_file)
     # -s must run after -b: SSSOM mappings are applied to the schema.yaml that
@@ -2759,22 +3255,46 @@ def main():
     if args.search:
         top_n = 10
         queries = _parse_search_queries(args.search)
-        results = _fts5_search_local(queries, config_file=config_file)
+
+        # In --ai mode, expand each query with Claude-generated synonyms before
+        # searching so that morphological and domain-specific variants are found.
+        if args.ai:
+            expanded = _ai_expand_queries(queries)
+        else:
+            expanded = [(i, q) for i, q in enumerate(queries)]
+
+        exp_queries = [q for _, q in expanded]
+
         with open(config_file) as _f:
             _cfg = yaml.safe_load(_f) or {}
         apis = _cfg.get("apis") or {}
+
+        # Search all expanded queries
+        exp_local = _fts5_search_local(exp_queries, config_file=config_file)
         if apis:
-            api_results = _search_apis(queries, apis, top_n, ai_mode=args.ai)
-            for local_r, api_r in zip(results, api_results):
+            exp_api = _search_apis(exp_queries, apis, top_n, ai_mode=args.ai)
+            for local_r, api_r in zip(exp_local, exp_api):
                 local_r["matches"] = local_r["matches"] + api_r["matches"]
-        for r in results:
+
+        # Pool synonym results back into their parent original query
+        pooled = [{"query": queries[i], "matches": []} for i in range(len(queries))]
+        for (orig_idx, _), exp_r in zip(expanded, exp_local):
+            pooled[orig_idx]["matches"].extend(exp_r["matches"])
+
+        for r in pooled:
             deduped = _dedup_matches_by_id(r["matches"])
-            deduped.sort(key=lambda m: (-m["score"], m["type"] != "enum", str(m["id"]).lower()))
+            deduped.sort(key=lambda m: (m["type"] != "enum", -m["score"], str(m["id"]).lower()))
             r["matches"] = deduped[:top_n]
+
+        _AI_MIN_SCORE = 0.30
+        results = pooled
         if args.ai:
             results = _ai_rescore(results)
             for r in results:
-                r["matches"].sort(key=lambda m: (-m["score"], m["type"] != "enum",
+                r["matches"] = [m for m in r["matches"]
+                                if m.get("score_source") != "ai"
+                                or m.get("score", 0) >= _AI_MIN_SCORE]
+                r["matches"].sort(key=lambda m: (m["type"] != "enum", -m["score"],
                                                  str(m["id"]).lower()))
         fmt = args.output_format
         if args.tabformat and fmt == "text":

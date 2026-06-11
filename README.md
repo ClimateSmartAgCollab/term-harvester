@@ -23,30 +23,65 @@ The term_harvester.py script fetches vocabulary sources, processes them into Lin
 
 ---
 
-## Installation
+## Table of Contents
 
-Dependencies are declared in `pyproject.toml`.  Install the core requirement
-(`pyyaml`) and whichever optional extras you need:
-
-```bash
-pip install -e .                  # core only (pyyaml)
-pip install -e ".[pdf]"           # + pypdf   (NASIS, NRCS Field Book, FreeText PDF input)
-pip install -e ".[owl]"           # + owlready2 (OWL ontologies)
-pip install -e ".[freetext]"      # + anthropic (FreeText AI extraction)
-pip install -e ".[all]"           # all optional dependencies
-```
-
-| Extra | Package | Required for |
-|---|---|---|
-| `pdf` | `pypdf` | `content_type: NASIS`, `NRCSSoilFieldBook`; FreeText PDF input |
-| `owl` | `owlready2` | `content_type: OWL` |
-| `freetext` | `anthropic` | `content_type: FreeText` |
+- [Quick-start workflow](#quick-start-workflow)
+- [Command reference](#command-reference)
+  - [`-a` — Add a source from a URL](#-a--add-a-source-from-a-url)
+  - [`-f` — Fetch (download) sources](#-f--fetch-download-sources)
+  - [`-c` — Process sources](#-c--process-sources-update-prefix-dicts)
+  - [`-b` — Build schema.yaml](#-b--build-schemayaml)
+  - [`-l` — Expand reachable_from source nodes via API](#-l--expand-reachable_from-source-nodes-via-api)
+  - [`-r` — Enum report](#-r--enum-report)
+  - [`--free_text` — Extract from free text](#--free_text--extract-from-free-text)
+  - [`-i` — Specify configuration file](#-i--specify-configuration-file)
+  - [`--search` — Search for terms](#--search--search-for-terms)
+- [Supported source types and auto-detection](#supported-source-types-and-auto-detection)
+- [Example `-a` invocations by source type](#example--a-invocations-by-source-type)
+  - [SNOMED CT (via OLS4)](#snomed-ct-via-ols4)
+  - [OBO ontology terms (ENVO, GO, UBERON, …)](#obo-ontology-terms-envo-go-uberon-)
+  - [AGROVOC](#agrovoc)
+  - [LinkML](#linkml)
+  - [LOINC CodeSystems and ValueSets](#loinc-codesystems-and-valuesets)
+  - [OWL ontologies](#owl-ontologies)
+  - [NSDB (National Soil DataBase)](#nsdb-national-soil-database)
+  - [Statistics Canada](#statistics-canada)
+  - [Statistics Canada Census Dictionary tables](#statistics-canada-census-dictionary-tables-statscan_table)
+  - [ISO 3166-2 country subdivisions](#iso-3166-2-country-subdivisions-iso_country)
+  - [NASIS (USDA NRCS National Soil Information System)](#nasis-usda-nrcs-national-soil-information-system)
+  - [NRCS Field Book (field description enumerations)](#nrcs-field-book-field-description-enumerations)
+  - [NAPCS Canada](#napcs-canada)
+  - [CRediT (Contributor Roles Taxonomy)](#credit-contributor-roles-taxonomy)
+  - [AgriFoodCA picklists](#agrifoodca-picklists)
+  - [FreeText](#freetext)
+- [FreeText source type](#freetext-source-type)
+- [Term Search](#term-search)
+  - [Basic usage](#basic-usage)
+  - [Structured queries (term:description)](#structured-queries-termdescription)
+  - [How matching works](#how-matching-works)
+  - [`--ai` flag: synonym expansion and AI re-scoring](#--ai-flag-synonym-expansion-and-ai-re-scoring)
+  - [Reading the Markdown output](#reading-the-markdown-output)
+- [`harvester_config.yaml` — source entry structure](#harvester_configyaml--source-entry-structure)
+  - [`minus` — exclude content during `-b` build](#minus--exclude-content-during--b-build)
+  - [`include` — restore excluded content, or whitelist-only mode](#include--restore-excluded-content-or-whitelist-only-mode)
+  - [`concise` — trim redundant hierarchy nodes during `-b`](#concise--trim-redundant-hierarchy-nodes-during--b)
+- [`minus` / `include` processing](#minus--include-processing--which-attributes-apply-to-which-content-types)
+- [API configuration](#api-configuration)
+  - [OLS4 IRI base auto-detection](#ols4-iri-base-auto-detection)
+- [OntologyAPI metadata population](#ontologyapi-metadata-population)
+- [SSSOM ontology mappings](#sssom-ontology-mappings)
+- [Python code notes](#python-code-notes)
+  - [Installation](#installation)
+  - [API key setup](#api-key-setup)
+  - [Module structure](#module-structure)
 
 ---
 
 ## Quick-start workflow
 
 **Note that some terminals access python as "python3". ALSO, term_harvester.py needs to be run within the context of the folder you want to generate schema.yaml in. If term_harvester.py location is not set in the shell environment then you will need to reference it using a relative path to the DataHarmonizer script/ folder, e.g. `python ../../../script/menu_manager/term_harvester.py`.**
+
+Install dependencies before first use — see [Python code notes](#python-code-notes).
 
 **The default configuration file is `harvester_config.yaml` in the current directory.  Use `-i`/`--input` to specify a different path.**
 
@@ -169,7 +204,7 @@ is configured.
 
 ### `--free_text` — Extract from free text
 
-Used with `-a` to extract enumerations from prose rather than a structured
+Used with `-a` to extract enumerations from a textual document rather than a structured
 source file.  See the dedicated [FreeText source type](#freetext-source-type)
 section for full usage, file-input support, and API key setup.
 
@@ -187,6 +222,31 @@ commands (`-a`, `-f`, `-c`, `-b`, `-d`, `-l`, `-r`, `-s`) read from and write to
 the specified file.  Useful when managing multiple independent schemas from the
 same working directory, or when using a pre-built config from the `examples/`
 folder as a starting point.
+
+---
+
+### `--search` — Search for terms
+
+Search for terms and enumerations across all sources that have been processed
+with `-c`.
+
+```bash
+# Plain-text report (default)
+python term_harvester.py --input myconfig.yaml --search 'soil acidity'
+
+# Markdown table, redirected to a file
+python term_harvester.py --input myconfig.yaml --format markdown --search 'soil acidity' > results.md
+
+# Structured query — text after ':' is a description for API/AI context only
+python term_harvester.py --input myconfig.yaml --search 'excess drainage:a soil drainage classification'
+
+# AI-assisted: synonym expansion + AI re-scoring
+python term_harvester.py --input myconfig.yaml --format markdown --ai --search 'soil acidity' > results.md
+```
+
+Results are ranked by relevance using a local FTS5 full-text index (built
+during `-c`) combined with optional API and AI scoring.  See
+[Term Search](#term-search) for full details.
 
 ---
 
@@ -296,8 +356,6 @@ python term_harvester.py -a https://terminology.hl7.org/en/valuesets.html
 
 ### OWL ontologies
 
-Requires the `owl` extra (see [Installation](#installation)).
-
 ```bash
 python term_harvester.py -a https://purl.obolibrary.org/obo/envo.owl
 ```
@@ -325,7 +383,7 @@ clicking on a variable name.
 
 ```bash
 python term_harvester.py -a "https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1368814"
-python term_harvester.py -c STATSCAN1441857
+python term_harvester.py -c STATSCAN_1441857
 ```
 
 ### Statistics Canada Census Dictionary tables (STATSCAN_TABLE)
@@ -466,7 +524,7 @@ python term_harvester.py -b                  # rebuilds schema.yaml, syncs wd: a
 
 NASIS publishes all domain tables (controlled vocabularies for every categorical
 field in the NASIS soil survey database) as a single PDF.  Each domain becomes
-one LinkML enum.  Requires the `pdf` extra (see [Installation](#installation)).
+one LinkML enum.
 
 ```bash
 python term_harvester.py -a "https://www.nrcs.usda.gov/sites/default/files/2025-07/NASIS%207.4.3%20Domains.pdf"
@@ -496,7 +554,6 @@ the ~1,950 permissible values marked obsolete in the PDF at `-b` build time.
 The USDA NRCS *Field Book for Describing and Sampling Soils* (Ver. 4, November 2024)
 defines the categorical vocabularies used when recording soil observations.
 `source_nrcs.py` parses selected tables from the PDF into LinkML enums.
-Requires the `pdf` extra (see [Installation](#installation)).
 
 Auto-detection via `-a` is not yet implemented for this source.  Add it to
 `harvester_config.yaml` manually, then run `-c` and `-b`:
@@ -567,7 +624,40 @@ opens directly to the source table.
 
 The generic `_parse_generic` table parser covers standard two- and three-column
 layouts.  The following enumerations need hand-written parsers in
-`sources/source_nrcs.py` due to unusual PDF layout:
+`sources/source_nrcs.py` due to unusual PDF layout.
+
+**Alternative: extract via FreeText.**  Because these tables exist in a PDF that
+is already downloaded locally, the `FreeText` source type with a PDF file input
+is a practical workaround while the dedicated parsers are pending.  Point
+`--free_text` at the relevant page range excerpt or supply the table text
+inline.  Example for the three Manner of Failure tables on page 116:
+
+```bash
+# Step 1 — add a FreeText source citing the Field Book PDF
+python term_harvester.py \
+  -a "https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=116" \
+  --free_text "Manner of Failure classifications for soil consistence: brittleness, fluidity, and smeariness scales from the NRCS Field Book Ver. 4 page 116"
+
+# Step 2 — if the initial extraction used Claude's knowledge rather than the PDF,
+# download the PDF and re-extract from it:
+python term_harvester.py -f MannerOfFailure   # downloads PDF to sources/MannerOfFailure.pdf
+python term_harvester.py -c MannerOfFailure   # re-extracts from actual PDF text
+
+# Step 3 — build schema.yaml
+python term_harvester.py -b
+```
+
+The source key is derived from the `--free_text` topic string (e.g.
+`"Manner Of Failure Brittleness"` → `MannerOfFailureBrittleness`).  Review the extracted YAML in
+`sources/{key}.yaml` — Claude may need the text pasted inline for tables whose
+pypdf extraction is fragmented.  To supply text inline, paste the relevant table
+rows directly as the `--free_text` argument instead of a topic string:
+
+```bash
+python term_harvester.py \
+  -a "https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf#page=116" \
+  --free_text "Manner of Failure – Brittleness: Non-brittle NB, Slightly brittle SB, Brittle B"
+```
 
 | Enum key | Title | Pages | Parsing challenge |
 |---|---|---|---|
@@ -619,12 +709,6 @@ The URL is detected as `CRediT` pre-download.  The PDF is saved to
 call is required for the initial add.  Each permissible value carries a
 `meaning` URI pointing to the role's canonical page on `credit.niso.org`.
 
-Requires the `pdf` extra:
-
-```bash
-pip install -e ".[pdf]"
-```
-
 To rebuild from an already-downloaded PDF:
 
 ```bash
@@ -661,7 +745,7 @@ When a source document URL is found in the CSV metadata (the `source` column of 
 ### FreeText
 
 For picklists described in free prose — inline text, a `.txt` file, or a `.pdf`
-document.  Requires the Anthropic API (see [FreeText source type](#freetext-source-type)).
+document.  See [FreeText source type](#freetext-source-type) for full details.
 
 ```bash
 # Register the source. With a short topic string Claude draws on its training
@@ -703,13 +787,22 @@ grower's manual.
 ### How it works
 
 1. You supply a citation URL and the relevant text (inline or as a file).
-2. Claude reads the text and returns a JSON structure containing one or more
-   named enumerations, each with ordinal permissible values ordered from
-   lowest/worst to highest/best.
-3. The extracted enums are written to `sources/{key}.yaml` and a
-   `content_type: FreeText` entry is added to `harvester_config.yaml`.
+2. Claude reads the text and returns a JSON structure containing **one or more
+   named enumerations** — one per distinct scale or classification found in the
+   input.  Each enum has ordinal permissible values ordered from lowest/worst
+   to highest/best.
+3. All extracted enums are written together to a single `sources/{key}.yaml`
+   and a `content_type: FreeText` entry is added to `harvester_config.yaml`.
 4. The original text is stored in the `description` field of the config entry
    so extraction can be repeated without re-supplying the text.
+
+> **Multiple enumerations from one extraction:** if the input passage describes
+> several distinct scales or classifications, Claude extracts all of them in one
+> call.  For example, a field-book page covering brittleness, fluidity, and
+> smeariness will yield three separate enums — `BrittlenessScale`,
+> `FluidityClass`, `SmearyClass` — all stored in a single `sources/{key}.yaml`
+> under the one source key.  Use `include` / `minus` in `harvester_config.yaml`
+> to select a subset when building `schema.yaml`.
 
 ### Input forms
 
@@ -717,11 +810,29 @@ grower's manual.
 |---|---|
 | Inline text | `--free_text "Scale of 1–9 where 9 = no lodging"` |
 | Plain-text file | `--free_text methods.txt` |
-| PDF file | `--free_text /path/to/appendix.pdf` (requires `pdf` extra) |
+| PDF file | `--free_text /path/to/appendix.pdf` |
 
 Text extracted from files is capped at 10 000 characters before being sent to
-Claude.  For long documents, paste only the relevant excerpt as inline text or
-a small `.txt` file.
+Claude.  For long documents the cap will silently discard the relevant section
+unless you anchor the extraction window using a URL fragment on the
+`source_ontology` URL.  Three anchor forms are supported:
+
+| Fragment | Works for | Effect |
+|---|---|---|
+| `#page=116` or `#page=116-118` | PDF | Extract only the specified page(s) |
+| `#element-id` (bare id, no `=`) | HTML | Start extraction from the element with that `id=` attribute |
+| `#text=Manner+of+Failure` | Any | Find the first occurrence of the phrase and start the 10 000-char window 200 chars before it |
+
+When the document is truncated and no anchor is present, the tool prints a tip
+suggesting the appropriate form.
+
+**HTML page anchors** work the same way as browser `#fragment` links — the bare
+fragment (`#section-id`) is matched against `id="..."` attributes in the raw
+HTML.  Use `#text=` instead when the HTML has no suitable id attributes.
+
+For very long PDF field books or specification documents, `#page=N` is the most
+reliable anchor.  Use `#text=` when the relevant content spans multiple pages
+or the exact page number is not known.
 
 ### Code assignment
 
@@ -742,6 +853,21 @@ itself uses them; they are not invented for non-numeric vocabularies.
 **Initial setup** — `-a` with `--free_text` is self-contained: Claude runs
 immediately, `sources/{key}.yaml` is written, and the entry is registered in
 `harvester_config.yaml`.  Go straight to `-b` from there.
+
+After extraction Claude prints the enums it found and its suggested source key,
+then prompts you to confirm or rename before anything is written:
+
+```
+  Claude extracted 3 enum(s): MannerOfFailure, BrittlenessScale, FluidityClass
+  Suggested source key: 'MannerOfFailure'
+  Source key [MannerOfFailure]: SoilConsistenceFailure
+  Added source 'SoilConsistenceFailure' to harvester_config.yaml
+```
+
+Press Enter to accept the suggestion, or type a replacement.  The key must be a
+valid identifier (letters, digits, underscores; start with a letter).  Entering
+a key that already exists in the config is rejected and you are re-prompted.
+This prevents `-a` from ever overwriting an existing source.
 
 > **Note:** Claude only receives the `--free_text` string during `-a` — the
 > source URL is stored as a citation but the document is not fetched or read.
@@ -785,8 +911,11 @@ python term_harvester.py -b                       # rebuild schema.yaml
 - `-f SoilAerationStatus` without a subsequent `-c` simply archives the document
   locally for inspection; `sources/SoilAerationStatus.yaml` is unchanged.
 
-**`-f all` and `-c` with no arguments both silently skip FreeText sources.**
-FreeText sources must always be updated consciously via explicit `[key]`.
+**BECAUSE AI PARSING OF SOURCE IS NONDETERMINISTIC, regeneration of FreeText
+content types has to be explicitly and manually performed and reviewed.**
+`-f all` and `-c` with no arguments both silently skip FreeText sources.
+FreeText sources must always be regenerated consciously via an explicit
+`-c [key]`, and the printed diff must be reviewed before running `-b`.
 
 When `-c [key]` runs, text is sourced in this priority order:
 
@@ -811,44 +940,127 @@ SoilAerationStatus:
 
 The `--free_text` string is stored verbatim as the `description` field in `harvester_config.yaml` so that future `-c [key]` runs send the same topic prompt to the LLM.  This is intended to encourage — but not guarantee — determinism and reproducibility: given the same source document and the same description string, LLM re-extraction should produce a structurally similar enum.  LLM output is inherently non-deterministic, so treat the stored description as a best-effort reproducibility seed rather than a strict specification.
 
-### Setting up `ANTHROPIC_API_KEY`
+See [Python code notes → API key setup](#api-key-setup) for instructions on setting `ANTHROPIC_API_KEY`.
 
-FreeText extraction requires a key from [console.anthropic.com](https://console.anthropic.com/)
-→ **API Keys** → **Create Key**.
+---
 
-**Current session only** (forgotten when the terminal closes):
+## Term Search
 
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-```
+The `--search` option lets you find terms and enumerations across all sources
+that have been processed with `-c`, without loading `schema.yaml` or DataHarmonizer.
+It is useful for exploring what controlled vocabulary is available before building
+a data specification, or for quickly verifying that a concept is covered.
 
-**Permanently** — add to your shell profile and reload it:
-
-```bash
-# macOS (zsh)
-echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc && source ~/.zshrc
-
-# Linux (bash)
-echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.bashrc && source ~/.bashrc
-```
-
-**Verify the key is visible to the shell:**
+### Basic usage
 
 ```bash
-echo $ANTHROPIC_API_KEY
+# Plain-text report (default)
+python term_harvester.py --input myconfig.yaml --search 'soil acidity'
+
+# Markdown table, redirect to a file for viewing in a Markdown renderer
+python term_harvester.py --input myconfig.yaml --format markdown --search 'soil acidity' > results.md
+
+# Multiple space-separated queries in one run
+python term_harvester.py --input myconfig.yaml --format markdown \
+  --search 'soil drainage' 'soil texture' 'soil pH'
 ```
 
-Install the required packages via the `freetext` extra (and `pdf` if you will
-pass PDF files):
+### Structured queries (term:description)
+
+A query may include a description separated by a colon: `term:description`.
 
 ```bash
-pip install -e ".[freetext]"       # anthropic only
-pip install -e ".[freetext,pdf]"   # anthropic + pypdf
+python term_harvester.py --input myconfig.yaml \
+  --search 'excess drainage:a categorical drainage classification for soils'
 ```
 
-> **Note:** keep your API key out of `harvester_config.yaml` and out of version
-> control.  The environment variable approach above is the standard and safest
-> method.
+The description is **not** used in local keyword scoring — only the term before
+the colon drives FTS5 matching and token overlap.  The description is forwarded
+to API search endpoints (OLS4, BioPortal) and, when `--ai` is given, to Claude
+as semantic context for synonym generation.  This lets you narrow API results
+without eliminating local matches that lack the description words.
+
+### How matching works
+
+`--search` uses a two-stage ranking approach.
+
+**Stage 1 — FTS5 full-text index**
+
+During `-c`, a SQLite FTS5 index is built at `sources/search_index.db` using a
+Porter stemmer.  The stemmer maps morphological variants to a common root, so
+querying `excess drainage` automatically finds *"Excessively Drained"* because
+`excess` and `excessive/excessively` share the stem `excess`, and `drain`,
+`drainage`, and `drained` share the stem `drain`.
+
+Labels are weighted 5× over definitions during BM25 scoring.  FTS5 scores are
+normalised to a 0–0.85 range; exact phrase substring matches in the label or
+definition score 1.0.  If the index file is absent, the search falls back to
+token-overlap scoring directly against the source YAML files.
+
+**Stage 2 — API search**
+
+When the `apis` block in `harvester_config.yaml` is configured, OLS4 and
+BioPortal are queried in parallel for each search term.  API results are merged
+with local results, deduplicated by term ID, and re-ranked.
+
+### `--ai` flag: synonym expansion and AI re-scoring
+
+Adding `--ai` activates two additional Claude-powered steps (requires `ANTHROPIC_API_KEY` — see [Python code notes](#python-code-notes)).
+
+**Step 1 — Synonym expansion (Claude Haiku)**
+
+Before search, Claude is called once per query to generate 3–5 close synonyms
+that might appear in controlled vocabularies.  All synonyms are searched
+alongside the original query, and results are pooled back to the original term.
+
+For example, `--search 'soil acidity'` might expand to:
+
+> *soil pH · soil reaction · hydrogen ion concentration in soil ·
+> soil acidification · active acidity in soil*
+
+This catches terms like *"Reaction (pH)"* or *"Soil pH class"* that would not
+match the string `soil acidity` literally.
+
+**Step 2 — AI re-scoring (Claude Sonnet)**
+
+After pooling, Claude re-evaluates the full candidate set and assigns a
+relevance score (0–1) for each match against the original query intent.  This
+re-ranking is especially useful when synonym expansion retrieves many candidates
+that are only tangentially related to the original concept.
+
+### Reading the Markdown output
+
+Use `--format markdown` and redirect to a `.md` file to view results in any
+Markdown renderer (GitHub, VS Code preview, Obsidian, etc.).
+
+```bash
+python term_harvester.py \
+  --input examples/agrifoodca_config.yaml \
+  --format markdown \
+  --ai \
+  --search 'soil acidity' > soil_acidity.md
+```
+
+Example output:
+
+| Source | Type&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | Score | Parent | ID | Label | Definition&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |
+|---|---|---|---|---|---|---|
+| NRCSSoilFieldBook | enum<details><summary>8 children</summary>VE · EX · VS · S · SL · N · MH · H</details> | 1.00 | | NRCSSoilFieldBook_ReactionPH | Reaction (pH) | Soil **acidity** and alkalinity expressed as a **pH** value, ranging from very strongly **acid** (≤4.4) to very strongly alkaline (≥9.1). |
+| NRCSSoilFieldBook | term | 0.92 | NRCSSoilFieldBook_ReactionPH | VS | Very Strongly Acid | **Soil** **pH** 4.5–5.0. Common in forested mineral soils and many organic soils in humid climates. |
+| NRCSSoilFieldBook | term | 0.87 | NRCSSoilFieldBook_ReactionPH | EX | Extremely Acid | **Soil** **pH** < 3.5. Found in acid sulphate soils and highly organic soils with advanced decomposition. |
+| NSDBSNTv2 | enum<details><summary>7 children</summary>1 · 2 · 3 · 4 · 5 · 6 · 7</details> | 0.72 | | NSDB_PMCHEM1 | Parent Material Chemical Property | Chemical characteristics of the parent material including **acidity**, base saturation, and mineral weathering potential. |
+
+**Column guide:**
+
+| Column | Contents |
+|---|---|
+| Source | The source key from `harvester_config.yaml` |
+| Type | `enum` (a full enumeration) or `term` (an individual permissible value). For enums, a collapsible `N children` list shows all member terms. |
+| Score | Relevance score 0–1.  Scores ≥ 0.85 indicate strong label matches; scores from FTS5 stemming cap at 0.85; API and AI scores fill the range. |
+| Parent | For `term` rows, the enum key the term belongs to. |
+| ID | The permissible-value key or enum key. |
+| Label | The human-readable title. |
+| Definition | Truncated definition with **matched query tokens bolded**. |
 
 ---
 
@@ -1070,7 +1282,61 @@ specifications.
 
 ---
 
-## Module structure
+---
+
+## Python code notes
+
+### Installation
+
+Dependencies are declared in `pyproject.toml`.  Install the core requirement
+(`pyyaml`) and whichever optional extras you need:
+
+```bash
+pip install -e .                  # core only (pyyaml)
+pip install -e ".[pdf]"           # + pypdf   (NASIS, NRCS Field Book, CRediT, FreeText PDF input)
+pip install -e ".[owl]"           # + owlready2 (OWL ontologies)
+pip install -e ".[freetext]"      # + anthropic (FreeText extraction, --search --ai)
+pip install -e ".[all]"           # all optional dependencies
+```
+
+| Extra | Package | Required for |
+|---|---|---|
+| `pdf` | `pypdf` | `content_type: NASIS`, `NRCSSoilFieldBook`, `CRediT`; FreeText PDF input |
+| `owl` | `owlready2` | `content_type: OWL` |
+| `freetext` | `anthropic` | `content_type: FreeText`; `--search --ai` synonym expansion and re-scoring |
+
+### API key setup
+
+FreeText extraction and AI-assisted search (`--search --ai`) require an Anthropic API
+key from [console.anthropic.com](https://console.anthropic.com/) → **API Keys** → **Create Key**.
+
+**Current session only** (forgotten when the terminal closes):
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+**Permanently** — add to your shell profile and reload it:
+
+```bash
+# macOS (zsh)
+echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.zshrc && source ~/.zshrc
+
+# Linux (bash)
+echo 'export ANTHROPIC_API_KEY=sk-ant-...' >> ~/.bashrc && source ~/.bashrc
+```
+
+**Verify the key is visible to the shell:**
+
+```bash
+echo $ANTHROPIC_API_KEY
+```
+
+> **Note:** keep your API key out of `harvester_config.yaml` and out of version
+> control.  The environment variable approach above is the standard and safest
+> method.
+
+### Module structure
 
 | Module | Responsibility | Source |
 |---|---|---|
@@ -1081,8 +1347,8 @@ specifications.
 | `source_ontologyapi.py` | `content_type: OntologyAPI` — OLS4 / BioPortal / AGROVOC graph fetching and processing | |
 | `source_agrovoc.py` | AGROVOC SPARQL fetchers and `match_agrovoc` detection | [SPARQL endpoint](https://agrovoc.fao.org/sparql/) |
 | `source_loinc.py` | LOINC CodeSystem / ValueSet JSON conversion and HL7 table parsing | [HTML / JSON files](https://terminology.hl7.org/) |
-| `source_nasis.py` | `content_type: NASIS` — USDA NRCS NASIS Domains PDF parsing (`pdf` extra) | [PDF file](https://www.nrcs.usda.gov/sites/default/files/2025-07/NASIS%207.4.3%20Domains.pdf) |
-| `source_nrcs.py` | `content_type: NRCSSoilFieldBook` — USDA NRCS Field Book PDF parsing (`pdf` extra) | [PDF file](https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf) |
+| `source_nasis.py` | `content_type: NASIS` — USDA NRCS NASIS Domains PDF parsing | [PDF file](https://www.nrcs.usda.gov/sites/default/files/2025-07/NASIS%207.4.3%20Domains.pdf) |
+| `source_nrcs.py` | `content_type: NRCSSoilFieldBook` — USDA NRCS Field Book PDF parsing | [PDF file](https://www.nrcs.usda.gov/sites/default/files/2025-05/Field-Book-for-Describing-and-Sampling-Soils-Ver4.pdf) |
 | `source_nsdb.py` | National Soil DataBase HTML parsing | [index](https://sis.agr.gc.ca/cansis/nsdb/index.html) |
 | `source_statscan.py` | Statistics Canada classification page scraping | |
 | `source_statscan_table.py` | `content_type: STATSCANTable` — Statistics Canada Census Dictionary table pages; auto-fetches French translations from the corresponding `index-fra.cfm` page | |
@@ -1090,4 +1356,4 @@ specifications.
 | `source_napcscanada.py` | NAPCS Canada CSV parsing | [CSV file](https://www.statcan.gc.ca/en/media/5274) |
 | `source_agrifoodca.py` | AgriFoodCA picklist CSV parsing and GitHub directory import | [CSV files](https://github.com/agrifooddatacanada/picklists_for_schemas/tree/main/picklists) |
 | `source_credit.py` | `content_type: CRediT` — CRediT contributor roles Zenodo PDF parsing | |
-| `source_freetext.py` | `content_type: FreeText` — Claude API enum extraction from free text (`freetext` extra) | |
+| `source_freetext.py` | `content_type: FreeText` — Claude API enum extraction from free text | |

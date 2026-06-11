@@ -10,6 +10,8 @@ Public API:
     IndentedDumper
     strip_tags(html)
     fetch_html(url)
+    normalize_text(s)
+    log_extraction(key, *, term_type, doc_detail, count, lang_counts, indent)
     sort_prefixes(prefixes)
     make_config_schema(id, name, title, ...)
     add_permissible_value(permissible_values, code, *, ...)
@@ -86,6 +88,68 @@ def _represent_str(dumper, data):
 IndentedDumper.add_representer(str, _represent_str)
 
 
+# Typographic Unicode → ASCII equivalents.  Accented letters are intentionally
+# excluded — they carry meaning in French, Spanish, and other language content.
+_TYPO_MAP = str.maketrans({
+    "–": "-",    # en dash
+    "—": "-",    # em dash
+    "‘": "'",    # left single quotation mark
+    "’": "'",    # right single quotation mark / apostrophe
+    "‚": ",",    # single low-9 quotation mark (looks like a comma)
+    "“": '"',    # left double quotation mark
+    "”": '"',    # right double quotation mark
+    "„": '"',    # double low-9 quotation mark
+    "…": "...",  # horizontal ellipsis
+    " ": " ",    # non-breaking space
+    "­": "",     # soft hyphen (invisible, remove)
+    "•": "*",    # bullet
+    "‹": "<",    # single left-pointing angle quotation mark
+    "›": ">",    # single right-pointing angle quotation mark
+    "«": "<",    # left-pointing double angle quotation mark
+    "»": ">",    # right-pointing double angle quotation mark
+    "≤": "<=",   # less-than or equal to
+    "≥": ">=",   # greater-than or equal to
+})
+
+
+def normalize_text(s):
+    """Replace typographic Unicode with plain ASCII equivalents.
+
+    Handles curly quotes, dashes, ellipsis, angle quotation marks, and similar
+    decorative characters.  Accented letters (é, ñ, ü, etc.) are left intact.
+    Returns *s* unchanged when it is None or empty.
+    """
+    if not s:
+        return s
+    return s.translate(_TYPO_MAP)
+
+
+def log_extraction(key, *, term_type="enum", doc_detail=None, count=None,
+                   lang_counts=None, indent="  "):
+    """Print a standard extraction progress line.
+
+    Format::
+        {indent}Extracting {term_type} {key}[ from {doc_detail}][: ({count} terms)][ + fr(n), es(n) ...]
+
+    key:         Enum or term key being extracted.
+    term_type:   Label for the artefact type; defaults to ``"enum"``.
+    doc_detail:  Optional source location, e.g. ``"PDF page 19"`` or ``"PDF pages 3-5"``.
+    count:       Number of terms/values extracted; omitted when None.
+    lang_counts: Ordered dict ``{lang_code: count}`` of translation counts; omitted when empty.
+    indent:      Leading whitespace (default two spaces).
+    """
+    msg = f"{indent}Extracting {term_type} {key}"
+    if doc_detail:
+        msg += f" from {doc_detail}"
+    if count is not None:
+        msg += f": ({count} terms)"
+    if lang_counts:
+        lang_parts = [f"{lang}({n})" for lang, n in lang_counts.items() if n]
+        if lang_parts:
+            msg += " + " + ", ".join(lang_parts)
+    print(msg)
+
+
 def strip_tags(html):
     """Remove all HTML tags from a string and return stripped plain text."""
     return re.sub(r'<[^>]+>', '', html).strip()
@@ -121,12 +185,14 @@ def add_permissible_value(permissible_values, code, *, title=None, description=N
     exact_mappings: List of CURIEs/IRIs that are exact matches for this concept.
     """
     entry = {}
-    if title and title.lower() != code.lower():
-        entry["title"] = title
-    if description: entry["description"] = description
+    if title:
+        title = normalize_text(title)
+        if title.lower() != code.lower():
+            entry["title"] = title
+    if description: entry["description"] = normalize_text(description)
     if is_a:        entry["is_a"]        = is_a
     if status:      entry["status"]      = status
-    if comments:    entry["comments"]    = comments
+    if comments:    entry["comments"]    = normalize_text(comments)
     if meaning:
         if prefixes:
             for pfx, uri in prefixes.items():

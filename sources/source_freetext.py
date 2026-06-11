@@ -5,17 +5,18 @@ unstructured text.  Three entry points cover the full lifecycle:
 
   -a URI --free_text TEXT|FILE
       match_freetext()    — initial add: resolves inline text or file, runs
-                            Claude, writes sources/{key}.yaml, registers entry.
+                            Claude, writes sources/{key}.yaml, downloads the
+                            source URI to sources/{key}.{ext}, registers entry.
 
   -f [key]  (explicit only; -f all skips FreeText)
-      fetch_freetext_source() — downloads the source URI to
+      fetch_freetext_source() — re-downloads the source URI to
                             sources/{key}.{ext} without running Claude.
 
   -c [key]  (explicit only; -c with no args skips FreeText)
       process_freetext_source() — extracts enums via Claude using, in priority:
-                            (1) locally downloaded file from -f [key],
-                            (2) temporarily fetched URI text (not saved),
-                            (3) stored description from harvester_config.yaml.
+                            (1) locally downloaded file from -a or -f [key],
+                            (2) stored description from harvester_config.yaml.
+                            No network access; run -f [key] first if needed.
                             Prints a diff vs the existing sources/{key}.yaml.
 
 Requires:
@@ -60,6 +61,7 @@ The JSON must have this structure:
 {
   "source_key": "PascalCaseIdentifier",
   "source_title": "Human-readable title for the overall source",
+  "version": "detected version string, or null if not found",
   "enums": [
     {
       "key": "PascalCaseEnumIdentifier",
@@ -77,6 +79,9 @@ The JSON must have this structure:
 }
 
 Rules:
+- COMPLETENESS: Extract EVERY row from EVERY section of a table without
+  exception. Count the rows in each section and verify your output matches.
+  Missing values are worse than imperfect labels.
 - ORDERING: Always list permissible_values from lowest/worst/least to
   highest/best/most. For numeric scales, list codes in ascending numeric order
   (1, 2, 3 … 9). For categorical scales, use the natural semantic order (e.g.
@@ -91,11 +96,22 @@ Rules:
   uses an explicit numeric rating scale. If a numeric range is described
   (e.g. 1–9) with per-value labels in the source, use the integers as codes
   and supply a title for each.
-- MULTIPLE ENUMS: Extract one enum per distinct scale or classification in the
-  text. Each gets its own entry in "enums".
+- SECTIONS: When a table or list has named sub-sections (e.g. "Brittleness",
+  "Fluidity", "Smeariness"), extract each sub-section as its own enum with
+  the section name as the enum key and title. Include "has_sections": true at
+  the top level so the caller knows sections exist. Each section's rows are
+  that enum's permissible_values. Never merge sections silently.
+- MULTIPLE ENUMS: Extract one enum per distinct scale, classification, or
+  table section. Each gets its own entry in "enums".
 - TITLES: Keep titles concise (2–6 words). source_key and each enum key must be
   PascalCase identifiers that reflect the content (e.g. "LodgingScale",
   "GrainAppearanceScale").
+- VERSION: If a "Source URL:" line is present, scan it for version patterns
+  (e.g. "Ver4", "v2.1", "V4", "-ver-4", ".V4.", "version_2"). Also scan the
+  first ~500 characters of text for explicit version labels such as "Version 4",
+  "Ver. 4 November 2024", "v1.0", "Edition 3", "Release 2.1". Extract just the
+  core version identifier (e.g. "4", "2.1", "Ver. 4"). Return null if nothing
+  plausible is found — do not guess.
 - Return only the JSON object, no surrounding text."""
 
 
@@ -146,7 +162,25 @@ def _call_claude(free_text):
         if not raw:
             print("  Error: Claude returned no text content.", file=sys.stderr)
             return None
-        return json.loads(raw)
+        result = json.loads(raw)
+
+        # Normalize: enums must be a list of dicts.  Claude occasionally returns
+        # permissible-value lists directly as enum elements when the source text
+        # is table-heavy.  Filter out non-dict elements and warn.
+        enums = result.get("enums") if isinstance(result, dict) else None
+        if not isinstance(enums, list):
+            print("  Error: Claude response missing valid 'enums' list.", file=sys.stderr)
+            return None
+        bad = [i for i, e in enumerate(enums) if not isinstance(e, dict)]
+        if bad:
+            print(
+                f"  Warning: Claude response contained {len(bad)} malformed enum(s)"
+                f" (at index {bad}) — skipping those entries.",
+                file=sys.stderr,
+            )
+            result = dict(result)
+            result["enums"] = [e for e in enums if isinstance(e, dict)]
+        return result
 
     except json.JSONDecodeError as e:
         print(f"  Error: Claude response was not valid JSON: {e}", file=sys.stderr)
@@ -156,14 +190,113 @@ def _call_claude(free_text):
         return None
 
 
-def _build_schema(result, source_url, key, see_also=None):
+def _apply_section_format(enums, merged_key, fmt):
+    """Transform a multi-enum list into the requested section format silently.
+
+    fmt: 1 = flat (merge all PVs), 2 = separate (no change), 3 = hierarchical
+         (section headers interspersed as terms).
+    Returns the (possibly transformed) list of enum dicts.
+    """
+    if fmt == 2 or len(enums) <= 1:
+        return enums
+
+    if fmt == 1:
+        merged_pvs = []
+        for e in enums:
+            merged_pvs.extend(e.get("permissible_values", []))
+        return [{"key": merged_key, "title": merged_key, "permissible_values": merged_pvs}]
+
+    # fmt == 3: section headers become terms, their values follow immediately
+    merged_pvs = []
+    for e in enums:
+        header_code = e.get("key") or re.sub(r'\W+', '', e.get("title", "Section"))
+        pv = {"code": header_code, "title": e.get("title") or header_code}
+        if e.get("description"):
+            pv["description"] = e["description"]
+        merged_pvs.append(pv)
+        merged_pvs.extend(e.get("permissible_values", []))
+    return [{"key": merged_key, "title": merged_key, "permissible_values": merged_pvs}]
+
+
+def _detect_format_from_yaml(yaml_path):
+    """Infer section_format 1/2/3 from an existing sources/{key}.yaml.
+
+    Returns an int (1, 2, or 3), or None if the file is absent/unreadable.
+
+    Heuristic:
+      • Multiple top-level enums → 2 (separate)
+      • Single enum whose PV codes include at least one PascalCase word longer
+        than 3 characters (looks like a section-header term) → 3 (hierarchical)
+      • Single enum otherwise → 1 (flat)
+    """
+    if not os.path.exists(yaml_path):
+        return None
+    try:
+        with open(yaml_path) as f:
+            schema = yaml.safe_load(f) or {}
+        enums = schema.get("enums") or {}
+        if len(enums) > 1:
+            return 2
+        if len(enums) == 1:
+            pvs = list(enums.values())[0].get("permissible_values") or {}
+            # A PascalCase code longer than 3 chars is likely a section header
+            for code in pvs:
+                if re.match(r'^[A-Z][a-z]{2,}', str(code)):
+                    return 3
+            return 1
+    except Exception:
+        pass
+    return None
+
+
+def _prompt_section_format(enums, merged_key):
+    """Interactively ask how to structure a multi-section extraction.
+
+    Called only when Claude returns more than one enum and no stored preference
+    is available.  Returns (transformed_enums, fmt_int) so the caller can
+    persist the choice.
+    """
+    sections = [(e.get("title") or e.get("key", "?"), len(e.get("permissible_values", [])))
+                for e in enums]
+    total = sum(c for _, c in sections)
+
+    print(f"\n  Multi-section content detected — {len(enums)} sections, {total} values total:")
+    for title, count in sections:
+        print(f"    • {title!r}  ({count} values)")
+    print()
+    print(f"  [1] Flat      — one enum '{merged_key}' with all {total} values merged")
+    print(f"  [2] Separate  — {len(enums)} distinct enums, one per section  (default)")
+    print(f"  [3] Hierarchy — one enum '{merged_key}' with section headers as terms")
+
+    while True:
+        try:
+            choice = input("  Choice [2]: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return enums, 2
+        if not choice:
+            choice = "2"
+        if choice in ("1", "2", "3"):
+            break
+        print("  Enter 1, 2, or 3.")
+
+    fmt = int(choice)
+    return _apply_section_format(enums, merged_key, fmt), fmt
+
+
+def _build_schema(result, source_url, key, see_also=None, version=None):
     """Convert a Claude extraction dict into a LinkML schema dict."""
     schema = make_config_schema(
         id=source_url,
         name=key,
         title=result.get("source_title", key),
+        version=version or "",
     )
     for enum_def in result.get("enums", []):
+        if not isinstance(enum_def, dict):
+            print(f"  Warning: skipping malformed enum entry (expected dict, got"
+                  f" {type(enum_def).__name__})", file=sys.stderr)
+            continue
         enum_key = enum_def.get("key", key)
         permissible_values = {}
         for pv in enum_def.get("permissible_values", []):
@@ -188,6 +321,14 @@ def _build_schema(result, source_url, key, see_also=None):
             entry["permissible_values"] = permissible_values
         schema["enums"][enum_key] = entry
     return schema
+
+
+_ANCHOR_TIP_PDF  = ("  Tip: add #page=N or #page=N-M to the source URL to target a PDF page, "
+                    "or #text=exact+phrase to anchor to matching text in any document type.")
+_ANCHOR_TIP_HTML = ("  Tip: add #element-id (matching an id= attribute in the HTML) to anchor "
+                    "to a specific section, or use #text=exact+phrase for a text-based anchor.")
+_ANCHOR_TIP_TEXT = ("  Tip: add #text=exact+phrase to the source URL to anchor extraction "
+                    "to the first occurrence of that phrase.")
 
 
 def _resolve_free_text(value):
@@ -243,6 +384,10 @@ def _resolve_free_text(value):
     text = re.sub(r'\s+', ' ', text).strip()
     if len(text) > 10000:
         print(f"  Text truncated to 10 000 chars (source: {len(text):,} chars).")
+        if ext == ".pdf":
+            print(_ANCHOR_TIP_PDF, file=sys.stderr)
+        else:
+            print(_ANCHOR_TIP_TEXT, file=sys.stderr)
         text = text[:10000]
     if not text:
         print(f"  Error: no readable text extracted from {value}.", file=sys.stderr)
@@ -299,6 +444,29 @@ def _fetch_for_grounding(url):
         return text if len(text) >= 100 else None
     except Exception as e:
         print(f"  Warning: could not fetch {url} for grounding check: {e}",
+              file=sys.stderr)
+        return None
+
+
+def _fetch_for_grounding_from_file(path):
+    """Return full visible text from a locally downloaded HTML/text file for grounding.
+
+    Same treatment as _fetch_for_grounding but reads from disk.
+    Returns None for PDFs (binary) and on failure.
+    """
+    try:
+        _, ext = os.path.splitext(path.lower())
+        if ext == ".pdf":
+            return None
+        with open(path, encoding="utf-8", errors="replace") as f:
+            raw = f.read()
+        raw = _BLOCK_TAG_RE.sub(lambda m: " " + m.group(), raw)
+        text = strip_tags(raw)
+        text = html_module.unescape(text)
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text if len(text) >= 100 else None
+    except Exception as e:
+        print(f"  Warning: could not read {path} for grounding check: {e}",
               file=sys.stderr)
         return None
 
@@ -406,13 +574,66 @@ def _detect_ext(url, content_type_header):
     }.get(ct, "html")
 
 
-def _extract_text_from_file(path):
+def _parse_fragment(fragment):
+    """Parse a URL fragment into an extraction directive dict.
+
+    Supported forms
+    ---------------
+    page=N           — PDF page N (1-indexed); stored as 0-indexed
+    page=N-M         — PDF pages N through M inclusive
+    text=some+phrase — anchor extraction window to first match of the phrase
+                       (URL-encoded or literal); works for any file type
+    anything-else    — treated as an HTML element-ID anchor
+
+    Returns a dict with a 'type' key, or None if fragment is absent.
+    """
+    if not fragment:
+        return None
+    import urllib.parse
+    frag = fragment.strip()
+    # page=N or page=N-M
+    m = re.match(r'^page=(\d+)(?:-(\d+))?$', frag, re.IGNORECASE)
+    if m:
+        start = int(m.group(1)) - 1
+        end   = int(m.group(2)) - 1 if m.group(2) else start
+        return {'type': 'page', 'start': max(start, 0), 'end': max(end, start)}
+    # text=QUERY  (URL-encoded or literal spaces)
+    m = re.match(r'^text=(.+)$', frag, re.IGNORECASE)
+    if m:
+        return {'type': 'text', 'query': urllib.parse.unquote_plus(m.group(1))}
+    # Anything else: treat as an HTML element-ID anchor
+    return {'type': 'html_id', 'id': frag}
+
+
+def _extract_text_from_file(path, url_fragment=None):
     """Extract and return plain text from a locally downloaded source file.
 
     Handles PDF (via pypdf), HTML (strip_tags), and plain text.
     Caps output at 10 000 characters.  Returns None on failure.
+
+    url_fragment : str or None
+        The fragment portion of the source URL (everything after '#').
+
+        Supported anchoring schemes (applied before the 10 000-char cap):
+
+        #page=N or #page=N-M
+            PDF only.  Extract only the specified page(s).
+
+        #text=some+exact+phrase
+            Any file type.  Find the first case-insensitive match of the
+            phrase in the extracted text and start the window 200 chars
+            before it, giving Claude up to 10 000 chars from that point.
+
+        #element-id  (bare id, no '=')
+            HTML only.  Locate the element with id="element-id" in the raw
+            HTML and begin text extraction from that point.
+
+        When no fragment is given and the document exceeds 10 000 characters,
+        a tip is printed suggesting the appropriate anchor form.
     """
     _, ext = os.path.splitext(path.lower())
+    directive = _parse_fragment(url_fragment)
+
     try:
         if ext == ".pdf":
             try:
@@ -424,34 +645,121 @@ def _extract_text_from_file(path):
                 )
                 return None
             reader = pypdf.PdfReader(path)
-            text = "\n".join(page.extract_text() or "" for page in reader.pages)
+            if directive and directive['type'] == 'page':
+                end_pg = min(directive['end'], len(reader.pages) - 1)
+                pages  = reader.pages[directive['start'] : end_pg + 1]
+                print(f"  Extracting PDF page(s) {directive['start']+1}–{end_pg+1}"
+                      f" of {len(reader.pages)}")
+            else:
+                pages = reader.pages
+            text = "\n".join(page.extract_text() or "" for page in pages)
+
         elif ext in (".html", ".htm"):
             with open(path, encoding="utf-8", errors="replace") as f:
-                text = strip_tags(f.read())
+                raw = f.read()
+            # HTML element-ID anchor: find id="..." in raw HTML and slice from there
+            if directive and directive['type'] == 'html_id':
+                html_id = directive['id']
+                patterns = [f'id="{html_id}"', f"id='{html_id}'",
+                            f'name="{html_id}"', f"name='{html_id}'"]
+                found = False
+                for pat in patterns:
+                    pos = raw.lower().find(pat.lower())
+                    if pos >= 0:
+                        raw = raw[pos:]
+                        print(f"  Anchored to HTML element #{html_id}")
+                        found = True
+                        break
+                if not found:
+                    print(f"  Warning: HTML anchor #{html_id!r} not found in document"
+                          f" — using full page.", file=sys.stderr)
+            text = strip_tags(raw)
+
         else:
             with open(path, encoding="utf-8", errors="replace") as f:
                 text = f.read()
+
     except Exception as e:
         print(f"  Error reading {path}: {e}", file=sys.stderr)
         return None
 
     text = re.sub(r'\s+', ' ', text).strip()
+
+    # text= anchor: find phrase in extracted text, window from there
+    if directive and directive['type'] == 'text':
+        query = directive['query']
+        pos = text.lower().find(query.lower())
+        if pos >= 0:
+            start = max(0, pos - 200)
+            text = text[start:]
+            print(f"  Anchored to text {query!r} at position {pos:,}")
+        else:
+            print(f"  Warning: anchor text {query!r} not found in document"
+                  f" — using full text.", file=sys.stderr)
+
     if len(text) > 10000:
         print(f"  Text truncated to 10 000 chars (source: {len(text):,} chars).")
+        if not directive:
+            if ext == ".pdf":
+                print(_ANCHOR_TIP_PDF, file=sys.stderr)
+            elif ext in (".html", ".htm"):
+                print(_ANCHOR_TIP_HTML, file=sys.stderr)
+            else:
+                print(_ANCHOR_TIP_TEXT, file=sys.stderr)
         text = text[:10000]
+
     return text or None
 
 
+def _find_shared_local_file(url, key, config_file):
+    """Return path to an existing local file from another source with the same base URL.
+
+    Strips URL fragments before comparing, so a FreeText source whose
+    source_ontology ends with '#page=116' will match a sibling source whose
+    source_ontology is the bare PDF URL.  Returns None if no match is found.
+    """
+    base_url = url.split("#")[0]
+    try:
+        with open(config_file) as f:
+            cfg = yaml.safe_load(f) or {}
+        for other_key, other_src in (cfg.get("sources") or {}).items():
+            if other_key == key:
+                continue
+            other_url = (
+                (other_src.get("reachable_from") or {})
+                .get("source_ontology", "")
+            ).split("#")[0]
+            if not other_url or other_url != base_url:
+                continue
+            for ext in _SOURCE_EXTENSIONS:
+                candidate = f"sources/{other_key}.{ext}"
+                if os.path.exists(candidate):
+                    return candidate, other_key
+    except Exception:
+        pass
+    return None, None
+
+
 def fetch_freetext_source(key, source, config_file=MENU_CONFIG):
-    """Download the FreeText source URI to sources/{key}.{ext}.
+    """Download the FreeText source URI to sources/{key}.{ext} then extract enums.
 
     Called only by explicit -f [key]; -f all silently skips FreeText sources.
-    Does NOT run Claude or write a YAML file — use -c [key] after downloading
-    to extract enums from the saved document.
+    After a successful download (or when a shared file is available) immediately
+    calls process_freetext_source so the YAML is refreshed in one step.
+
+    If another source has already downloaded the same URL, its local file is
+    used directly and no network request is made.
     """
     url = (source.get("reachable_from") or {}).get("source_ontology", "")
     if not url:
         print(f"  Skipping {key}: no source_ontology URL.", file=sys.stderr)
+        return
+
+    shared_path, shared_key = _find_shared_local_file(url, key, config_file)
+    if shared_path:
+        print(f"  Using existing {shared_path} (same URL as '{shared_key}') —"
+              f" no download needed.")
+        process_freetext_source(key, source, config_file)
         return
 
     fetch_url = url.split("#")[0]
@@ -486,7 +794,6 @@ def fetch_freetext_source(key, source, config_file=MENU_CONFIG):
     with open(output_path, "wb") as f:
         f.write(data)
     print(f"  Saved to {output_path}")
-    print(f"  Run '-c {key}' to extract enums via Claude.")
 
     update_source_config(
         key,
@@ -494,26 +801,25 @@ def fetch_freetext_source(key, source, config_file=MENU_CONFIG):
         config_file,
     )
 
+    # Immediately extract enums — same as running -c [key] after download
+    process_freetext_source(key, source, config_file)
+
 
 def match_freetext(url, free_text, config_file=MENU_CONFIG):
     """Handle a URL + free_text -a addition. Returns True if handled.
 
-    Calls Claude to extract enumerations from the provided text, writes
-    sources/{key}.yaml, and adds a FreeText entry to the config file.
-    The free_text is stored in the 'description' field for later -c re-runs.
-
-    If free_text is a file path the file is copied to sources/{key}.{ext} and
-    file_format is set to that extension.  Inline text uses file_format 'yaml'.
+    Calls Claude to suggest a source key and title, prompts the user to
+    confirm the key, downloads the source document, writes the config entry,
+    then delegates YAML generation to process_freetext_source (same as -c).
     """
-    # Remember whether the value is a local file before resolving it to text
     src_file = free_text if os.path.isfile(free_text) else None
     if src_file:
         src_ext = os.path.splitext(src_file)[1].lstrip(".").lower() or "txt"
 
-    # Resolve file path → plain text before anything else
-    free_text = _resolve_free_text(free_text)
-    if free_text is None:
-        return True  # file read failed; caller should not fall through to other matchers
+    # Resolve file path → plain text for the key-suggestion Claude call
+    suggestion_text = _resolve_free_text(free_text)
+    if suggestion_text is None:
+        return True
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print(
@@ -521,13 +827,13 @@ def match_freetext(url, free_text, config_file=MENU_CONFIG):
             " — cannot process FreeText source.",
             file=sys.stderr,
         )
-        return True  # abort; do not fall through to other matchers
+        return True
 
     with open(config_file) as f:
         config = yaml.safe_load(f) or {}
 
-    print("  Extracting picklist data from free text via Claude ...")
-    result = _call_claude(free_text)
+    print("  Consulting Claude for source key and title ...")
+    result = _call_claude(suggestion_text)
     if result is None:
         return False
 
@@ -539,54 +845,67 @@ def match_freetext(url, free_text, config_file=MENU_CONFIG):
         )
         return False
 
-    if source_key in config.get("sources", {}):
-        print(
-            f"  Skipping: source key '{source_key}' already exists in {config_file}",
-            file=sys.stderr,
-        )
-        return True
+    existing_keys = set(config.get("sources", {}).keys())
+    enum_names = [e.get("key", "?") for e in (result.get("enums") or [])]
+    print(f"  Claude extracted {len(enum_names)} enum(s): {', '.join(enum_names)}")
+    print(f"  Suggested source key: '{source_key}'")
 
-    # Verify extracted values against the source document.
-    # Skipped silently when the URI is not fetchable as text (PDFs, network errors).
+    default_key = source_key
+    if default_key in existing_keys:
+        n = 1
+        while f"{source_key}_{n}" in existing_keys:
+            n += 1
+        default_key = f"{source_key}_{n}"
+        print(f"  Warning: '{source_key}' already exists in {config_file}."
+              f"  Default adjusted to '{default_key}'.", file=sys.stderr)
+
+    while True:
+        try:
+            user_input = input(f"  Source key [{default_key}]: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n  Aborted.")
+            return True
+        chosen = user_input if user_input else default_key
+        if chosen in existing_keys:
+            print(f"  '{chosen}' already exists in {config_file} — enter a different key.")
+            continue
+        if not re.match(r'^[A-Za-z][A-Za-z0-9_]*$', chosen):
+            print(f"  '{chosen}' is not a valid identifier"
+                  f" (letters/digits/underscores only, must start with a letter).")
+            continue
+        break
+    source_key = chosen
+
+    # Download the source document so process_freetext_source can work offline
+    _raw_bytes = None
+    _raw_ext = "html"
+    _raw_source_path = None
+
     fetch_url = url.split("#")[0] if url else ""
-    doc_text = _fetch_for_grounding(fetch_url) if fetch_url else None
-    if doc_text:
-        unmatched = _check_grounding(result.get("enums", []), doc_text)
-        if unmatched:
-            total = sum(len(v) for v in unmatched.values())
-            print(
-                f"\n  Warning: {total} enum value(s) not found verbatim"
-                f" in the source document:"
-            )
-            for enum_key, titles in unmatched.items():
-                print(f"    {enum_key}:")
-                for t in titles:
-                    print(f"      - {t!r}")
-            print(
-                "  These values may come from Claude's training knowledge"
-                " rather than the source document."
-            )
+    if src_file:
+        _raw_source_path = f"sources/{source_key}.{src_ext}"
+        _raw_ext = src_ext
+    elif fetch_url and fetch_url.lower().startswith(("http://", "https://")):
+        _shared_path, _shared_key = _find_shared_local_file(url, source_key, config_file)
+        if _shared_path:
+            _raw_source_path = _shared_path
+            print(f"  Source document: using existing {_shared_path}"
+                  f" (same URL as '{_shared_key}').")
+        else:
+            print(f"  Downloading source document ...")
             try:
-                resp = input("\n  Accept into config anyway? [y/N] ").strip().lower()
-            except (EOFError, KeyboardInterrupt):
-                print()
-                resp = "n"
-            if resp != "y":
-                print("  Source not added.")
-                return True
+                req = urllib.request.Request(fetch_url, headers=BROWSER_HEADERS)
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    _ct_header = resp.headers.get("Content-Type", "")
+                    _raw_bytes = resp.read()
+                _raw_ext = _detect_ext(url, _ct_header)
+                _raw_source_path = f"sources/{source_key}.{_raw_ext}"
+            except Exception as e:
+                print(f"  Warning: could not download source document: {e}",
+                      file=sys.stderr)
 
-    see_also = url or None
-    schema = _build_schema(result, url, source_key, see_also=see_also)
-    yaml_path = f"sources/{source_key}.yaml"
-    with open(yaml_path, "w") as f:
-        yaml.dump(
-            schema, f,
-            Dumper=IndentedDumper, default_flow_style=False, sort_keys=False,
-        )
-    enum_count = len(schema.get("enums") or {})
-    print(f"  Saved {enum_count} enum(s) to {yaml_path}")
-
-    # Copy the source document into sources/ so -c [key] can find it later
+    # Save source document to disk before process_freetext_source needs it
+    today = datetime.date.today().isoformat()
     file_format = "yaml"
     if src_file:
         doc_path = f"sources/{source_key}.{src_ext}"
@@ -594,15 +913,26 @@ def match_freetext(url, free_text, config_file=MENU_CONFIG):
             d.write(s.read())
         print(f"  Copied source document to {doc_path}")
         file_format = src_ext
+    elif _raw_bytes and _raw_source_path:
+        with open(_raw_source_path, "wb") as f:
+            f.write(_raw_bytes)
+        print(f"  Saved source document to {_raw_source_path}")
+        file_format = _raw_ext
 
+    # Register source in config before calling process_freetext_source
     entry = make_source_entry(
         source_key, url, "FreeText", file_format,
         title=result.get("source_title"),
-        description=free_text,
+        description=suggestion_text,
     )
+    if src_file or _raw_bytes:
+        entry["download_date"] = today
     config.setdefault("sources", {})[source_key] = entry
     write_config(config, config_file)
     print(f"  Added source '{source_key}' to {config_file}")
+
+    # Generate YAML using the same code path as -c [source_key]
+    process_freetext_source(source_key, entry, config_file)
     return True
 
 
@@ -621,7 +951,7 @@ def _patch_see_also(yaml_path, see_also):
         print(f"  Added see_also to {updated} enum(s) in {yaml_path}")
 
 
-def process_freetext_source(key, source, config_file=MENU_CONFIG, locales=None):
+def process_freetext_source(key, source, config_file=MENU_CONFIG, locales=None, debug=False):
     """Extract enums via Claude for an explicitly named FreeText -c [key].
 
     Text source priority (first non-empty source wins):
@@ -630,7 +960,8 @@ def process_freetext_source(key, source, config_file=MENU_CONFIG, locales=None):
       3. Stored description text from harvester_config.yaml
 
     Prints a diff of changes versus the existing sources/{key}.yaml before
-    writing the new YAML.
+    writing the new YAML.  Pass debug=True (--debug flag) to also print the
+    full new YAML when the size-guard rejects it.
     """
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print(
@@ -640,23 +971,35 @@ def process_freetext_source(key, source, config_file=MENU_CONFIG, locales=None):
         return
 
     url = (source.get("reachable_from") or {}).get("source_ontology", "")
+    url_fragment = url.split("#")[1] if "#" in url else None
     text = None
 
-    # 1. Locally downloaded source file
+    # 1. Locally downloaded source file for this key
     for ext in _SOURCE_EXTENSIONS:
         candidate = f"sources/{key}.{ext}"
         if os.path.exists(candidate):
             print(f"  Using downloaded file {candidate} ...")
-            text = _extract_text_from_file(candidate)
+            text = _extract_text_from_file(candidate, url_fragment=url_fragment)
             if text:
                 break
 
-    # 2. Temporary URI fetch (not saved)
+    # 1b. Another source's local file downloaded from the same base URL
     if not text and url:
-        print(f"  No local source file — fetching {url} temporarily ...")
-        text = _fetch_uri_text(url)
+        shared_path, shared_key = _find_shared_local_file(url, key, config_file)
+        if shared_path:
+            print(f"  Using existing {shared_path}"
+                  f" (same source URL as '{shared_key}') ...")
+            text = _extract_text_from_file(shared_path, url_fragment=url_fragment)
 
-    # 3. Stored description fallback
+    # 2. No local file — remind user how to download
+    if not text and url:
+        print(
+            f"  No local source file for '{key}'."
+            f" Run '-f {key}' to download the source document.",
+            file=sys.stderr,
+        )
+
+    # 3. Stored description fallback (covers inline-text FreeText sources)
     if not text:
         text = (source.get("description") or "").strip() or None
 
@@ -669,14 +1012,41 @@ def process_freetext_source(key, source, config_file=MENU_CONFIG, locales=None):
         )
         return
 
+    # Prepend source URL so Claude can detect version from URL path patterns
+    if url:
+        text = f"Source URL: {url}\n\n{text}"
+
     print(f"  Extracting '{key}' via Claude ...")
     result = _call_claude(text)
     if result is None:
         return
 
+    # Extract and persist detected version
+    version = (result.get("version") or "").strip() or None
+    if version:
+        print(f"  Detected version: {version!r}")
+        update_source_config(key, {"version": version}, config_file)
+
+    if len(result.get("enums", [])) > 1:
+        result = dict(result)
+        # Prefer stored config preference, fall back to detecting from existing YAML
+        yaml_path_check = f"sources/{key}.yaml"
+        stored_fmt = source.get("section_format") or _detect_format_from_yaml(yaml_path_check)
+        if stored_fmt:
+            print(f"  Applying stored section format {stored_fmt}"
+                  f" ({'flat' if stored_fmt==1 else 'separate' if stored_fmt==2 else 'hierarchical'})"
+                  f" — delete section_format from config to reset.")
+            result["enums"] = _apply_section_format(result["enums"], key, stored_fmt)
+            _new_section_fmt = stored_fmt
+        else:
+            result["enums"], _new_section_fmt = _prompt_section_format(result["enums"], key)
+            update_source_config(key, {"section_format": _new_section_fmt}, config_file)
+    else:
+        _new_section_fmt = None
+
     yaml_path = f"sources/{key}.yaml"
     see_also = url or None
-    new_schema = _build_schema(result, url, key, see_also=see_also)
+    new_schema = _build_schema(result, url, key, see_also=see_also, version=version)
 
     print(_diff_report(yaml_path, new_schema))
 
@@ -695,6 +1065,12 @@ def process_freetext_source(key, source, config_file=MENU_CONFIG, locales=None):
                 f" — keeping existing {yaml_path}",
                 file=sys.stderr,
             )
+            if debug:
+                print(
+                    f"  DEBUG: rejected new extraction for '{key}':\n"
+                    + "  " + yaml_content.replace("\n", "\n  ").rstrip(),
+                    file=sys.stderr,
+                )
             if see_also:
                 _patch_see_also(yaml_path, see_also)
             return
@@ -703,3 +1079,4 @@ def process_freetext_source(key, source, config_file=MENU_CONFIG, locales=None):
         f.write(yaml_content)
     enum_count = len(new_schema.get("enums") or {})
     print(f"  Saved {enum_count} enum(s) to {yaml_path}")
+    return True  # signal to caller that YAML was written
