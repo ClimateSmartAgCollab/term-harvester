@@ -17,6 +17,27 @@
 locales:
   - en
   - fr
+apis:
+  agrovoc:
+    type:
+      sparql:
+        uri: https://agrovoc.fao.org/sparql/
+      rest:
+        uri: https://agrovoc.fao.org/browse/rest/v1/
+    ontologies:
+      - agrovoc
+  bioportal:
+    type:
+      rest:
+        uri: https://data.bioontology.org/
+        apikey: 75494b6d-7473-49b5-b47a-6e846f90d16b
+    ontologies:
+      - envo
+  ols:
+    type:
+      rest:
+        uri: http://www.ebi.ac.uk/ols4/api/ontologies/{ontology}/terms/{double_encoded}/graph
+    ontologies: []
 sources:
   AgriFoodCA_Picklists:
     title: AgriFoodCA Picklists

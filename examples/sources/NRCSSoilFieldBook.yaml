@@ -6,7 +6,7 @@ version: Ver. 4 November 2024
 license: ''
 in_language: en
 imports:
-  - 'linkml:types'
+  - linkml:types
 prefixes: {}
 default_prefix: ''
 classes: {}

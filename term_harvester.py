@@ -181,12 +181,14 @@
 #
 
 import argparse
+import concurrent.futures
 import csv
 import datetime
 import html
 import json
 import os
 import re
+import sqlite3
 import sys
 import tempfile
 import urllib.parse
@@ -1269,7 +1271,7 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG):
 
         process_linkml_source(key, source, config_file)
 
-
+    _rebuild_fts_index(config_file)
 
 
 def expand_reachable_from(yaml_path, enum_filter=None, apis=None, locales=None):
@@ -1445,6 +1447,1010 @@ def expand_reachable_from(yaml_path, enum_filter=None, apis=None, locales=None):
     return expanded
 
 
+# ---------------------------------------------------------------------------
+# --search: term search across sources/*.yaml
+# ---------------------------------------------------------------------------
+
+_SEARCH_INDEX_DB = "sources/search_index.db"
+
+_STOPWORDS = frozenset({
+    'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+    'should', 'may', 'might', 'for', 'of', 'in', 'on', 'at', 'to', 'with',
+    'by', 'from', 'that', 'this', 'these', 'those', 'and', 'or', 'but',
+    'not', 'if', 'as', 'it', 'its', 'any', 'all', 'each', 'some', 'such',
+    'used', 'use', 'using', 'also', 'other', 'than', 'which', 'when',
+    'where', 'who', 'how', 'what', 'their', 'they', 'them', 'there',
+    'no', 'so', 'up', 'out', 'about', 'into', 'than', 'more', 'can',
+})
+
+
+def _tokenize(text):
+    """Return a frozenset of lowercase word tokens, filtering stopwords."""
+    return frozenset(
+        w for w in re.findall(r'[a-zA-Z]+', text.lower())
+        if w not in _STOPWORDS and len(w) > 1
+    )
+
+
+def _overlap_score(query_tokens, target_tokens):
+    """Fraction of query tokens present in target tokens (recall-weighted)."""
+    if not query_tokens or not target_tokens:
+        return 0.0
+    return len(query_tokens & target_tokens) / len(query_tokens)
+
+
+def _is_verbatim(query, source_label, source_def):
+    """True if the query text, or either half of a term:description query, appears
+    literally as a substring in the source label or definition (case-insensitive)."""
+    term = (query.get("term") or "").strip()
+    desc = (query.get("description") or "").strip()
+    haystack = ((source_label or "") + " " + (source_def or "")).lower()
+    candidates = [s for s in [term, desc, f"{term}: {desc}" if desc else ""] if len(s) > 2]
+    return any(s.lower() in haystack for s in candidates)
+
+
+def _match_score(query_tokens, query_text, label_text, def_text):
+    """Score a match against label and definition fields separately.
+
+    1.0 is returned only when the exact query phrase appears as a substring in
+    the label or definition.  Token-overlap matches (where query words appear
+    scattered rather than as a contiguous phrase) are capped at 0.9 for label
+    matches and 0.5 for definition-only matches.
+    """
+    qt = query_text.lower()
+    if qt in (label_text or "").lower():
+        return 1.0
+    if def_text and qt in def_text.lower():
+        return 1.0
+    label_score = _overlap_score(query_tokens, _tokenize(label_text))
+    def_score = _overlap_score(query_tokens, _tokenize(def_text))
+    combined = max(label_score * 0.9, def_score * 0.5)
+    return combined
+
+
+def _parse_search_queries(text):
+    """Parse --search input into a list of {term, description} dicts.
+
+    Supports three input forms (auto-detected):
+      - Free text:           "soil with poor drainage"
+      - Structured pair:     "SoilDrainage:classification of how well soil drains"
+      - Batch (either form): entries separated by ';' or newlines
+
+    Returns a list of dicts with keys 'term' (str) and 'description' (str|None).
+    """
+    raw_entries = [e.strip() for e in re.split(r'[;\n]+', text) if e.strip()]
+    queries = []
+    for entry in raw_entries:
+        # Detect "name:description" — colon not part of a URL (no preceding /)
+        m = re.match(r'^([^:/]{1,80}):\s*(.+)$', entry, re.DOTALL)
+        if m:
+            queries.append({"term": m.group(1).strip(), "description": m.group(2).strip()})
+        else:
+            queries.append({"term": entry, "description": None})
+    return queries
+
+
+def _search_sources(queries, config_file=MENU_CONFIG, top_n=10):
+    """Search all sources/*.yaml for terms matching the given queries.
+
+    For each query, scores every enum and permissible_value by token overlap
+    between the query text and the target's name/title/description fields.
+    Returns a list of {query, matches} dicts; matches are sorted by score desc.
+
+    Each match dict contains:
+      source, id, label, type ('enum'|'permissible_value'), parent (label),
+      definition, def_source ('verbatim'|''), score.
+    """
+    with open(config_file) as f:
+        config = yaml.safe_load(f) or {}
+    all_sources = config.get("sources", {})
+
+    source_yamls = {}
+    for key in all_sources:
+        path = f"sources/{key}.yaml"
+        if os.path.exists(path):
+            with open(path) as f:
+                data = yaml.safe_load(f)
+            if isinstance(data, dict):
+                source_yamls[key] = data
+
+    # Build enum title map for parent-label lookup
+    enum_title_map = {}   # (source_key, enum_name) -> title
+    for source_key, data in source_yamls.items():
+        for enum_name, enum_def in (data.get("enums") or {}).items():
+            title = (enum_def or {}).get("title", "") or enum_name
+            enum_title_map[(source_key, enum_name)] = title
+
+    results = []
+    for query in queries:
+        query_text = query["term"]
+        q_tokens = _tokenize(query_text)
+
+        matches = []
+        for source_key, data in source_yamls.items():
+            for enum_name, enum_def in (data.get("enums") or {}).items():
+                enum_def = enum_def or {}
+                enum_title = enum_def.get("title", "") or enum_name
+
+                # Score enum itself
+                enum_label_text = f"{enum_name} {enum_title}"
+                enum_desc = enum_def.get("description", "") or ""
+                score = _match_score(q_tokens, query_text, enum_label_text, enum_desc)
+                if score > 0:
+                    matches.append({
+                        "source":     source_key,
+                        "id":         enum_name,
+                        "term_uri":   "",
+                        "label":      enum_title,
+                        "type":       "enum",
+                        "parent":     None,
+                        "parent_uri": "",
+                        "definition": enum_desc,
+                        "def_source": "verbatim" if _is_verbatim(query, enum_title, enum_desc) else "",
+                        "score":      score,
+                        "children":   _get_local_children(data, enum_name, "enum"),
+                    })
+
+                # Score each permissible value
+                for pv_code, pv_def in (enum_def.get("permissible_values") or {}).items():
+                    pv_def = pv_def or {}
+                    pv_label = pv_def.get("title", "") or str(pv_code)
+                    pv_desc = pv_def.get("description", "") or ""
+                    pv_score = _match_score(q_tokens, query_text,
+                                            f"{pv_code} {pv_label}", pv_desc)
+                    if pv_score > 0:
+                        matches.append({
+                            "source":     source_key,
+                            "id":         pv_code,
+                            "term_uri":   pv_def.get("meaning") or "",
+                            "label":      pv_label,
+                            "type":       "term",
+                            "parent":     enum_title_map.get((source_key, enum_name)) or enum_name,
+                            "parent_uri": "",
+                            "definition": pv_desc,
+                            "def_source": "verbatim" if _is_verbatim(query, pv_label, pv_desc) else "",
+                            "score":      pv_score,
+                            "children":   _get_local_children(data, pv_code, "term"),
+                        })
+
+        # Sort: score desc, enums before terms at equal score, then alpha by id
+        matches.sort(key=lambda m: (-m["score"], m["type"] != "enum", str(m["id"]).lower()))
+        results.append({"query": query, "matches": matches[:top_n]})
+
+    return results
+
+
+def _rebuild_fts_index(config_file=MENU_CONFIG):
+    """Rebuild the FTS5 full-text search index from all sources/*.yaml files.
+
+    Uses SQLite FTS5 with the built-in Porter stemmer so that morphological
+    variants like 'excess' / 'excessive' / 'excessively' and 'drain' /
+    'drainage' / 'drained' all resolve to the same stem and match each other.
+    Called automatically at the end of process_sources(-c).
+    Falls back silently if this SQLite build lacks FTS5 support.
+    """
+    try:
+        conn = sqlite3.connect(_SEARCH_INDEX_DB)
+        conn.execute("DROP TABLE IF EXISTS terms")
+        conn.execute(
+            "CREATE VIRTUAL TABLE terms USING fts5("
+            "source_key UNINDEXED, id UNINDEXED, type UNINDEXED, "
+            "parent UNINDEXED, term_uri UNINDEXED, label, definition, "
+            "tokenize='porter ascii')"
+        )
+    except Exception as e:
+        print(f"  Warning: FTS5 index unavailable ({e}) — token overlap used for --search.",
+              file=sys.stderr)
+        return
+
+    with open(config_file) as f:
+        config = yaml.safe_load(f) or {}
+
+    total = 0
+    for key in config.get("sources", {}):
+        path = f"sources/{key}.yaml"
+        if not os.path.exists(path):
+            continue
+        with open(path) as f:
+            data = yaml.safe_load(f)
+        if not isinstance(data, dict):
+            continue
+
+        rows = []
+        for enum_name, enum_def in (data.get("enums") or {}).items():
+            enum_def = enum_def or {}
+            enum_title = enum_def.get("title") or enum_name
+            enum_desc = enum_def.get("description") or ""
+            rows.append((key, enum_name, "enum", "", "", enum_title, enum_desc))
+
+            for pv_code, pv_def in (enum_def.get("permissible_values") or {}).items():
+                pv_def = pv_def or {}
+                pv_label = pv_def.get("title") or str(pv_code)
+                pv_desc = pv_def.get("description") or ""
+                pv_uri = pv_def.get("meaning") or ""
+                rows.append((key, str(pv_code), "term", enum_title, pv_uri, pv_label, pv_desc))
+
+        conn.executemany(
+            "INSERT INTO terms(source_key,id,type,parent,term_uri,label,definition) "
+            "VALUES(?,?,?,?,?,?,?)",
+            rows,
+        )
+        total += len(rows)
+
+    conn.commit()
+    conn.close()
+    print(f"  Search index: {total} terms indexed in {_SEARCH_INDEX_DB}")
+
+
+def _fts5_search_local(queries, config_file=MENU_CONFIG, top_n=10):
+    """Search local source YAML files using SQLite FTS5 with Porter stemming.
+
+    Porter stemming lets 'excess drainage' match 'Excessively Drained' because
+    'excess*' and 'drain*' share the same stems.  Falls back to token-overlap
+    search (_search_sources) if the FTS5 index does not exist yet (run -c first).
+
+    Scoring combines FTS5 BM25 (label weighted 5×, definition 1×) with the
+    existing phrase/token-overlap scorer; the higher of the two is used.
+    FTS5-only matches (morphological variants) are capped at 0.85 so they rank
+    below exact phrase matches (1.0).
+    """
+    if not os.path.exists(_SEARCH_INDEX_DB):
+        return _search_sources(queries, config_file=config_file, top_n=top_n)
+
+    try:
+        conn = sqlite3.connect(_SEARCH_INDEX_DB)
+        conn.execute("SELECT count(*) FROM terms").fetchone()
+    except Exception:
+        return _search_sources(queries, config_file=config_file, top_n=top_n)
+
+    # Lazily loaded source YAMLs, keyed by source_key, for children lookup.
+    loaded_yamls: dict = {}
+
+    def _yaml_for(source_key):
+        if source_key not in loaded_yamls:
+            path = f"sources/{source_key}.yaml"
+            try:
+                with open(path) as _f:
+                    loaded_yamls[source_key] = yaml.safe_load(_f) or {}
+            except Exception:
+                loaded_yamls[source_key] = {}
+        return loaded_yamls[source_key]
+
+    results = []
+    for query in queries:
+        # Use only the term (not description) for retrieval and scoring.
+        # The description is context for the user / AI re-scorer; including it
+        # in FTS5 queries and token overlap would require those words to appear
+        # in source text, eliminating valid matches.
+        term_text = query["term"]
+        q_tokens = _tokenize(term_text)
+
+        fts_words = [
+            w.lower() for w in re.findall(r'[a-zA-Z0-9]+', term_text)
+            if w.lower() not in _STOPWORDS and len(w) > 1
+        ]
+        if not fts_words:
+            results.append({"query": query, "matches": []})
+            continue
+
+        fts_query = " ".join(fts_words)
+        try:
+            rows = conn.execute(
+                "SELECT source_key, id, type, parent, term_uri, label, definition, "
+                "bm25(terms, 5.0, 1.0) as rank "
+                "FROM terms WHERE terms MATCH ? ORDER BY rank LIMIT ?",
+                (fts_query, top_n * 3),
+            ).fetchall()
+        except sqlite3.OperationalError as e:
+            print(f"  Warning: FTS5 query error for '{term_text[:40]}': {e}", file=sys.stderr)
+            rows = []
+
+        if not rows:
+            results.append({"query": query, "matches": []})
+            continue
+
+        best_rank = min(r[7] for r in rows)
+
+        matches = []
+        for row in rows:
+            source_key, id_, type_, parent, term_uri, label, definition, rank = row
+            token_score = _match_score(q_tokens, term_text,
+                                       f"{id_} {label}", definition)
+            fts5_score = (rank / best_rank) * 0.85 if best_rank < 0 else 0.0
+            score = max(token_score, fts5_score)
+            if score <= 0:
+                continue
+            matches.append({
+                "source":     source_key,
+                "id":         id_,
+                "term_uri":   term_uri or "",
+                "label":      label or "",
+                "type":       type_,
+                "parent":     parent or None,
+                "parent_uri": "",
+                "definition": definition or "",
+                "def_source": "verbatim" if _is_verbatim(query, label, definition) else "",
+                "score":      round(score, 4),
+                "children":   _get_local_children(_yaml_for(source_key), id_, type_),
+            })
+
+        matches.sort(key=lambda m: (-m["score"], m["type"] != "enum", str(m["id"]).lower()))
+        results.append({"query": query, "matches": matches[:top_n]})
+
+    conn.close()
+    return results
+
+
+def _dedup_matches_by_id(matches):
+    """Merge rows that share the same term id, combining their source names.
+
+    When the same CURIE (e.g. ENVO:06105241) appears in both OLS4 and BioPortal
+    results, collapse to a single row with sources joined as 'src1, src2'.
+    The highest score, longest definition, and any verbatim flag are kept.
+    """
+    seen = {}   # id -> index in deduped
+    deduped = []
+    for m in matches:
+        mid = str(m["id"])
+        if mid in seen:
+            ex = deduped[seen[mid]]
+            if m["source"] not in ex["source"].split(", "):
+                ex["source"] = ex["source"] + ", " + m["source"]
+            if m["score"] > ex["score"]:
+                ex["score"] = m["score"]
+            if m.get("def_source") == "verbatim":
+                ex["def_source"] = "verbatim"
+            if not ex.get("definition") and m.get("definition"):
+                ex["definition"] = m["definition"]
+        else:
+            seen[mid] = len(deduped)
+            deduped.append(dict(m))
+    return deduped
+
+
+def _ai_rescore(results, model="claude-haiku-4-5-20251001"):
+    """Re-score search results using Claude for semantic relevance.
+
+    Sends one API call per query with the full candidate list and asks Claude
+    to assign a 0.00-1.00 relevance score for each term.  Requires the
+    ``anthropic`` package and ``ANTHROPIC_API_KEY`` in the environment.
+    Returns the same results structure with scores (and score_source='ai') updated.
+    """
+    try:
+        import anthropic as _anthropic
+    except ImportError:
+        print("  Warning: 'anthropic' package not installed — skipping AI re-scoring."
+              "  Install with: pip install anthropic", file=sys.stderr)
+        return results
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        print("  Warning: ANTHROPIC_API_KEY not set — skipping AI re-scoring.", file=sys.stderr)
+        return results
+
+    client = _anthropic.Anthropic(api_key=api_key)
+
+    for result in results:
+        matches = result["matches"]
+        if not matches:
+            continue
+        q = result["query"]
+        query_text = q["term"] + (f": {q['description']}" if q.get("description") else "")
+
+        term_lines = []
+        for i, m in enumerate(matches):
+            label = m.get("label") or str(m["id"])
+            defn  = (m.get("definition") or "")[:200]
+            entry = f'{i}. "{label}"'
+            if defn:
+                entry += f' — {defn}'
+            term_lines.append(entry)
+
+        prompt = (
+            f'Rate each term\'s semantic relevance to the search query: "{query_text}"\n\n'
+            f'Score 0.00–1.00 where:\n'
+            f'  1.00 = the term is precisely what was searched for\n'
+            f'  0.80–0.99 = highly relevant (e.g. a domain synonym or directly related concept)\n'
+            f'  0.50–0.79 = moderately relevant (shares meaningful subject matter)\n'
+            f'  0.00–0.49 = tangential (only incidentally mentions the query words)\n\n'
+            f'Terms:\n' + '\n'.join(term_lines) + '\n\n'
+            f'Respond with ONLY a JSON array of objects, one per term in order:\n'
+            f'[{{"index": 0, "score": 0.95}}, {{"index": 1, "score": 0.72}}, ...]\n'
+            f'No explanation, no markdown fences — raw JSON only.'
+        )
+
+        try:
+            response = client.messages.create(
+                model=model,
+                max_tokens=300,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = response.content[0].text.strip()
+            json_match = re.search(r'\[.*\]', raw, re.DOTALL)
+            if not json_match:
+                print(f"  Warning: AI re-scoring returned unexpected response for '{query_text[:40]}'",
+                      file=sys.stderr)
+                continue
+            scored = json.loads(json_match.group())
+            for item in scored:
+                idx   = item.get("index")
+                score = item.get("score")
+                if idx is not None and score is not None and 0 <= idx < len(matches):
+                    matches[idx]["score"] = round(float(score), 2)
+                    matches[idx]["score_source"] = "ai"
+        except Exception as e:
+            print(f"  Warning: AI re-scoring failed for '{query_text[:40]}': {e}", file=sys.stderr)
+
+    return results
+
+
+def _format_search_report(results, fmt="text", tsv=False):
+    """Format search results.  fmt is 'text' (default), 'tsv', or 'markdown'.
+    The legacy tsv=True kwarg is equivalent to fmt='tsv'.
+
+    Column order: source, type, score, parent, id, label, definition.
+    """
+    if tsv and fmt == "text":
+        fmt = "tsv"
+
+    _DEF_MAX = 100
+
+    def _trunc(s):
+        return (s[:_DEF_MAX] + "…") if len(s) > _DEF_MAX else s
+
+    def _query_str(q):
+        return q["term"] + (f": {q['description']}" if q.get("description") else "")
+
+    def _score_str(m):
+        """Format score, appending '*' when assigned by AI re-scoring."""
+        s = f"{m['score']:.2f}"
+        return s + "*" if m.get("score_source") == "ai" else s
+
+    def _children_tsv(m):
+        kids = m.get("children") or []
+        return "; ".join(
+            f"{c['id']}: {c['label']}" if c.get("label") else str(c["id"])
+            for c in kids
+        )
+
+    # ------------------------------------------------------------------ TSV --
+    if fmt == "tsv":
+        lines = ["\t".join(
+            ["query", "source", "type", "score", "score_source", "parent", "parent_uri",
+             "id", "label", "definition", "def_source", "children"]
+        )]
+        for result in results:
+            qs = _query_str(result["query"])
+            if not result["matches"]:
+                lines.append("\t".join([qs, "(no matches)", *[""] * 10]))
+                continue
+            for m in result["matches"]:
+                lines.append("\t".join([
+                    qs,
+                    m["source"],
+                    m["type"],
+                    f"{m['score']:.2f}",
+                    m.get("score_source") or "token",
+                    m.get("parent") or "",
+                    m.get("parent_uri") or "",
+                    str(m["id"]),
+                    m.get("label") or "",
+                    m.get("definition") or "",
+                    m.get("def_source") or "",
+                    _children_tsv(m),
+                ]))
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------ Markdown --
+    if fmt == "markdown":
+        def _cell(s):
+            return str(s).replace("|", "\\|").replace("\n", " ")
+
+        def _parent_md(m):
+            parent = m.get("parent") or ""
+            uri    = m.get("parent_uri") or ""
+            if not parent:
+                return "—"
+            if uri:
+                # "ID: label" → use everything after the first ": " as link text
+                plabel = parent.split(": ", 1)[1] if ": " in parent else parent
+                return f"[{_cell(plabel)}]({uri})"
+            return _cell(parent)
+
+        def _children_md(m):
+            kids = m.get("children") or []
+            if not kids:
+                return ""
+            n = len(kids)
+            items = " · ".join(
+                f"[{_cell(c.get('label') or c['id'])}]({c['uri']})"
+                if c.get("uri", "").startswith(("http://", "https://", "urn:"))
+                else _cell(c.get("label") or c["id"])
+                for c in kids
+            )
+            return f"<details><summary>{n} children</summary>{items}</details>"
+
+        def _type_md(m):
+            """Type label with optional collapsible children appended."""
+            return m["type"] + _children_md(m)
+
+        def _bold_query_words(text, q_tokens):
+            """Wrap each query-token occurrence in **bold** (whole-word, case-insensitive)."""
+            if not text or not q_tokens:
+                return text
+            spans = []
+            for token in q_tokens:
+                for hit in re.finditer(r'\b' + re.escape(token) + r'\b', text, re.IGNORECASE):
+                    spans.append([hit.start(), hit.end()])
+            if not spans:
+                return text
+            spans.sort()
+            merged = []
+            for start, end in spans:
+                if merged and start < merged[-1][1]:
+                    merged[-1][1] = max(merged[-1][1], end)
+                else:
+                    merged.append([start, end])
+            out, prev = [], 0
+            for start, end in merged:
+                out.append(text[prev:start])
+                out.append(f"**{text[start:end]}**")
+                prev = end
+            out.append(text[prev:])
+            return "".join(out)
+
+        # Pad narrow column headers to enforce minimum visual width in renderers.
+        _NB = "&nbsp;"
+        type_header = "Type" + _NB * 26   # ~30 chars
+        def_header  = "Definition" + _NB * 20   # ~30 chars
+
+        lines = []
+        for result in results:
+            qs = _query_str(result["query"])
+            lines.append(f"\n## Search: {qs}\n")
+            if not result["matches"]:
+                lines.append("*No matches found.*\n")
+                continue
+            lines.append(f"| Source | {type_header} | Score | Parent | ID | Label | {def_header} |")
+            lines.append("|--------|------|------:|--------|-----|-------|------------|")
+            q_tokens_bold = _tokenize(result["query"]["term"])
+            for m in result["matches"]:
+                defn = m.get("definition") or ""
+                defn_md = _cell(_bold_query_words(_trunc(defn), q_tokens_bold)) if defn else ""
+                tid = str(m["id"])
+                turi = m.get("term_uri") or ""
+                id_md = f"[{_cell(tid)}]({turi})" if turi else _cell(tid)
+                lines.append(
+                    f"| {_cell(m['source'])} | {_type_md(m)} | {_score_str(m)}"
+                    f" | {_parent_md(m)} | {id_md}"
+                    f" | {_cell(m.get('label') or '')} | {defn_md} |"
+                )
+        return "\n".join(lines)
+
+    # --------------------------------------------------------- Space-padded --
+    lines = []
+    col_source = 24
+    col_type   = 18
+    col_score  =  6
+    col_parent = 28
+    col_id     = 24
+    col_label  = 28
+    col_ch     =  8   # just the count
+
+    header_row = (
+        f"  {'Source':<{col_source}}  {'Type':<{col_type}}  {'Score':>{col_score}}"
+        f"  {'Parent':<{col_parent}}  {'ID':<{col_id}}  {'Label':<{col_label}}"
+        f"  {'Ch':>{col_ch}}  Definition"
+    )
+    rule = "  " + "-" * (col_source + col_type + col_score + col_parent +
+                          col_id + col_label + col_ch + 28)
+
+    for result in results:
+        qs = _query_str(result["query"])
+        lines.append(f"\nSearch: {qs}")
+        if not result["matches"]:
+            lines.append("  (no matches found)")
+            continue
+        lines.append(header_row)
+        lines.append(rule)
+        for m in result["matches"]:
+            defn_str = ""
+            if m.get("definition"):
+                defn_str = f'"{_trunc(m["definition"])}"'
+                if m.get("def_source"):
+                    defn_str += f" [{m['def_source']}]"
+            parent = m.get("parent") or "—"
+            label  = m.get("label") or ""
+            n_ch   = len(m.get("children") or [])
+            ch_str = str(n_ch) if n_ch else ""
+            lines.append(
+                f"  {m['source']:<{col_source}}  {m['type']:<{col_type}}  {_score_str(m):>{col_score}}"
+                f"  {parent:<{col_parent}}  {str(m['id']):<{col_id}}  {label:<{col_label}}"
+                f"  {ch_str:>{col_ch}}  {defn_str}"
+            )
+
+    return "\n".join(lines)
+
+
+_OLS4_DEFAULT_SEARCH_URI = "https://www.ebi.ac.uk/ols4/api"
+
+
+def _fetch_ols4_children(api_base, ontology, iri, max_n=10):
+    """Return list of {id, label, uri} dicts for direct hierarchical children, or []."""
+    double_enc = urllib.parse.quote(urllib.parse.quote(iri, safe=""), safe="")
+    url = f"{api_base}/ontologies/{ontology}/terms/{double_enc}/hierarchicalChildren?size={max_n}"
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+        terms = (data.get("_embedded") or {}).get("terms") or []
+        result = []
+        for t in terms[:max_n]:
+            cid = t.get("obo_id") or t.get("short_form") or ""
+            clabel = t.get("label") or ""
+            ciri = t.get("iri") or ""
+            if not ciri and cid and ":" in cid:
+                prefix, local = cid.split(":", 1)
+                ciri = f"http://purl.obolibrary.org/obo/{prefix}_{local}"
+            result.append({"id": cid, "label": clabel, "uri": ciri})
+        return result
+    except Exception:
+        return []
+
+
+def _fetch_bioportal_children(base_uri, apikey, ontology, iri, max_n=10):
+    """Return list of {id, label, uri} dicts for direct children, or []."""
+    encoded = urllib.parse.quote(iri, safe="")
+    url = (f"{base_uri}/ontologies/{ontology}/classes/{encoded}/children"
+           f"?apikey={apikey}&include=prefLabel&pagesize={max_n}")
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+        items = data.get("collection") or []
+        result = []
+        for item in items[:max_n]:
+            ciri = item.get("@id") or ""
+            cid = ciri.rsplit("/", 1)[-1].replace("_", ":") if ciri else ""
+            clabel = item.get("prefLabel") or ""
+            result.append({"id": cid, "label": clabel, "uri": ciri})
+        return result
+    except Exception:
+        return []
+
+
+def _curie_to_uri(value, prefixes):
+    """Return a full http(s) URI for *value*, or '' if it cannot be resolved.
+
+    Accepts full URIs (returned as-is) and CURIEs like 'wd:Q1234' resolved
+    via *prefixes* (a dict mapping prefix → base URI).
+    """
+    if not value:
+        return ""
+    s = str(value)
+    if s.startswith(("http://", "https://", "urn:")):
+        return s
+    if ":" in s:
+        prefix, local = s.split(":", 1)
+        base = (prefixes or {}).get(prefix)
+        if base:
+            return base + local
+    return ""
+
+
+def _get_local_children(source_yaml, id_, type_):
+    """Return list of {id, label, uri} children from an already-loaded source YAML dict.
+
+    For enums: returns the permissible values.
+    For terms: returns sibling PVs whose is_a equals this term's id.
+    CURIE meanings (e.g. wd:Q1234) are resolved to full URIs via the source's
+    prefix map so that the markdown report can hyperlink them correctly.
+    """
+    prefixes = source_yaml.get("prefixes") or {}
+
+    def _child(code, pv_def):
+        pv_def = pv_def or {}
+        return {
+            "id": str(code),
+            "label": pv_def.get("title") or str(code),
+            "uri": _curie_to_uri(pv_def.get("meaning") or "", prefixes),
+        }
+
+    if type_ == "enum":
+        enum_def = (source_yaml.get("enums") or {}).get(id_) or {}
+        pvs = enum_def.get("permissible_values") or {}
+        return [_child(code, pv_def) for code, pv_def in pvs.items()]
+
+    if type_ == "term":
+        for enum_def in (source_yaml.get("enums") or {}).values():
+            pvs = (enum_def or {}).get("permissible_values") or {}
+            if id_ in pvs:
+                return [
+                    _child(code, pv_def) for code, pv_def in pvs.items()
+                    if (pv_def or {}).get("is_a") == id_
+                ]
+    return []
+
+
+def _fetch_ols4_parent(api_base, ontology, iri):
+    """Return (display_str, parent_uri) for the first hierarchical parent, or ('', '')."""
+    double_enc = urllib.parse.quote(urllib.parse.quote(iri, safe=""), safe="")
+    url = f"{api_base}/ontologies/{ontology}/terms/{double_enc}/hierarchicalParents"
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+        terms = (data.get("_embedded") or {}).get("terms") or []
+        if not terms:
+            return "", ""
+        t = terms[0]
+        pid = t.get("obo_id") or t.get("short_form") or ""
+        plabel = t.get("label") or ""
+        piri = t.get("iri") or ""
+        if not piri and pid and ":" in pid:
+            prefix, local = pid.split(":", 1)
+            piri = f"http://purl.obolibrary.org/obo/{prefix}_{local}"
+        display = f"{pid}: {plabel}" if pid and plabel else (plabel or pid)
+        return display, piri
+    except Exception:
+        return "", ""
+
+
+def _fetch_bioportal_parent(base_uri, apikey, ontology, iri):
+    """Return (display_str, parent_uri) for the first parent of a term, or ('', '')."""
+    encoded = urllib.parse.quote(iri, safe="")
+    url = (f"{base_uri}/ontologies/{ontology}/classes/{encoded}/parents"
+           f"?apikey={apikey}&include=prefLabel&pagesize=1")
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+        items = data if isinstance(data, list) else (data.get("collection") or [])
+        if not items:
+            return "", ""
+        item = items[0]
+        parent_iri = item.get("@id") or ""
+        parent_id = parent_iri.rsplit("/", 1)[-1].replace("_", ":") if parent_iri else ""
+        plabel = item.get("prefLabel") or ""
+        display = f"{parent_id}: {plabel}" if parent_id and plabel else (plabel or parent_id)
+        return display, parent_iri
+    except Exception:
+        return "", ""
+
+
+_OLS4_AI_SEARCH_MODEL = "llama-embed-nemotron-8b_pca512"
+
+
+def _search_ols4(query, api_conf, api_name, top_n=10, ai_mode=False):
+    """Search OLS4 for terms matching query. Returns list of match dicts.
+
+    When ai_mode=True, passes searchModel=llama-embed-nemotron-8b_pca512 to
+    request EBI's embedding-based AI search instead of BM25 keyword search.
+    The full query (term + description) is sent to the API for better semantic
+    retrieval, but scoring against returned results uses only the term text.
+    """
+    # Pass full text (term + description) to the API — the extra context helps
+    # semantic/BM25 ranking on the server side.
+    api_query_text = query["term"] + (" " + query["description"] if query.get("description") else "")
+    # Score returned results against the term only so description words don't
+    # dilute token overlap (e.g. "a soil related term" shouldn't require those
+    # words to appear in the matched label/definition).
+    term_text = query["term"]
+    q_tokens = _tokenize(term_text)
+
+    rest_conf = ((api_conf or {}).get("type") or {}).get("rest") or {}
+    uri_template = rest_conf.get("uri") or f"{_OLS4_DEFAULT_SEARCH_URI}/ontologies/{{ontology}}/terms/{{double_encoded}}/graph"
+    # Strip to api_base: everything up to and including /api
+    api_base = uri_template.split("/ontologies/")[0].rstrip("/")
+
+    ontologies = api_conf.get("ontologies") or []
+    params = {
+        "q": api_query_text,
+        "rows": str(top_n * 2),
+        "fieldList": "label,description,short_form,iri,obo_id,ontology_name,type",
+    }
+    if ontologies:
+        params["ontology"] = ",".join(o.lower() for o in ontologies)
+    if ai_mode:
+        params["searchModel"] = _OLS4_AI_SEARCH_MODEL
+
+    url = f"{api_base}/search?" + urllib.parse.urlencode(params)
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"  Warning: OLS4 search failed for '{api_query_text[:40]}': {e}", file=sys.stderr)
+        return []
+    # Collect candidates, then deduplicate by term_id keeping the primary ontology
+    candidates = []
+    for doc in (data.get("response") or {}).get("docs") or []:
+        label = doc.get("label") or ""
+        desc_raw = doc.get("description") or ""
+        description = (desc_raw[0] if isinstance(desc_raw, list) and desc_raw else desc_raw) or ""
+        term_id = doc.get("obo_id") or doc.get("short_form") or doc.get("iri") or ""
+        ontology = doc.get("ontology_name") or ""
+        score = _match_score(q_tokens, query_text, label, description)
+        if score <= 0:
+            continue
+        candidates.append({
+            "source":     f"{api_name}:{ontology}" if ontology else api_name,
+            "id":         term_id,
+            "term_uri":   doc.get("iri") or "",
+            "label":      label,
+            "type":       "term",
+            "parent":     ontology.upper() if ontology else "",
+            "parent_uri": "",
+            "definition": description,
+            "def_source": "verbatim" if _is_verbatim(query, label, description) else "",
+            "score":      score,
+        })
+
+    # Deduplicate: when the same term appears in multiple ontologies (because one
+    # imports from another), keep only the result whose ontology matches the term's
+    # own IRI prefix (e.g. ENVO:01001370 → prefer ontology_name=="envo").
+    seen: dict = {}
+    for c in candidates:
+        tid = c["id"]
+        id_prefix = tid.split(":")[0].upper() if ":" in str(tid) else ""
+        if tid not in seen:
+            seen[tid] = c
+        elif id_prefix and c["parent"] == id_prefix and seen[tid]["parent"] != id_prefix:
+            seen[tid] = c  # replace imported copy with the owning ontology's copy
+    matches = list(seen.values())[:top_n]
+
+    # Fetch parent and children for each match in parallel
+    if not matches:
+        return matches
+    iris = [m.get("term_uri", "") for m in matches]
+    onts = [m["parent"].lower() for m in matches]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(matches) * 2, 12)) as ex:
+        parent_futs = [ex.submit(_fetch_ols4_parent, api_base, ont, iri)
+                       for ont, iri in zip(onts, iris)]
+        child_futs  = [ex.submit(_fetch_ols4_children, api_base, ont, iri)
+                       for ont, iri in zip(onts, iris)]
+        for m, pfut, cfut in zip(matches, parent_futs, child_futs):
+            try:
+                parent_str, parent_uri = pfut.result()
+                if parent_str:
+                    m["parent"] = parent_str
+                    m["parent_uri"] = parent_uri
+            except Exception:
+                pass
+            try:
+                m["children"] = cfut.result()
+            except Exception:
+                m["children"] = []
+
+    matches.sort(key=lambda m: (-m["score"], str(m["id"]).lower()))
+    return matches
+
+
+def _search_bioportal(query, api_conf, api_name, top_n=10):
+    """Search BioPortal for terms matching query. Returns list of match dicts.
+
+    The full query (term + description) is sent to the API for richer retrieval,
+    but scoring against returned results uses only the term text so that
+    description words (e.g. 'a soil related term') don't dilute token overlap.
+    """
+    api_query_text = query["term"] + (" " + query["description"] if query.get("description") else "")
+    term_text = query["term"]
+    q_tokens = _tokenize(term_text)
+
+    rest_conf = ((api_conf or {}).get("type") or {}).get("rest") or {}
+    base_uri = (rest_conf.get("uri") or "https://data.bioontology.org").rstrip("/")
+    apikey = rest_conf.get("apikey") or ""
+    if not apikey:
+        print(f"  Warning: BioPortal search skipped for '{api_name}': no apikey configured",
+              file=sys.stderr)
+        return []
+
+    ontologies = api_conf.get("ontologies") or []
+    params = {
+        "q": api_query_text,
+        "pagesize": str(top_n * 2),
+        "include": "prefLabel,definition",
+        "apikey": apikey,
+    }
+    if ontologies:
+        params["ontologies"] = ",".join(o.upper() for o in ontologies)
+
+    url = f"{base_uri}/search?" + urllib.parse.urlencode(params)
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"  Warning: BioPortal search failed for '{api_query_text[:40]}': {e}", file=sys.stderr)
+        return []
+
+    matches = []
+    for item in (data.get("collection") or []):
+        label = item.get("prefLabel") or ""
+        def_raw = item.get("definition") or ""
+        description = (def_raw[0] if isinstance(def_raw, list) and def_raw else def_raw) or ""
+        ont_url = (item.get("links") or {}).get("ontology") or ""
+        ontology = ont_url.rstrip("/").rsplit("/", 1)[-1] if ont_url else ""
+        iri = item.get("@id") or ""
+        term_id = iri.rsplit("/", 1)[-1].replace("_", ":") if iri else ""
+        score = _match_score(q_tokens, term_text, label, description)
+        if score <= 0:
+            continue
+        matches.append({
+            "source":     f"{api_name}:{ontology}" if ontology else api_name,
+            "id":         term_id,
+            "term_uri":   iri,
+            "label":      label,
+            "type":       "term",
+            "parent":     ontology.upper() if ontology else "",
+            "parent_uri": "",
+            "definition": description,
+            "def_source": "verbatim" if _is_verbatim(query, label, description) else "",
+            "score":      score,
+        })
+
+    matches = matches[:top_n]
+
+    # Fetch parent and children for each match in parallel
+    if not matches:
+        return matches
+    iris = [m.get("term_uri", "") for m in matches]
+    onts = [m["parent"] for m in matches]  # uppercase ontology name
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(matches) * 2, 12)) as ex:
+        parent_futs = [ex.submit(_fetch_bioportal_parent, base_uri, apikey, ont, iri)
+                       for ont, iri in zip(onts, iris)]
+        child_futs  = [ex.submit(_fetch_bioportal_children, base_uri, apikey, ont, iri)
+                       for ont, iri in zip(onts, iris)]
+        for m, pfut, cfut in zip(matches, parent_futs, child_futs):
+            try:
+                parent_str, parent_uri = pfut.result()
+                if parent_str:
+                    m["parent"] = parent_str
+                    m["parent_uri"] = parent_uri
+            except Exception:
+                pass
+            try:
+                m["children"] = cfut.result()
+            except Exception:
+                m["children"] = []
+
+    matches.sort(key=lambda m: (-m["score"], str(m["id"]).lower()))
+    return matches
+
+
+_OLS4_URI_MARKERS = ("ols4", "ebi.ac.uk/ols")
+
+
+def _search_apis(queries, apis, top_n=10, ai_mode=False):
+    """Search configured REST APIs (OLS4, BioPortal) for each query.
+
+    Returns a list parallel to queries: [{query, matches}, ...].
+    BioPortal: detected by presence of apikey in rest config.
+    OLS4: detected by uri containing 'ols4'/'ebi.ac.uk/ols', or no uri (uses default).
+    Other REST endpoints (e.g. agrovoc browse API) are skipped — use sparql type for those.
+    When ai_mode=True, OLS4 requests use the llama-embed-nemotron embedding model.
+    """
+    results = [{"query": q, "matches": []} for q in queries]
+    for api_name, api_conf in (apis or {}).items():
+        rest_conf = ((api_conf or {}).get("type") or {}).get("rest") or {}
+        if not rest_conf:
+            continue
+        apikey = rest_conf.get("apikey") or ""
+        uri = rest_conf.get("uri") or ""
+        is_bioportal = bool(apikey)
+        is_ols4 = not is_bioportal and (not uri or any(m in uri for m in _OLS4_URI_MARKERS))
+        if not is_bioportal and not is_ols4:
+            continue  # non-OLS4, non-BioPortal REST endpoint — skip for search
+        for i, query in enumerate(queries):
+            if is_bioportal:
+                api_matches = _search_bioportal(query, api_conf, api_name, top_n)
+            else:
+                api_matches = _search_ols4(query, api_conf, api_name, top_n, ai_mode=ai_mode)
+            results[i]["matches"].extend(api_matches)
+    return results
+
+
 def generate_enum_report(yaml_file, tsv=False, output=sys.stdout, header=None):
     """Generate a report of enum keys, titles, source_domain, and source_schema.
 
@@ -1513,6 +2519,18 @@ def main():
     parser.add_argument("-t", "--tabformat", action="store_true", help="Output report as tab-delimited TSV (default is space-padded columns)")
     parser.add_argument("-i", "--input", metavar="CONFIG_FILE", default=None, help="Path to the configuration file (default: harvester_config.yaml)")
     parser.add_argument("--free_text", metavar="TEXT", default=None, help="Free text describing a picklist to extract via Claude API (used with -a; requires ANTHROPIC_API_KEY)")
+    parser.add_argument("--search", metavar="TEXT", default=None,
+        help=(
+            "Search configured sources for matching terms.  Accepts free text, "
+            "'term:description' structured pairs, or ';'/newline-separated batches of either.  "
+            "Searches enum names/titles/descriptions and permissible value codes/titles/descriptions "
+            "in all sources/*.yaml files.  Use --format to control output format."
+        ))
+    parser.add_argument("--format", dest="output_format",
+                        choices=["text", "tsv", "markdown"], default="text",
+                        help="Output format for --search results: text (default), tsv, or markdown.")
+    parser.add_argument("--ai", action="store_true",
+        help="Use Claude AI to semantically rank search results and synthesize missing definitions (requires ANTHROPIC_API_KEY; reserved for future implementation).")
     args = parser.parse_args()
 
     config_file = args.input if args.input else MENU_CONFIG
@@ -1738,8 +2756,33 @@ def main():
             title = source.get("title") or ""
             header = f"{name}: {title}" if title else name
             generate_enum_report(source_path, tsv=args.tabformat, header=header)
-    if not any([args.add, args.build is not None, args.delete, args.fetch is not None, args.config is not None, args.sssom is not None, args.report]):
-        print("No action taken. Use -a to add sources, -b to build schema.yaml, -c to update harvester_config.yaml, -d to delete sources, -f to fetch sources, -r to report on all sources, or -s to apply SSSOM mappings.")
+    if args.search:
+        top_n = 10
+        queries = _parse_search_queries(args.search)
+        results = _fts5_search_local(queries, config_file=config_file)
+        with open(config_file) as _f:
+            _cfg = yaml.safe_load(_f) or {}
+        apis = _cfg.get("apis") or {}
+        if apis:
+            api_results = _search_apis(queries, apis, top_n, ai_mode=args.ai)
+            for local_r, api_r in zip(results, api_results):
+                local_r["matches"] = local_r["matches"] + api_r["matches"]
+        for r in results:
+            deduped = _dedup_matches_by_id(r["matches"])
+            deduped.sort(key=lambda m: (-m["score"], m["type"] != "enum", str(m["id"]).lower()))
+            r["matches"] = deduped[:top_n]
+        if args.ai:
+            results = _ai_rescore(results)
+            for r in results:
+                r["matches"].sort(key=lambda m: (-m["score"], m["type"] != "enum",
+                                                 str(m["id"]).lower()))
+        fmt = args.output_format
+        if args.tabformat and fmt == "text":
+            fmt = "tsv"
+        print(_format_search_report(results, fmt=fmt))
+    if not any([args.add, args.build is not None, args.delete, args.fetch is not None,
+                args.config is not None, args.sssom is not None, args.report, args.search]):
+        print("No action taken. Use -a to add sources, -b to build schema.yaml, -c to update harvester_config.yaml, -d to delete sources, -f to fetch sources, -r to report on all sources, -s to apply SSSOM mappings, or --search to search sources.")
 
 
 if __name__ == "__main__":

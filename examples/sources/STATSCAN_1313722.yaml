@@ -6,7 +6,7 @@ version: null
 license: ''
 in_language: en
 imports:
-  - 'linkml:types'
+  - linkml:types
 prefixes:
   statscan: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=
 default_prefix: ''
