@@ -70,8 +70,8 @@ sources:
     content_type: CRediT
     file_format: pdf
     reachable_from:
-      source_ontology: https://zenodo.org/records/18421449/files/CRediT%20roles%20and%20example%20research%20tasks%20that%20could%20be%20attributed%20to%20them.pdf?download=1
-    download_date: '2026-06-08'
+      source_ontology: https://zenodo.org/records/18421449
+    download_date: '2026-06-11'
     description: The Contributor Roles Taxonomy (CRediT) is a high-level taxonomy
       representing the 14 roles typically played by contributors to scientific scholarly
       output. Each role describes a specific contribution to the scholarly output.
@@ -84,7 +84,7 @@ sources:
     file_format: json
     reachable_from:
       source_ontology: https://www.iso.org/obp/ui/#iso:code:3166:CA
-    download_date: '2026-06-09'
+    download_date: '2026-06-11'
     prefixes:
       iso: https://www.iso.org/iso-3166-country-codes/
       wd: http://www.wikidata.org/entity/
@@ -95,10 +95,12 @@ sources:
     content_type: FreeText
     file_format: yaml
     reachable_from:
-      source_ontology: https://link.springer.com/article/10.1186/s12870-025-07322-y
-    download_date: '2026-06-08'
-    description: "A visual estimation of lodging before harvest using a scale of 1\u2013\
-      9."
+      source_ontology: https://link.springer.com/article/10.1186/s12870-025-07322-y#text=A
+        visual estimation of lodging before
+    download_date: '2026-06-11'
+    description: A visual estimation of lodging before harvest using a scale of 1
+      - 9.
+    section_format: 2
   NRCSSoilFieldBook:
     title: NRCS Field Book for Describing and Sampling Soils Ver. 4
     name: NRCSSoilFieldBook
@@ -119,23 +121,25 @@ sources:
     file_format: html
     reachable_from:
       source_ontology: https://sis.agr.gc.ca/cansis/nsdb/soil/v2/snt/index.html
-    download_date: '2026-06-08'
+    download_date: '2026-06-11'
     include:
       concepts:
         - NSDB_DRAINAGE
         - NSDB_PMCHEM1
         - NSDB_PMTEX1
         - NSDB_WATERTBL
-  SoilSalinityClass:
-    title: Soil Salinity Class
-    name: SoilSalinityClass
-    version: null
+  SoilSalinity:
+    title: Soil Salinity Classification
+    name: SoilSalinity
+    version: '1988'
     content_type: FreeText
-    file_format: yaml
+    file_format: html
     reachable_from:
-      source_ontology: https://www.undrr.org/understanding-disaster-risk/terminology/hips/en0303
-    download_date: '2026-06-08'
-    description: Soil salinity class
+      source_ontology: https://www.undrr.org/understanding-disaster-risk/terminology/hips/en0303#text=Soil
+        salinity and sodicity classes and crop growth
+    download_date: '2026-06-11'
+    description: soil salinity
+    section_format: 2
   SoilStructuralShape:
     title: Soil Structural Shape
     name: SoilStructuralShape
@@ -154,7 +158,7 @@ sources:
     file_format: yaml
     reachable_from:
       source_ontology: https://raw.githubusercontent.com/linkml/valuesets/main/src/valuesets/schema/computing/maturity_levels.yaml
-    download_date: '2026-06-09'
+    download_date: '2026-06-11'
     include:
       concepts:
         - StandardsMaturityLevel
@@ -163,10 +167,10 @@ sources:
     name: STATSCAN_1313722
     version: null
     content_type: STATSCAN
-    file_format: html
+    file_format: zip
     reachable_from:
       source_ontology: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1313722
-    download_date: '2026-06-08'
+    download_date: '2026-06-11'
   valuesets_merged_hierarchy:
     title: Merged Value Sets with Hierarchical Structure
     name: valuesets_merged_hierarchy
@@ -175,7 +179,7 @@ sources:
     file_format: yaml
     reachable_from:
       source_ontology: https://raw.githubusercontent.com/linkml/valuesets/refs/heads/main/src/valuesets/merged/merged_hierarchy.yaml
-    download_date: '2026-06-09'
+    download_date: '2026-06-11'
     include:
       concepts:
         - GenderIdentity
