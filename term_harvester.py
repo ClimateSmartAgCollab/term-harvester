@@ -291,6 +291,7 @@ from source_nasis import (
 )
 from source_credit import (
     process_credit_source,
+    fetch_credit_source,
     match_credit,
 )
 from source_freetext import (
@@ -1161,8 +1162,13 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
         _url_base = url.split("?")[0].rstrip("/").split("/")[-1]
         _ext = _url_base.rsplit(".", 1)[1].lower() if "." in _url_base else ""
         if _ext != "json":
-            print(f"  Skipping {url}: unrecognised file extension '{_ext or '(none)'}'"
+            _ext_disp = _ext or "(none)"
+            print(f"  Skipping {url}", file=sys.stderr)
+            print(f"  REASON: unrecognised file extension '{_ext_disp}'"
                   " — expected .json, .yaml, or .yml", file=sys.stderr)
+            if not _ext:
+                print(f"  Tip: if this is a web page you want Claude to extract"
+                      f" terms from, add --free_text 'topic'", file=sys.stderr)
             os.unlink(tmp_path)
             continue
 
@@ -1384,6 +1390,31 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
         pass
     else:
         _rebuild_fts_index(config_file)
+
+    _report_missing_yamls(config_file)
+
+
+# Content types whose yaml is generated via -c (API fetch), not -f (file download).
+_REGEN_C_TYPES = {"OntologyAPI", "AGROVOC"}
+
+
+def _report_missing_yamls(config_file):
+    """Print all config sources that have no sources/{key}.yaml, with regen command."""
+    try:
+        with open(config_file) as f:
+            all_sources = (yaml.safe_load(f) or {}).get("sources", {})
+    except Exception:
+        return
+    missing = [
+        (k, "-c" if v.get("content_type") in _REGEN_C_TYPES else "-f")
+        for k, v in all_sources.items()
+        if not os.path.exists(f"sources/{k}.yaml")
+    ]
+    if not missing:
+        return
+    print("\nMissing sources yaml — run to regenerate:")
+    for key, flag in missing:
+        print(f"  {flag} {key}")
 
 
 def expand_reachable_from(yaml_path, enum_filter=None, apis=None, locales=None):
@@ -3023,6 +3054,13 @@ def main():
         for key in config_keys:
             del config["sources"][key]
             print(f"Deleted source '{key}' from {config_file}")
+            # Remove all sources/ files associated with this key
+            _source_exts = ("yaml", "zip", "html", "htm", "pdf", "json", "csv", "txt")
+            for _ext in _source_exts:
+                _p = f"sources/{key}.{_ext}"
+                if os.path.exists(_p):
+                    os.remove(_p)
+                    print(f"  Deleted {_p}")
         if config_keys:
             write_config(config, config_file)
 
@@ -3100,27 +3138,35 @@ def main():
                     _nrcs_pdf_fetched = True
                 else:
                     print(f"  Skipping {key}: NRCSSoilFieldBook PDF already downloaded this run")
+                process_nrcs_source(key, source, locales=locales_cfg)
                 continue
             # STATSCAN: multi-page crawl — build sources/{key}.zip.
             if content_type == "STATSCAN":
                 fetch_statscan_source(key, source, config_file, locales=locales_cfg)
+                process_statscan_source(key, source, config_file, locales=locales_cfg)
                 continue
             # ISO_COUNTRY: source_ontology is a Vaadin SPA URL; fetch Wikipedia instead.
             if content_type == "ISO_COUNTRY":
                 fetch_iso_country_source(key, source, config_file)
+                process_iso_country_source(key, source, config_file, locales=locales_cfg)
                 continue
             # NSDB sources: multi-page crawl — build sources/{key}.zip, not a single HTML.
             if content_type in ("NSDBSNT", "NSDBSLT", "NSDBSLC"):
                 fetch_nsdb_html_source(key, source, config_file, locales=locales_cfg)
+                _enum_prefix = "NSDBSLC" if content_type == "NSDBSLC" else "NSDB"
+                process_nsdb_html_source(key, source, enum_prefix=_enum_prefix, locales=locales_cfg)
                 continue
             if content_type == "NSDB":
                 fetch_nsdb_source(key, source, config_file, locales=locales_cfg)
+                process_nsdb_source(key, source, locales=locales_cfg)
                 continue
-            # AgriFoodCA directory sources (file_format: yaml) are built from
-            # multiple CSVs fetched via the GitHub API — raw urlretrieve would
-            # download the GitHub tree HTML page instead.
+            # AgriFoodCA directory sources: refetch_agrifood_dir already writes sources/{key}.yaml.
             if content_type == "AgriFoodCA" and source.get("file_format") == "yaml":
                 refetch_agrifood_dir(key, source, locales=locales_cfg)
+                continue
+            # CRediT: Zenodo direct download returns 403; use API content endpoint instead.
+            if content_type == "CRediT":
+                fetch_credit_source(key, source, config_file)
                 continue
             uri = (source.get("reachable_from") or {}).get("source_ontology")
             if not uri:
@@ -3137,14 +3183,14 @@ def main():
                     with open(tmp_path, "wb") as tmp_f:
                         tmp_f.write(response.read())
             except Exception as e:
-                print(f"  Error fetching {uri}: {e} — keeping existing {output_path}",
-                      file=sys.stderr)
+                _keep = f" — keeping existing {output_path}" if os.path.exists(output_path) else ""
+                print(f"  Error fetching {uri}: {e}{_keep}", file=sys.stderr)
                 os.unlink(tmp_path)
                 continue
             new_size = os.path.getsize(tmp_path)
             if new_size == 0:
-                print(f"  Error: downloaded file is empty — keeping existing {output_path}",
-                      file=sys.stderr)
+                _keep = f" — keeping existing {output_path}" if os.path.exists(output_path) else ""
+                print(f"  Error: downloaded file is empty{_keep}", file=sys.stderr)
                 os.unlink(tmp_path)
                 continue
             if os.path.exists(output_path):
@@ -3161,9 +3207,9 @@ def main():
             content_type = source.get("content_type", "")
             if content_type in ("LOINCCodeSystem", "LOINCValueSet"):
                 fill_loinc_source_metadata(output_path, key, config_file)
-            else:
-                if file_format == "yaml":
-                    generate_enum_report(output_path, tsv=args.tabformat)
+            process_sources([key], config_file)
+        # Report all config sources still missing a yaml (not just those fetched this run).
+        _report_missing_yamls(config_file)
     if args.config is not None:
         process_sources(args.config, config_file, debug=getattr(args, "debug", False))
     if args.build is not None:
