@@ -23,6 +23,7 @@ import yaml
 from source_utils import (
     MENU_CONFIG,
     IndentedDumper,
+    log_extraction,
     make_config_schema,
     make_source_entry,
     write_config,
@@ -419,7 +420,7 @@ def process_skos_source(key, source, config_file=MENU_CONFIG, locales=None):
     with open(yaml_path, "w") as _yf:
         yaml.dump(schema, _yf, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
 
-    print(f"  {key}: wrote {len(permissible_values)} permissible values to {yaml_path}")
+    log_extraction(key, count=len(permissible_values))
 
 
 def match_snomed(url, config_file=MENU_CONFIG):

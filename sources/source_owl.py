@@ -17,6 +17,7 @@ from source_utils import (
     MENU_CONFIG,
     IndentedDumper,
     sort_prefixes,
+    log_extraction,
     make_config_schema,
     add_permissible_value,
     make_source_entry,
@@ -315,7 +316,7 @@ def process_owl_source(key, source, config_file=MENU_CONFIG):
 
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
-    print(f"Updated {yaml_path} ({n} classes)")
+    log_extraction(key, count=n)
 
 
 def match_owl(url, tmp_path, config_file=MENU_CONFIG, process_fn=None):

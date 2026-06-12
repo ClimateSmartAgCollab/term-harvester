@@ -63,6 +63,7 @@ from source_utils import (
     strip_tags,
     fetch_html,
     add_permissible_value,
+    log_extraction,
     make_config_schema,
     _make_locale_extensions,
     IndentedDumper,
@@ -573,8 +574,8 @@ def process_statscan_source(key, source, config_file=None, locales=None):
     yaml_path = f"sources/{key}.yaml"
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
-    print(f"Updated {yaml_path}"
-          + (f" ({len(fr_permissible_values)} French translations)" if fr_permissible_values else ""))
+    log_extraction(key, count=len(permissible_values),
+                   lang_counts={"fr": len(fr_permissible_values)} if fr_permissible_values else None)
 
 
 # ---------------------------------------------------------------------------

@@ -4,25 +4,29 @@ Parses the CRediT roles PDF to produce one permissible value per contributor
 role, with definition text and a meaning URI pointing to credit.niso.org.
 
 Public API used by term_harvester.py:
+    fetch_credit_source(key, source, config_file)
     process_credit_source(key, source, locales=None)
     match_credit(url, config_file)
 """
 
+import datetime
 import os
 import re
-import subprocess
 import sys
 import urllib.parse
 import yaml
 
 from source_utils import (
+    MENU_CONFIG,
+    IndentedDumper,
     add_permissible_value,
+    log_extraction,
     make_config_schema,
     make_source_entry,
+    update_source_config,
     write_config,
-    IndentedDumper,
-    MENU_CONFIG,
 )
+from source_zenodo import fetch_zenodo_file, is_zenodo_record_url, to_zenodo_api_url
 
 _ROLE_NAMES = [
     "Conceptualization",
@@ -154,24 +158,69 @@ def process_credit_source(key, source, locales=None):
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper,
                   default_flow_style=False, sort_keys=False)
-    print(f"Updated {yaml_path} ({len(permissible_values)} roles)")
+    log_extraction(key, count=len(permissible_values))
 
 
-_ZENODO_PAT = re.compile(
-    r'zenodo\.org/records/\d+/files/.*credit.*\.pdf',
+# Matches bare Zenodo record URLs and file URLs containing "credit" and ".pdf".
+# Both forms are accepted by match_credit; the API record URL is stored in config.
+_ZENODO_CREDIT_RE = re.compile(
+    r'zenodo\.org/(?:api/)?records/(\d+)'
+    r'(?:/files/[^?]*credit[^?]*\.pdf)?',
     re.IGNORECASE,
 )
 
 
-def match_credit(url, config_file=MENU_CONFIG):
-    """Return True if *url* is the CRediT Zenodo PDF and was handled.
+def fetch_credit_source(key, source, config_file=MENU_CONFIG):
+    """Re-download the CRediT PDF from Zenodo via the record API.
 
-    Pre-download detector: downloads the PDF via curl (handles redirects),
-    writes the config entry with see_also pointing to https://credit.niso.org/,
-    and calls process_credit_source to generate sources/CRediT.yaml.
+    Called by -f CRediT.  Uses fetch_zenodo_file() which queries the
+    /api/records/{id} endpoint for the file list and downloads via the
+    file's self link — no browser headers, which Zenodo CDN blocks (403).
+    """
+    url = (source.get("reachable_from") or {}).get("source_ontology", "")
+    if not url:
+        print(f"  Skipping {key}: no source_ontology URL.", file=sys.stderr)
+        return
+    pdf_path = f"sources/{key}.pdf"
+    try:
+        data, _, _ = fetch_zenodo_file(url, file_format="pdf")
+    except Exception as e:
+        keep = f" — keeping existing {pdf_path}" if os.path.exists(pdf_path) else ""
+        print(f"  Error: {e}{keep}", file=sys.stderr)
+        return
+    if not data.startswith(b'%PDF-'):
+        print("  Error: downloaded file is not a PDF — check Zenodo record access.",
+              file=sys.stderr)
+        return
+    with open(pdf_path, "wb") as f:
+        f.write(data)
+    print(f"Saved to {pdf_path}")
+    update_source_config(
+        key, {"download_date": datetime.date.today().isoformat()}, config_file
+    )
+    process_credit_source(key, source)
+
+
+def match_credit(url, config_file=MENU_CONFIG):
+    """Return True if *url* is a Zenodo CRediT record or file URL and was handled.
+
+    Accepts:
+        https://zenodo.org/records/18421449
+        https://zenodo.org/api/records/18421449
+        https://zenodo.org/records/18421449/files/CRediT%20...pdf?download=1
+
+    The Zenodo API record URL (https://zenodo.org/api/records/{id}) is stored
+    in source_ontology so future -f fetches use the record API rather than
+    the direct file URL (which Zenodo CDN blocks for scripted clients).
     """
     decoded = urllib.parse.unquote(url)
-    if not _ZENODO_PAT.search(decoded):
+    m = _ZENODO_CREDIT_RE.search(decoded)
+    if not m:
+        return False
+
+    # For bare record URLs (no /files/ path) require "credit" to appear
+    # in the URL itself so we don't accidentally claim unrelated Zenodo records.
+    if '/files/' not in decoded.lower() and 'credit' not in decoded.lower():
         return False
 
     key = "CRediT"
@@ -183,31 +232,24 @@ def match_credit(url, config_file=MENU_CONFIG):
               file=sys.stderr)
         return True
 
+    # Always store the clean API record URL rather than the file/download URL.
+    record_api_url = to_zenodo_api_url(url)
     pdf_path = f"sources/{key}.pdf"
-    print(f"Fetching {url} ...")
-    result = subprocess.run(
-        ["curl", "-L", "--silent", "--show-error", "-o", pdf_path, url],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        print(f"  Error downloading PDF: {result.stderr.strip()}", file=sys.stderr)
+    try:
+        data, _, _ = fetch_zenodo_file(record_api_url, file_format="pdf")
+    except Exception as e:
+        print(f"  Error: {e}", file=sys.stderr)
         return True
-
-    with open(pdf_path, 'rb') as fh:
-        first_bytes = fh.read(205)
-    if not first_bytes.startswith(b'%PDF-'):
-        preview = first_bytes[:200].decode('utf-8', errors='replace').replace('\n', ' ')
-        print(
-            f"  Error: downloaded content is not a PDF.\n"
-            f"  First bytes: {preview[:120]!r}\n"
-            f"  Check {pdf_path} and verify the URL is still valid.",
-            file=sys.stderr,
-        )
+    if not data.startswith(b'%PDF-'):
+        print("  Error: downloaded file is not a PDF — check Zenodo record access.",
+              file=sys.stderr)
         return True
+    with open(pdf_path, "wb") as f:
+        f.write(data)
     print(f"Saved to {pdf_path}")
 
     entry = make_source_entry(
-        key, url, "CRediT", "pdf",
+        key, record_api_url, "CRediT", "pdf",
         title="CRediT Contributor Roles Taxonomy",
         version="2022",
         description=(

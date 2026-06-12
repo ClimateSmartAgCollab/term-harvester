@@ -40,6 +40,7 @@ from source_utils import (
     IndentedDumper,
     _make_locale_extensions,
     add_permissible_value,
+    log_extraction,
     make_config_schema,
     make_source_entry,
     update_source_config,
@@ -305,8 +306,8 @@ def process_iso_country_source(key, source, config_file=MENU_CONFIG, locales=Non
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
     n_fr = len(pv_fr)
-    print(f"Updated {yaml_path} ({len(pv_en)} subdivisions"
-          + (f", {n_fr} French translations" if n_fr else "") + ")")
+    log_extraction(enum_key, count=len(pv_en),
+                   lang_counts={"fr": n_fr} if n_fr else None)
 
 
 def match_iso_country(url, tmp_path, config_file=MENU_CONFIG):

@@ -26,6 +26,7 @@ import yaml
 
 from source_utils import (
     add_permissible_value,
+    log_extraction,
     make_config_schema,
     _make_locale_extensions,
     IndentedDumper,
@@ -370,9 +371,8 @@ def process_agrifood_source(key, source, config_file=None, locales=None):
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
 
     fr_count = len(permissible_values_fr)
-    print(f"Updated {yaml_path} ({len(permissible_values_en)} codes"
-          + (f", {fr_count} with French translations" if fr_count else "")
-          + ")")
+    log_extraction(key, count=len(permissible_values_en),
+                   lang_counts={"fr": fr_count} if fr_count else None)
 
 
 def _add_agrifood_from_csv(url, filename, csv_text, config_file, locales=None):
@@ -555,8 +555,12 @@ def refetch_agrifood_dir(key, source, locales=None):
             return
     with open(yaml_path, "w") as f:
         f.write(yaml_content)
-    print(f"Saved {len(results)} enums to {yaml_path}"
-          + (f" ({skipped} file(s) skipped)" if skipped else ""))
+    for enum_key, parsed in results:
+        fr_count = len(parsed['fr_permissible_values'])
+        log_extraction(enum_key, count=len(parsed['permissible_values']),
+                       lang_counts={"fr": fr_count} if fr_count else None)
+    if skipped:
+        print(f"  ({skipped} file(s) skipped)")
 
 
 def match_agrifood_csv(url, tmp_path, config_file=MENU_CONFIG):
@@ -731,7 +735,10 @@ def match_agrifood_dir(url, config_file=MENU_CONFIG):
     yaml_path = f"sources/{combined_key}.yaml"
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
-    print(f"Saved {len(results)} enums to {yaml_path}")
+    for enum_key, parsed in results:
+        fr_count = len(parsed['fr_permissible_values'])
+        log_extraction(enum_key, count=len(parsed['permissible_values']),
+                       lang_counts={"fr": fr_count} if fr_count else None)
 
     entry = make_source_entry(combined_key, url, "AgriFoodCA", "yaml",
                               title="AgriFoodCA Picklists",

@@ -17,6 +17,7 @@ import yaml
 
 from source_utils import (
     add_permissible_value,
+    log_extraction,
     IndentedDumper,
     make_config_schema,
     BROWSER_HEADERS,
@@ -491,7 +492,6 @@ def process_nrcs_source(key, source, locales=None):
             if len(pdf_pages) > 1
             else f"page {pdf_pages[0]}"
         )
-        print(f"  Extracting enum {enum_key} from PDF {page_label} ...", end="", flush=True)
         page_text = "\n".join(extract_page_text(pdf_path, p) for p in pdf_pages)
 
         if "description" in defn:
@@ -501,7 +501,7 @@ def process_nrcs_source(key, source, locales=None):
 
         rows = parser(page_text, defn)
         if not rows:
-            print(f" Warning: no table rows parsed", file=sys.stderr)
+            print(f"  Warning: no table rows parsed for {enum_key}", file=sys.stderr)
             continue
 
         permissible_values = {}
@@ -519,7 +519,7 @@ def process_nrcs_source(key, source, locales=None):
             "see_also":           see_also,
             "permissible_values": permissible_values,
         }
-        print(f" added ({len(permissible_values)} values)")
+        log_extraction(enum_key, doc_detail=f"PDF {page_label}", count=len(permissible_values))
 
     if _missing_parsers:
         print(f"  Warning: no parser(s) for: {', '.join(_missing_parsers)}", file=sys.stderr)

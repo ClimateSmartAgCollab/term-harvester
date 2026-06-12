@@ -786,7 +786,7 @@ grower's manual.
 
 ### How it works
 
-1. You supply a citation URL and the relevant text (inline or as a file).
+1. You supply a citation URL and enough relevant text (inline or as a file) to scope what you want converted from the source document.
 2. Claude reads the text and returns a JSON structure containing **one or more
    named enumerations** — one per distinct scale or classification found in the
    input.  Each enum has ordinal permissible values ordered from lowest/worst
@@ -947,7 +947,7 @@ See [Python code notes → API key setup](#api-key-setup) for instructions on se
 ## Term Search
 
 The `--search` option lets you find terms and enumerations across all sources
-that have been processed with `-c`, without loading `schema.yaml` or DataHarmonizer.
+that have been processed with `-c`, without needing the grand unified schema.yaml to be built.
 It is useful for exploring what controlled vocabulary is available before building
 a data specification, or for quickly verifying that a concept is covered.
 

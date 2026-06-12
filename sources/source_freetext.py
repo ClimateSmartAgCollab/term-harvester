@@ -71,7 +71,8 @@ The JSON must have this structure:
         {
           "code": "the code or identifier string",
           "title": "short label",
-          "description": "explanation of the value (omit key if not available)"
+          "description": "explanation of the value (omit key if not available)",
+          "is_intermediate": false
         }
       ]
     }
@@ -112,6 +113,13 @@ Rules:
   "Ver. 4 November 2024", "v1.0", "Edition 3", "Release 2.1". Extract just the
   core version identifier (e.g. "4", "2.1", "Ver. 4"). Return null if nothing
   plausible is found — do not guess.
+- INTERMEDIATES: When a numeric scale has only a few explicitly stated anchor
+  points (e.g. "1 = Erect, 9 = Prostrate") but implies all integer steps exist,
+  you may include the unstated intermediates. Mark each with "is_intermediate": true
+  and leave its "title" as "" — a second pass will generate "between X and Y"
+  labels. Explicitly stated values must have "is_intermediate": false. Only
+  generate intermediates for continuous numeric scales; never for categorical or
+  text-ordered lists.
 - Return only the JSON object, no surrounding text."""
 
 
@@ -190,6 +198,180 @@ def _call_claude(free_text):
         return None
 
 
+_INTERMEDIATE_LABEL_PROMPT = """\
+You are generating labels for intermediate values on a numeric rating scale.
+Return ONLY a JSON object — no markdown fences, no explanation.
+Map each intermediate code (as a string key) to a concise "between X and Y" label
+where X and Y are brief 1-3 word semantic rephrasing of the nearest stated anchor
+values immediately below and above the intermediate code."""
+
+
+def _pv_sort_key(code):
+    """Sort key for PV codes: numeric values first, then alphabetic."""
+    try:
+        return (0, float(code))
+    except (ValueError, TypeError):
+        return (1, str(code))
+
+
+def _label_intermediates(enums):
+    """Generate 'between X and Y' titles for is_intermediate PVs via a Haiku call.
+
+    For each enum containing PVs marked is_intermediate, sends the stated anchor
+    points and intermediate codes to Claude Haiku and fills in the returned labels.
+    Modifies enums in place.  Returns True if any labels were generated.
+    """
+    client = _get_anthropic_client()
+    if client is None:
+        return False
+
+    changed = False
+    for enum_def in enums:
+        pvs = enum_def.get("permissible_values", [])
+        inters = [pv for pv in pvs if pv.get("is_intermediate")]
+        stated = [pv for pv in pvs if not pv.get("is_intermediate")]
+        if not inters or not stated:
+            continue
+
+        sorted_pvs = sorted(pvs, key=lambda p: _pv_sort_key(p.get("code", "")))
+        anchor_lines = "\n".join(
+            f'  {p["code"]}: {p.get("title") or p["code"]}'
+            for p in sorted_pvs if not p.get("is_intermediate")
+        )
+        inter_codes = [str(p["code"]) for p in sorted(inters, key=lambda p: _pv_sort_key(p.get("code", "")))]
+        example_key = inter_codes[0]
+        user_msg = (
+            f'Scale: "{enum_def.get("title") or enum_def.get("key", "?")}"'
+            f"\nStated anchors:\n{anchor_lines}"
+            f"\nGenerate labels for these intermediate codes: {', '.join(inter_codes)}"
+            f'\nReturn JSON: {{"{example_key}": "between ... and ...", ...}}'
+        )
+
+        try:
+            import anthropic
+            resp = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=512,
+                system=_INTERMEDIATE_LABEL_PROMPT,
+                messages=[{"role": "user", "content": user_msg}],
+            )
+            raw = resp.content[0].text.strip()
+            labels = json.loads(raw)
+        except Exception as e:
+            print(f"  Warning: intermediate label generation failed for"
+                  f" {enum_def.get('key','?')}: {e}", file=sys.stderr)
+            continue
+
+        for pv in inters:
+            code = str(pv.get("code", ""))
+            if code in labels and labels[code]:
+                pv["title"] = labels[code]
+                changed = True
+
+    return changed
+
+
+def _md_cell(s):
+    """Escape pipe chars and collapse newlines for a markdown table cell."""
+    return str(s or "").replace("|", "\\|").replace("\n", " ").strip()
+
+
+def _write_temp_report(enums, key, url):
+    """Write temp.md and temp.tsv showing flat/separate/hierarchy views.
+
+    temp.md  — GitHub-Flavored Markdown tables; hierarchy uses &nbsp; indentation.
+    temp.tsv — tab-delimited; hierarchy uses two leading spaces in the label column.
+
+    Returns the markdown path written ("temp.md").
+    """
+    total = sum(len(e.get("permissible_values", [])) for e in enums)
+    multi = len(enums) > 1
+
+    def _md_table(rows, label_pad=0):
+        pad = "&nbsp;" * label_pad
+        lines = [f"| Code | Label{pad} | Description |",
+                 f"|------|-------{'---' * label_pad}|-------------|"]
+        for code, label, desc in rows:
+            lines.append(f"| `{_md_cell(code)}` | {_md_cell(label)} | {_md_cell(desc)} |")
+        return "\n".join(lines)
+
+    flat_rows = [
+        (pv.get("code", ""), pv.get("title", ""), pv.get("description", ""))
+        for e in enums for pv in e.get("permissible_values", [])
+    ]
+
+    # ---- Markdown ----
+    md = [f"# {key}: Extracted Enumerations\n"]
+    if url:
+        md.append(f"**Source:** {url}  \n")
+    md.append(f"**Extracted:** {len(enums)} section(s), {total} values\n")
+
+    if multi:
+        md.append(f"\n## Option 1 — Merge ({total} values merged)\n")
+    else:
+        md.append(f"\n## Values\n")
+    md.append(_md_table(flat_rows))
+
+    if multi:
+        md.append(f"\n\n## Option 2 — Separate Enums ({len(enums)} sections)\n")
+        for e in enums:
+            md.append(f"\n### {e.get('title') or e.get('key', 'Section')}\n")
+            rows = [(pv.get("code", ""), pv.get("title", ""), pv.get("description", ""))
+                    for pv in e.get("permissible_values", [])]
+            md.append(_md_table(rows))
+
+        md.append(f"\n\n## Option 3 — Hierarchy View\n")
+        md.append(
+            "One enumeration will be created with section items at top-level; "
+            "suitable for \"bag of terms\" multiple-selection into one field "
+            "with section items set to read-only menu items.\n"
+        )
+        hier_rows = []
+        for e in enums:
+            hdr = e.get("key") or re.sub(r'\W+', '', e.get("title", "Section"))
+            hier_rows.append((hdr, f"**{e.get('title') or hdr}**", e.get("description", "")))
+            for pv in e.get("permissible_values", []):
+                hier_rows.append((pv.get("code", ""),
+                                  f"&nbsp;&nbsp;{pv.get('title', '')}",
+                                  pv.get("description", "")))
+        md.append(_md_table(hier_rows, label_pad=15))
+
+    with open("temp.md", "w", encoding="utf-8") as f:
+        f.write("\n".join(md) + "\n")
+
+    # ---- TSV ----
+    tsv = [f"# {key} extracted enumerations"]
+    if url:
+        tsv.append(f"# Source: {url}")
+
+    if multi:
+        tsv += ["", "# Option 1: Merge", "Code\tLabel\tDescription"]
+        for code, label, desc in flat_rows:
+            tsv.append(f"{code}\t{label}\t{desc}")
+
+        tsv += ["", "# Option 2: Separate Enums"]
+        for e in enums:
+            tsv += [f"\n# Section: {e.get('title') or e.get('key', '')}", "Code\tLabel\tDescription"]
+            for pv in e.get("permissible_values", []):
+                tsv.append(f"{pv.get('code','')}\t{pv.get('title','')}\t{pv.get('description','')}")
+
+        tsv += ["", "# Option 3: Hierarchy", "Code\tLabel\tDescription"]
+        for e in enums:
+            hdr = e.get("key") or re.sub(r'\W+', '', e.get("title", "Section"))
+            tsv.append(f"{hdr}\t{e.get('title') or hdr}\t{e.get('description', '')}")
+            for pv in e.get("permissible_values", []):
+                tsv.append(f"{pv.get('code','')}\t  {pv.get('title','')}\t{pv.get('description','')}")
+    else:
+        tsv += ["", "Code\tLabel\tDescription"]
+        for code, label, desc in flat_rows:
+            tsv.append(f"{code}\t{label}\t{desc}")
+
+    with open("temp.tsv", "w", encoding="utf-8") as f:
+        f.write("\n".join(tsv) + "\n")
+
+    return "temp.md"
+
+
 def _apply_section_format(enums, merged_key, fmt):
     """Transform a multi-enum list into the requested section format silently.
 
@@ -249,31 +431,60 @@ def _detect_format_from_yaml(yaml_path):
     return None
 
 
-def _prompt_section_format(enums, merged_key):
+def _prompt_section_format(enums, merged_key, current_include=None):
     """Interactively ask how to structure a multi-section extraction.
 
     Called only when Claude returns more than one enum and no stored preference
-    is available.  Returns (transformed_enums, fmt_int) so the caller can
-    persist the choice.
+    is available.  Returns ``(transformed_enums, fmt_int, selected_keys)`` where
+    *selected_keys* is a list of enum keys to write to include.concepts (or None
+    meaning leave include.concepts unchanged).
     """
-    sections = [(e.get("title") or e.get("key", "?"), len(e.get("permissible_values", [])))
-                for e in enums]
-    total = sum(c for _, c in sections)
+    letters = [chr(ord('a') + i) for i in range(len(enums))]
+    total = sum(len(e.get("permissible_values", [])) for e in enums)
 
-    print(f"\n  Multi-section content detected — {len(enums)} sections, {total} values total:")
-    for title, count in sections:
-        print(f"    • {title!r}  ({count} values)")
-    print()
-    print(f"  [1] Flat      — one enum '{merged_key}' with all {total} values merged")
-    print(f"  [2] Separate  — {len(enums)} distinct enums, one per section  (default)")
+    # Step 1: enum subset selection
+    print(f"\n  Recognized potentially {len(enums)} enumerations, {total} choices total."
+          f"  Select which enumerations/choices should appear in output schema:")
+    for letter, e in zip(letters, enums):
+        title = e.get("title") or e.get("key", "?")
+        count = len(e.get("permissible_values", []))
+        ek = e.get("key", "")
+        marker = "  ✓" if current_include and ek in current_include else ""
+        print(f"    {letter}) {title!r}  ({count} values){marker}")
+    selected_keys = None
+    if current_include:
+        key_to_letter = {e.get("key", ""): l for e, l in zip(enums, letters)}
+        current_letters = [key_to_letter[k] for k in current_include if k in key_to_letter]
+        include_default = ",".join(current_letters) if current_letters else "unchanged"
+    else:
+        include_default = "all by default"
+    try:
+        raw = input(f"  Include [{include_default}]: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return enums, 2, None
+    if raw:
+        chosen_letters = [c.strip() for c in re.split(r'[,\s]+', raw) if c.strip()]
+        indices = [ord(c) - ord('a') for c in chosen_letters
+                   if len(c) == 1 and c.isalpha() and 0 <= ord(c) - ord('a') < len(enums)]
+        if not indices:
+            print("  Unrecognised selection — leaving include unchanged.")
+        else:
+            selected_keys = [enums[i].get("key") for i in sorted(set(indices))]
+
+    # Step 2: format selection
+    print(f"\n  Now, for the selected enumerations, choose whether to:")
+    print(f"  [1] Merge     — merge all {total} choices into 1 '{merged_key}' enum and ignore old enum names.")
+    print(f"  [2] Separate  — keep enumerations separate  (default)")
     print(f"  [3] Hierarchy — one enum '{merged_key}' with section headers as terms")
+    print(f"  (To preview each option, view temp.md or temp.tsv)")
 
     while True:
         try:
             choice = input("  Choice [2]: ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
-            return enums, 2
+            return enums, 2, selected_keys
         if not choice:
             choice = "2"
         if choice in ("1", "2", "3"):
@@ -281,7 +492,7 @@ def _prompt_section_format(enums, merged_key):
         print("  Enter 1, 2, or 3.")
 
     fmt = int(choice)
-    return _apply_section_format(enums, merged_key, fmt), fmt
+    return _apply_section_format(enums, merged_key, fmt), fmt, selected_keys
 
 
 def _build_schema(result, source_url, key, see_also=None, version=None):
@@ -309,6 +520,8 @@ def _build_schema(result, source_url, key, see_also=None, version=None):
                 title=pv.get("title") or None,
                 description=pv.get("description") or None,
             )
+            if pv.get("is_intermediate") and code in permissible_values:
+                permissible_values[code]["comments"] = ["intermediate"]
         entry = {
             "name":  enum_key,
             "title": enum_def.get("title", enum_key),
@@ -519,7 +732,14 @@ def _diff_report(old_yaml_path, new_schema):
             if ot != nt:
                 enum_lines.append(f"      ~ '{code}': {ot!r} → {nt!r}")
         n_old, n_new = len(old_pvs), len(new_pvs)
-        count_str = f"{n_old} values" if n_old == n_new else f"{n_old} → {n_new} values"
+        n_inter = sum(1 for pv in new_pvs.values()
+                      if "intermediate" in ((pv or {}).get("comments") or []))
+        if n_inter:
+            count_str = f"{n_new - n_inter} stated choices, {n_new} total including intermediates"
+        elif n_old == n_new:
+            count_str = f"{n_new} values"
+        else:
+            count_str = f"{n_old} → {n_new} values"
         if enum_lines:
             lines.append(f"  ~ {ek} ({count_str}):")
             lines.extend(enum_lines)
@@ -1027,22 +1247,58 @@ def process_freetext_source(key, source, config_file=MENU_CONFIG, locales=None, 
         print(f"  Detected version: {version!r}")
         update_source_config(key, {"version": version}, config_file)
 
-    if len(result.get("enums", [])) > 1:
+    enums_raw = result.get("enums", [])
+
+    # Generate "between X and Y" labels for any intermediate PVs before previewing
+    _has_intermediates = any(
+        pv.get("is_intermediate")
+        for e in enums_raw for pv in e.get("permissible_values", [])
+    )
+    if _has_intermediates:
+        print("  Generating labels for intermediate scale values ...")
+        _label_intermediates(enums_raw)
+
+    # Write temp.md + temp.tsv for the user to review before any prompt
+    _write_temp_report(enums_raw, key, url)
+    print("  Written temp.md and temp.tsv — review extracted content before confirming.")
+
+    current_include = (source.get("include") or {}).get("concepts") or None
+
+    if len(enums_raw) > 1:
         result = dict(result)
-        # Prefer stored config preference, fall back to detecting from existing YAML
         yaml_path_check = f"sources/{key}.yaml"
         stored_fmt = source.get("section_format") or _detect_format_from_yaml(yaml_path_check)
         if stored_fmt:
-            print(f"  Applying stored section format {stored_fmt}"
-                  f" ({'flat' if stored_fmt==1 else 'separate' if stored_fmt==2 else 'hierarchical'})"
-                  f" — delete section_format from config to reset.")
+            fmt_name = 'flat' if stored_fmt == 1 else 'separate' if stored_fmt == 2 else 'hierarchical'
+            msg = f"  Stored: format {stored_fmt} ({fmt_name})"
+            if stored_fmt == 2 and current_include:
+                enum_keys = [e.get("key") for e in enums_raw]
+                skipped = [ek for ek in enum_keys if ek not in current_include]
+                msg += f", including: {', '.join(current_include)}"
+                if skipped:
+                    msg += f" (skipping: {', '.join(skipped)})"
+            msg += f" — delete sources/{key}.yaml permissible_values to reprompt format question."
+            print(msg)
             result["enums"] = _apply_section_format(result["enums"], key, stored_fmt)
             _new_section_fmt = stored_fmt
         else:
-            result["enums"], _new_section_fmt = _prompt_section_format(result["enums"], key)
+            result["enums"], _new_section_fmt, _selected = _prompt_section_format(
+                result["enums"], key, current_include=current_include)
             update_source_config(key, {"section_format": _new_section_fmt}, config_file)
+            if _selected is not None:
+                update_source_config(key, {"include": {"concepts": _selected}}, config_file)
+                print(f"  Set include.concepts: {', '.join(_selected)}")
     else:
         _new_section_fmt = None
+        # Single enum — prompt even for flat list (new behaviour)
+        if not source.get("section_format"):
+            n_vals = len(enums_raw[0].get("permissible_values", [])) if enums_raw else 0
+            print(f"\n  Extracted 1 enum with {n_vals} values.")
+            try:
+                input("  Review temp.md, then press Enter to write YAML [Ctrl+C to abort]: ")
+            except (EOFError, KeyboardInterrupt):
+                print("\n  Aborted.")
+                return
 
     yaml_path = f"sources/{key}.yaml"
     see_also = url or None

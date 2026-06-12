@@ -53,6 +53,7 @@ from source_utils import (
     strip_tags,
     fetch_html,
     add_permissible_value,
+    log_extraction,
     _make_locale_extensions,
     IndentedDumper,
     make_config_schema,
@@ -469,7 +470,7 @@ def _build_nsdb_enum(attr_html, enum_prefix, require_qualifying=True):
 
 
 def _write_nsdb_yaml(schema, yaml_path, base_url, key, source, fr_enums_pvs, fr_description):
-    """Attach fr_locale extensions to *schema*, write YAML, and print a summary.
+    """Attach fr_locale extensions to *schema* and write YAML.
 
     If either *fr_enums_pvs* or *fr_description* is non-empty the function
     builds a ``extensions.locales.value.fr`` block and attaches it to *schema*
@@ -483,14 +484,6 @@ def _write_nsdb_yaml(schema, yaml_path, base_url, key, source, fr_enums_pvs, fr_
         )
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
-    fr_parts = []
-    if fr_description:
-        fr_parts.append("description")
-    if fr_enums_pvs:
-        n = sum(len(pvs) for pvs in fr_enums_pvs.values())
-        fr_parts.append(f"{len(fr_enums_pvs)} enums / {n} pvs")
-    print(f"Updated {yaml_path}"
-          + (f" (French: {', '.join(fr_parts)})" if fr_parts else ""))
 
 
 def _fetch_and_build_enums(attr_links, schema_enums, enum_prefix, indent="  ",
@@ -517,7 +510,7 @@ def _fetch_and_build_enums(attr_links, schema_enums, enum_prefix, indent="  ",
         attr_url_by_enum[enum_key] = attr_url
         en_count = len(enum_dict['permissible_values'])
 
-        lang_suffix = ""
+        lang_counts = {}
         if fetch_fr:
             try:
                 fr_attr_html = _html_get(nsdb_fr_url(attr_url), page_cache, indent=indent)
@@ -532,12 +525,12 @@ def _fetch_and_build_enums(attr_links, schema_enums, enum_prefix, indent="  ",
                                                   description=row['description'])
                 if fr_pvs:
                     fr_enums_pvs[enum_key] = fr_pvs
-                    lang_suffix = f" + fr({len(fr_pvs)})"
+                    lang_counts["fr"] = len(fr_pvs)
             except Exception as e:
                 print(f"{indent}Warning: French attr fetch failed for {enum_key}: {e}",
                       file=sys.stderr)
 
-        print(f"{indent}Extracting enum {enum_key} ({en_count} values){lang_suffix}")
+        log_extraction(enum_key, count=en_count, lang_counts=lang_counts or None, indent=indent)
     return attr_url_by_enum, fr_enums_pvs
 
 
@@ -695,7 +688,7 @@ def process_nsdb_html_source(key, source, enum_prefix, locales=None):
             schema["enums"][enum_key] = enum_dict
             schema["description"] = source.get("description") or enum_dict["description"]
 
-            lang_suffix = ""
+            lang_counts = {}
             if "fr" in (locales or ["en"]):
                 try:
                     fr_html = _html_get(nsdb_fr_url(base_url), page_cache)
@@ -710,10 +703,11 @@ def process_nsdb_html_source(key, source, enum_prefix, locales=None):
                                                       description=row['description'])
                     if fr_pvs:
                         fr_enums_pvs[enum_key] = fr_pvs
-                        lang_suffix = f" + fr({len(fr_pvs)})"
+                        lang_counts["fr"] = len(fr_pvs)
                 except Exception as e:
                     print(f"  Warning: French attr page failed: {e}", file=sys.stderr)
-            print(f"  Extracting enum {enum_key} ({len(enum_dict['permissible_values'])} values){lang_suffix}")
+            log_extraction(enum_key, count=len(enum_dict['permissible_values']),
+                           lang_counts=lang_counts or None)
 
     _write_nsdb_yaml(schema, yaml_path, base_url, key, source, fr_enums_pvs, fr_description)
 

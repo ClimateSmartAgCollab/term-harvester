@@ -25,6 +25,7 @@ from source_utils import (
     IndentedDumper,
     _make_locale_extensions,
     add_permissible_value,
+    log_extraction,
     fetch_html,
     make_config_schema,
     make_source_entry,
@@ -233,8 +234,8 @@ def process_statscan_table_source(key, source, config_file=MENU_CONFIG, locales=
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
     n_fr = len(pv_fr)
-    print(f"Updated {yaml_path} ({len(pv_en)} values"
-          + (f", {n_fr} French translations" if n_fr else "") + ")")
+    log_extraction(enum_key, count=len(pv_en),
+                   lang_counts={"fr": n_fr} if n_fr else None)
 
 
 def match_statscan_table(url, tmp_path, config_file=MENU_CONFIG):

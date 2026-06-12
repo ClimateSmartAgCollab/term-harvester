@@ -26,6 +26,7 @@ from source_utils import (
     strip_tags,
     fetch_html,
     add_permissible_value,
+    log_extraction,
     find_labeled_field,
     find_description_before_table,
     make_config_schema,
@@ -419,7 +420,7 @@ def process_loinc_table_source(key, source, config_file=MENU_CONFIG):
             enum_def["permissible_values"] = permissible_values
 
         schema["enums"][enum_key] = enum_def
-        print(f"    Added enum {enum_key} ({len(permissible_values)} values)")
+        log_extraction(enum_key, count=len(permissible_values), indent="    ")
 
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)

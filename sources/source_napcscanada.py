@@ -15,6 +15,7 @@ import sys
 import yaml
 from source_utils import (
     add_permissible_value,
+    log_extraction,
     make_config_schema,
     _make_locale_extensions,
     IndentedDumper,
@@ -162,9 +163,8 @@ def process_napcscanada_source(key, source, config_file=None, locales=None):
     yaml_path = f"sources/{key}.yaml"
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
-    print(f"Updated {yaml_path} ({len(permissible_values_en)} codes"
-          + (f", {len(permissible_values_fr)} with French translations" if permissible_values_fr else "")
-          + ")")
+    log_extraction(key, count=len(permissible_values_en),
+                   lang_counts={"fr": len(permissible_values_fr)} if permissible_values_fr else None)
 
 
 def match_napcs_csv(url, tmp_path, config_file=MENU_CONFIG, downloaded_filename=""):
