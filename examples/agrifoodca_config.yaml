@@ -148,7 +148,7 @@ sources:
     file_format: yaml
     reachable_from:
       source_ontology: https://iastate.pressbooks.pub/introsoilscience/chapter/soilstructure/
-    download_date: '2026-06-08'
+    download_date: '2026-06-11'
     description: Soil structural shape
   StandardsMaturityLevel:
     title: Standards Maturity Level

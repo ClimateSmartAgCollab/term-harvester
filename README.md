@@ -269,7 +269,7 @@ during `-c`) combined with optional API and AI scoring.  See
 | `STATSCAN` | URL from `statcan.gc.ca` containing `p3VD.pl` and `Function=getVD` |
 | `STATSCAN_TABLE` | URL from `www12.statcan.gc.ca/.../ref/dict/tab/index-eng.cfm?ID=` |
 | `ISO_COUNTRY` | URL from `iso.org/obp/ui/#iso:code:3166:` followed by a 2-letter country code |
-| `CRediT` | URL from `zenodo.org` matching a CRediT PDF filename pattern |
+| `CRediT` | URL from `zenodo.org/records/{id}` — bare record URL containing "credit", or a `/files/` path containing "credit" and ".pdf" |
 | `NAPCSCanada` | CSV content with NAPCS-specific column headers |
 | `AgriFoodCA` | GitHub directory URL for `agrifooddatacanada/picklists_for_schemas` (pre-download) |
 | `AgriFoodCA` | CSV first row matches `,title,description,keywords,source` (content-based) |
@@ -700,16 +700,33 @@ contributors to scholarly output (Conceptualization, Data Curation, Formal
 Analysis, …).  The source PDF is published on Zenodo.
 
 ```bash
-python term_harvester.py -a "https://zenodo.org/records/18421449/files/CRediT%20roles%20and%20example%20research%20tasks%20that%20could%20be%20attributed%20to%20them.pdf?download=1"
+python term_harvester.py -a "https://zenodo.org/records/18421449"
 ```
 
-The URL is detected as `CRediT` pre-download.  The PDF is saved to
-`sources/CRediT.pdf`, processed immediately via `pypdf`, and a
-`sources/CRediT.yaml` file is written in one step — no separate `-c` or `-b`
-call is required for the initial add.  Each permissible value carries a
-`meaning` URI pointing to the role's canonical page on `credit.niso.org`.
+Either the bare Zenodo record URL or the full file URL is accepted.  Detection
+happens before any download: the URL is matched against `zenodo.org/records/{id}`
+and must contain "credit" (bare record URL) or point to a `/files/` path
+containing "credit" and ".pdf".
 
-To rebuild from an already-downloaded PDF:
+The PDF is fetched via the **Zenodo REST API** (`/api/records/{id}`) rather than
+a direct download URL — Zenodo's CDN returns HTTP 403 for scripted clients on
+direct file links, but the API endpoint works without authentication.  The
+resolved API record URL (`https://zenodo.org/api/records/18421449`) is stored
+in `harvester_config.yaml` so subsequent `-f` fetches use the same method.
+
+The PDF is saved to `sources/CRediT.pdf`, processed immediately via `pypdf`, and
+`sources/CRediT.yaml` is written in one step — no separate `-c` or `-b` call is
+required for the initial add.  Each permissible value carries a `meaning` URI
+pointing to the role's canonical page on `credit.niso.org`.
+
+To re-fetch and rebuild from Zenodo:
+
+```bash
+python term_harvester.py -f CRediT
+python term_harvester.py -b
+```
+
+To rebuild from an already-downloaded PDF without re-fetching:
 
 ```bash
 python term_harvester.py -c CRediT
@@ -1355,5 +1372,6 @@ echo $ANTHROPIC_API_KEY
 | `source_iso_country.py` | `content_type: ISO_COUNTRY` — ISO 3166-2 country subdivision codes via Wikidata SPARQL (P297 for country name, P300 prefix filter for subdivisions); each PV carries its Wikidata QID as `meaning`; ISO OBP is a Vaadin SPA, not directly fetchable | [ISO OBP](https://www.iso.org/obp/ui/) |
 | `source_napcscanada.py` | NAPCS Canada CSV parsing | [CSV file](https://www.statcan.gc.ca/en/media/5274) |
 | `source_agrifoodca.py` | AgriFoodCA picklist CSV parsing and GitHub directory import | [CSV files](https://github.com/agrifooddatacanada/picklists_for_schemas/tree/main/picklists) |
-| `source_credit.py` | `content_type: CRediT` — CRediT contributor roles Zenodo PDF parsing | |
+| `source_zenodo.py` | Shared Zenodo REST API utilities: `is_zenodo_record_url`, `to_zenodo_api_url`, `fetch_zenodo_file` — used by `source_credit.py` | |
+| `source_credit.py` | `content_type: CRediT` — CRediT contributor roles; fetches PDF via Zenodo API, parses with `pypdf` | |
 | `source_freetext.py` | `content_type: FreeText` — Claude API enum extraction from free text | |
