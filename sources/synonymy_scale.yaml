@@ -1,0 +1,560 @@
+id: https://term-harvester.example.org/synonymy-scale
+name: SynonymyScale
+description: >-
+  Rating-scale synonym clusters for intermediate label generation in term_harvester.
+  Each enum is one semantic dimension ordered negative to positive. The permissible_value
+  key is the canonical (preferred) label; aliases on each PV are synonyms used for
+  dimension detection via case-insensitive substring matching against anchor labels.
+  Enum-level aliases are true thesaurus synonyms of the dimension name itself.
+  is_midpoint: "true" marks the neutral central position.
+  Users may extend this file with additional dimensions; updates here take effect
+  immediately without code changes.
+
+enums:
+
+  QualityPerformanceScale:
+    description: General quality or performance, from unsatisfactory to excellent.
+    aliases:
+      - quality
+      - performance
+      - rating
+      - grade
+      - standard
+    permissible_values:
+      Unsatisfactory:
+        description: Negative extreme
+        aliases:
+          - unacceptable
+          - poor quality
+          - inadequate
+          - deficient
+          - failing
+          - very poor
+          - very bad
+      Poor:
+        aliases:
+          - bad
+          - substandard
+          - below par
+          - weak
+      Fair:
+        aliases:
+          - below average
+          - mediocre
+          - passable
+          - marginal
+      Acceptable:
+        description: Neutral midpoint
+        annotations:
+          is_midpoint: "true"
+        aliases:
+          - adequate
+          - average
+          - satisfactory
+          - ok
+          - okay
+          - neutral
+          - sufficient
+      Good:
+        aliases:
+          - above average
+          - decent
+          - solid
+          - sound
+      Very Good:
+        aliases:
+          - great
+          - notable
+          - commendable
+          - impressive
+      Excellent:
+        description: Positive extreme
+        aliases:
+          - outstanding
+          - exceptional
+          - superb
+          - exemplary
+          - distinguished
+
+  SeverityScale:
+    description: Severity, damage, or intensity from absent/none to complete/total.
+    aliases:
+      - severity
+      - damage
+      - intensity
+      - impact
+      - affliction
+    permissible_values:
+      None:
+        description: Negative extreme — completely absent
+        aliases:
+          - absent
+          - zero
+          - nil
+          - not present
+          - no lodging
+          - no damage
+          - no occurrence
+      Trace:
+        aliases:
+          - negligible
+          - barely detectable
+          - incipient
+          - very slight
+      Slight:
+        aliases:
+          - minor
+          - minimal
+          - low
+          - light
+      Moderate:
+        description: Neutral midpoint
+        annotations:
+          is_midpoint: "true"
+        aliases:
+          - medium
+          - intermediate
+          - mid-level
+          - middling
+      Significant:
+        aliases:
+          - considerable
+          - notable
+          - marked
+          - substantial
+          - pronounced
+      Severe:
+        aliases:
+          - extreme
+          - heavy
+          - high
+          - intense
+          - serious
+          - acute
+      Complete:
+        description: Positive extreme
+        aliases:
+          - total
+          - absolute
+          - maximum
+          - full
+
+  FrequencyScale:
+    description: Frequency or occurrence from never to always.
+    aliases:
+      - frequency
+      - occurrence
+      - recurrence
+      - incidence
+      - prevalence
+    permissible_values:
+      Never:
+        description: Negative extreme
+        aliases:
+          - not at all
+          - zero occurrence
+          - absent
+      Rarely:
+        aliases:
+          - seldom
+          - infrequently
+          - occasionally
+          - almost never
+      Sometimes:
+        aliases:
+          - at times
+          - periodically
+          - intermittently
+          - now and then
+      Often:
+        description: Neutral midpoint
+        annotations:
+          is_midpoint: "true"
+        aliases:
+          - frequently
+          - regularly
+          - commonly
+      Usually:
+        aliases:
+          - mostly
+          - generally
+          - predominantly
+          - as a rule
+      Always:
+        description: Positive extreme
+        aliases:
+          - constantly
+          - invariably
+          - every time
+          - without exception
+
+  AgreementScale:
+    description: Likert agreement scale from strongly disagree to strongly agree.
+    aliases:
+      - agreement
+      - likert
+      - opinion
+      - consensus
+      - concurrence
+    permissible_values:
+      Strongly Disagree:
+        description: Negative extreme
+        aliases:
+          - completely disagree
+          - totally disagree
+          - strongly opposed
+      Disagree:
+        aliases:
+          - do not agree
+          - oppose
+          - not in agreement
+      Neutral:
+        description: Neutral midpoint
+        annotations:
+          is_midpoint: "true"
+        aliases:
+          - neither agree nor disagree
+          - no opinion
+          - undecided
+          - indifferent
+      Agree:
+        aliases:
+          - concur
+          - assent
+          - in agreement
+      Strongly Agree:
+        description: Positive extreme
+        aliases:
+          - completely agree
+          - fully agree
+          - endorse
+          - strongly support
+
+  SatisfactionScale:
+    description: Satisfaction from very dissatisfied to very satisfied.
+    aliases:
+      - satisfaction
+      - happiness
+      - contentment
+      - approval
+      - fulfilment
+    permissible_values:
+      Very Dissatisfied:
+        description: Negative extreme
+        aliases:
+          - highly dissatisfied
+          - very unhappy
+          - extremely dissatisfied
+      Dissatisfied:
+        aliases:
+          - unhappy
+          - displeased
+          - not satisfied
+      Neutral:
+        description: Neutral midpoint
+        annotations:
+          is_midpoint: "true"
+        aliases:
+          - neither satisfied nor dissatisfied
+          - indifferent
+          - no strong feeling
+      Satisfied:
+        aliases:
+          - pleased
+          - content
+          - happy
+      Very Satisfied:
+        description: Positive extreme
+        aliases:
+          - highly satisfied
+          - very pleased
+          - delighted
+          - extremely satisfied
+
+  AmountCoverageScale:
+    description: Amount, coverage, or extent from none to complete.
+    aliases:
+      - amount
+      - coverage
+      - extent
+      - quantity
+      - proportion
+    permissible_values:
+      None:
+        description: Negative extreme
+        aliases:
+          - absent
+          - zero
+          - no coverage
+          - empty
+      Sparse:
+        aliases:
+          - very low
+          - minimal
+          - scant
+          - slight coverage
+      Low:
+        aliases:
+          - limited
+          - small amount
+          - light
+          - low coverage
+      Moderate:
+        description: Neutral midpoint
+        annotations:
+          is_midpoint: "true"
+        aliases:
+          - medium
+          - partial
+          - intermediate
+          - mid-level coverage
+      High:
+        aliases:
+          - substantial
+          - heavy
+          - extensive
+          - considerable
+          - high coverage
+      Very High:
+        aliases:
+          - dense
+          - abundant
+          - near-complete
+          - very extensive
+      Complete:
+        description: Positive extreme
+        aliases:
+          - full
+          - total
+          - maximum
+          - full coverage
+
+  HealthVigorScale:
+    description: Health or vigor of a plant, animal, or organism, from dead to excellent.
+    aliases:
+      - health
+      - vigor
+      - vitality
+      - condition
+      - constitution
+    permissible_values:
+      Dead:
+        description: Negative extreme
+        aliases:
+          - dying
+          - collapsed
+          - failed
+          - necrotic
+      Poor:
+        aliases:
+          - very weak
+          - severely stressed
+          - severely affected
+          - very low vigor
+      Fair:
+        aliases:
+          - below normal
+          - stressed
+          - reduced vigor
+          - slightly affected
+      Acceptable:
+        description: Neutral midpoint
+        annotations:
+          is_midpoint: "true"
+        aliases:
+          - average
+          - normal
+          - adequate growth
+          - typical
+      Good:
+        aliases:
+          - healthy
+          - above normal
+          - robust
+          - good vigor
+      Very Good:
+        aliases:
+          - vigorous
+          - thriving
+          - strong
+          - high vigor
+      Excellent:
+        description: Positive extreme
+        aliases:
+          - exceptional vigor
+          - peak condition
+          - outstanding health
+
+  ProbabilityScale:
+    description: Probability or likelihood from impossible to certain.
+    aliases:
+      - probability
+      - likelihood
+      - risk
+      - chance
+      - odds
+    permissible_values:
+      Impossible:
+        description: Negative extreme
+        aliases:
+          - never
+          - no chance
+          - zero probability
+          - cannot occur
+      Unlikely:
+        aliases:
+          - improbable
+          - low probability
+          - rare
+          - infrequent
+      Possible:
+        aliases:
+          - may occur
+          - uncertain
+          - chance
+          - conceivable
+      Likely:
+        description: Neutral midpoint
+        annotations:
+          is_midpoint: "true"
+        aliases:
+          - probable
+          - expected
+          - anticipated
+          - plausible
+      Very Likely:
+        aliases:
+          - highly probable
+          - almost certain
+          - high probability
+      Certain:
+        description: Positive extreme
+        aliases:
+          - definite
+          - guaranteed
+          - always
+          - inevitable
+
+  SizeScale:
+    description: Size or magnitude from very small to very large.
+    aliases:
+      - size
+      - magnitude
+      - scale
+      - dimension
+      - bulk
+    permissible_values:
+      Very Small:
+        description: Negative extreme
+        aliases:
+          - tiny
+          - negligible
+          - minute
+          - microscopic
+      Small:
+        aliases:
+          - little
+          - low
+          - below average size
+      Medium:
+        description: Neutral midpoint
+        annotations:
+          is_midpoint: "true"
+        aliases:
+          - moderate
+          - average
+          - mid-sized
+          - intermediate
+      Large:
+        aliases:
+          - big
+          - high
+          - substantial
+          - above average size
+      Very Large:
+        description: Positive extreme
+        aliases:
+          - huge
+          - massive
+          - extreme
+          - enormous
+
+  SpeedRateScale:
+    description: Speed or rate from very slow to very fast.
+    aliases:
+      - speed
+      - rate
+      - pace
+      - velocity
+      - tempo
+    permissible_values:
+      Very Slow:
+        description: Negative extreme
+        aliases:
+          - sluggish
+          - extremely slow
+          - very low rate
+      Slow:
+        aliases:
+          - below average speed
+          - low rate
+          - gradual
+      Moderate:
+        description: Neutral midpoint
+        annotations:
+          is_midpoint: "true"
+        aliases:
+          - medium
+          - average
+          - intermediate speed
+      Fast:
+        aliases:
+          - quick
+          - rapid
+          - above average
+          - high rate
+      Very Fast:
+        description: Positive extreme
+        aliases:
+          - very rapid
+          - extremely fast
+          - maximum speed
+
+  PriorityScale:
+    description: Priority or importance from low to critical.
+    aliases:
+      - priority
+      - importance
+      - urgency
+      - rank
+      - precedence
+    permissible_values:
+      Low:
+        description: Negative extreme
+        aliases:
+          - minor
+          - unimportant
+          - low priority
+          - negligible priority
+      Medium:
+        description: Neutral midpoint
+        annotations:
+          is_midpoint: "true"
+        aliases:
+          - moderate
+          - normal
+          - standard priority
+          - average importance
+      High:
+        aliases:
+          - important
+          - elevated
+          - high priority
+          - significant priority
+      Critical:
+        description: Positive extreme
+        aliases:
+          - urgent
+          - essential
+          - top priority
+          - maximum priority
