@@ -23,6 +23,7 @@ import yaml
 from source_utils import (
     MENU_CONFIG,
     IndentedDumper,
+    get_api_key,
     log_extraction,
     make_config_schema,
     make_source_entry,
@@ -202,7 +203,7 @@ def _fetch_bioportal_graph(ontology, term_id, api_conf):
     """
     rest_conf = _get_type_conf(api_conf, "rest")
     base_uri = (rest_conf.get("uri") or "https://data.bioontology.org").rstrip("/")
-    apikey   = rest_conf.get("apikey") or ""
+    apikey   = get_api_key("BIOPORTAL_API_KEY", rest_conf.get("apikey"))
     inner_iri = f"http://purl.obolibrary.org/obo/{ontology}_{term_id}"
     encoded_iri = urllib.parse.quote(inner_iri, safe="")
 

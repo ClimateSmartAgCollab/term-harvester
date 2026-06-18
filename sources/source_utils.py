@@ -112,6 +112,11 @@ _TYPO_MAP = str.maketrans({
 })
 
 
+def get_api_key(env_var, config_value=None):
+    """Return API key from environment variable, falling back to config_value."""
+    return os.environ.get(env_var) or config_value or ""
+
+
 def normalize_text(s):
     """Replace typographic Unicode with plain ASCII equivalents.
 
