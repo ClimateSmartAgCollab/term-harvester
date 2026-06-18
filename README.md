@@ -270,6 +270,7 @@ during `-c`) combined with optional API and AI scoring.  See
 | `STATSCAN_TABLE` | URL from `www12.statcan.gc.ca/.../ref/dict/tab/index-eng.cfm?ID=` |
 | `ISO_COUNTRY` | URL from `iso.org/obp/ui/#iso:code:3166:` followed by a 2-letter country code |
 | `CRediT` | URL from `zenodo.org/records/{id}` — bare record URL containing "credit", or a `/files/` path containing "credit" and ".pdf" |
+| `LOC_CLASSIFICATION` | Exact URL `https://www.loc.gov/catdir/cpso/lcco/` |
 | `NAPCSCanada` | CSV content with NAPCS-specific column headers |
 | `AgriFoodCA` | GitHub directory URL for `agrifooddatacanada/picklists_for_schemas` (pre-download) |
 | `AgriFoodCA` | CSV first row matches `,title,description,keywords,source` (content-based) |
@@ -823,29 +824,56 @@ grower's manual.
 
 ### Input forms
 
+#### URL-only (no `--free_text`)
+
+When the `-a` URL points to an HTML page or a PDF, the file type is detected
+from the HTTP `Content-Type` response header — no `.html` or `.pdf` extension
+is required in the URL.  The document is fetched automatically and sent to Claude:
+
+```bash
+# HTML article — Content-Type: text/html detected from server response
+python term_harvester.py \
+  -a "https://link.springer.com/article/10.1186/s12870-025-07322-y#text=A visual estimation of lodging before harvest"
+
+# Same paper in PDF form — Content-Type: application/pdf
+python term_harvester.py \
+  -a "https://bmcplantbiol.biomedcentral.com/counter/pdf/10.1186/s12870-025-07322-y.pdf#text=A visual estimation of lodging before harvest"
+```
+
+The `#text=` anchor scopes the 10 000-character extraction window to the paragraph
+that begins with that phrase (starting 200 characters before the first match).
+The Springer article URL contains no file extension; content-type detection
+makes both forms work identically.
+
+#### With `--free_text`
+
+Supply extraction context directly as an inline string or local file:
+
 | Form | Example |
 |---|---|
-| Inline text | `--free_text "Scale of 1–9 where 9 = no lodging"` |
+| Inline description | `--free_text "Scale of 1–9 where 9 = no lodging"` |
 | Plain-text file | `--free_text methods.txt` |
 | PDF file | `--free_text /path/to/appendix.pdf` |
 
-Text extracted from files is capped at 10 000 characters before being sent to
-Claude.  For long documents the cap will silently discard the relevant section
-unless you anchor the extraction window using a URL fragment on the
-`source_ontology` URL.  Three anchor forms are supported:
+When `--free_text` is an inline string or local file path, the source URL is
+stored as a citation only — the document at that URL is **not** fetched.  A
+short topic string produces a plausible enum from Claude's training knowledge;
+a longer excerpt or file produces a grounded extraction.
+
+#### Anchoring the extraction window
+
+Text extracted from fetched documents is capped at 10 000 characters.  For long
+documents the cap will silently discard the relevant section unless you anchor
+the extraction window using a URL fragment:
 
 | Fragment | Works for | Effect |
 |---|---|---|
 | `#page=116` or `#page=116-118` | PDF | Extract only the specified page(s) |
-| `#element-id` (bare id, no `=`) | HTML | Start extraction from the element with that `id=` attribute |
-| `#text=Manner+of+Failure` | Any | Find the first occurrence of the phrase and start the 10 000-char window 200 chars before it |
+| `#element-id` (bare id, no `=`) | HTML | Start from the element with that `id=` attribute |
+| `#text=phrase` | Any | Find the first occurrence of the phrase; start the window 200 chars before it |
 
 When the document is truncated and no anchor is present, the tool prints a tip
 suggesting the appropriate form.
-
-**HTML page anchors** work the same way as browser `#fragment` links — the bare
-fragment (`#section-id`) is matched against `id="..."` attributes in the raw
-HTML.  Use `#text=` instead when the HTML has no suitable id attributes.
 
 For very long PDF field books or specification documents, `#page=N` is the most
 reliable anchor.  Use `#text=` when the relevant content spans multiple pages
@@ -886,24 +914,28 @@ valid identifier (letters, digits, underscores; start with a letter).  Entering
 a key that already exists in the config is rejected and you are re-prompted.
 This prevents `-a` from ever overwriting an existing source.
 
-> **Note:** Claude only receives the `--free_text` string during `-a` — the
-> source URL is stored as a citation but the document is not fetched or read.
-> A short topic string (e.g. `"soil aeration status"`) produces a plausible
-> enum drawn from Claude's training knowledge, not extracted from the source.
-> For extraction grounded in the actual document, run `-f [key]` then `-c [key]`
+> **Note:** When `--free_text` is an inline string, Claude receives only that
+> string — the URL is stored as a citation but the document at that URL is not
+> fetched.  A short topic string (e.g. `"soil aeration status"`) produces a
+> plausible enum from Claude's training knowledge rather than from the document.
+> For grounded extraction: either use URL-only mode (omit `--free_text` and let
+> content-type detection fetch the page), or run `-f [key]` then `-c [key]`
 > after the initial `-a`.
 
 ```bash
-# Step 1 — add the source (Claude runs immediately, writes sources/SoilAerationStatus.yaml)
+# URL-only: page fetched automatically, enum grounded in actual article text
+python term_harvester.py \
+  -a "https://link.springer.com/article/10.1186/s12870-025-07322-y#text=A visual estimation of lodging before harvest"
+
+# --free_text topic string: enum drawn from Claude's general knowledge, URL is citation only
 python term_harvester.py \
   -a "https://static.ixambee.com/public/miscellaneous-pdf/physical_and_chemical_properties_of_soil1720241418.pdf" \
   --free_text "soil aeration status"
 
-# Step 2 — build schema.yaml from the generated sources/SoilAerationStatus.yaml
 python term_harvester.py -b
 ```
 
-To ground the enum in the actual source document rather than Claude's general knowledge:
+To ground a `--free_text`-initiated source in the actual document:
 
 **Later, to keep a FreeText source up-to-date**, `-f` and `-c` have distinct,
 separated roles:
@@ -1374,4 +1406,5 @@ echo $ANTHROPIC_API_KEY
 | `source_agrifoodca.py` | AgriFoodCA picklist CSV parsing and GitHub directory import | [CSV files](https://github.com/agrifooddatacanada/picklists_for_schemas/tree/main/picklists) |
 | `source_zenodo.py` | Shared Zenodo REST API utilities: `is_zenodo_record_url`, `to_zenodo_api_url`, `fetch_zenodo_file` — used by `source_credit.py` | |
 | `source_credit.py` | `content_type: CRediT` — CRediT contributor roles; fetches PDF via Zenodo API, parses with `pypdf` | |
+| `source_loc_classification.py` | `content_type: LOC_CLASSIFICATION` — Library of Congress Classification; downloads HTML index + ~20 class PDFs; hierarchy via numeric range containment | [Index](https://www.loc.gov/catdir/cpso/lcco/) |
 | `source_freetext.py` | `content_type: FreeText` — Claude API enum extraction from free text | |
