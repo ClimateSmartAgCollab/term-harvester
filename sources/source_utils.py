@@ -156,7 +156,16 @@ def log_extraction(key, *, term_type="enum", doc_detail=None, count=None,
 
 
 def strip_tags(html):
-    """Remove all HTML tags from a string and return stripped plain text."""
+    """Remove all HTML tags from a string and return stripped plain text.
+
+    Entire subtrees for non-visible elements (script, style, svg, symbol,
+    noscript) are removed before tag-stripping so their inner content —
+    SVG path data, JavaScript, CSS, etc. — does not leak into the output.
+    """
+    html = re.sub(
+        r'<(script|style|svg|symbol|noscript)[^>]*>.*?</\1>',
+        ' ', html, flags=re.IGNORECASE | re.DOTALL,
+    )
     return re.sub(r'<[^>]+>', '', html).strip()
 
 
