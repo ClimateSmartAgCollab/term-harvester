@@ -250,6 +250,7 @@ from source_iso_country import (
     process_iso_country_source,
     fetch_iso_country_source,
     match_iso_country,
+    match_iso_country_all,
 )
 from source_loinc import (
     to_camel_case,
@@ -293,6 +294,11 @@ from source_credit import (
     process_credit_source,
     fetch_credit_source,
     match_credit,
+)
+from source_loc_classification import (
+    process_loc_source,
+    fetch_loc_source,
+    match_loc,
 )
 from source_freetext import (
     match_freetext,
@@ -968,8 +974,7 @@ def _fetch_to_file(url, dest_path, timeout=60):
     redirects, government CDNs) than Python's urllib.  Falls back to urllib
     if curl is not on PATH or exits non-zero.
 
-    Returns (success: bool, content_disposition: str).
-    content_disposition is only populated by the urllib path.
+    Returns (success: bool, content_disposition: str, content_type: str).
     """
     import shutil as _shutil, subprocess as _subprocess
     fetch_url = url.split("#")[0]
@@ -982,12 +987,13 @@ def _fetch_to_file(url, dest_path, timeout=60):
              "--connect-timeout", "15",
              "--silent", "--show-error", "--fail",
              "-A", "Mozilla/5.0 (compatible; term-harvester/1.0)",
+             "--write-out", "%{content_type}",
              "-o", dest_path,
              fetch_url],
             capture_output=True, text=True,
         )
         if result.returncode == 0 and os.path.getsize(dest_path) > 0:
-            return True, ""
+            return True, "", result.stdout.strip()
         if result.returncode != 0:
             print(f"  curl failed (exit {result.returncode})"
                   f" — falling back to urllib", file=sys.stderr)
@@ -998,11 +1004,12 @@ def _fetch_to_file(url, dest_path, timeout=60):
         req = urllib.request.Request(fetch_url, headers=BROWSER_HEADERS)
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             cd = resp.headers.get("Content-Disposition", "")
+            ct = resp.headers.get("Content-Type", "")
             with open(dest_path, "wb") as f:
                 f.write(resp.read())
-        return True, cd
+        return True, cd, ct
     except Exception as e:
-        return False, str(e)
+        return False, str(e), ""
 
 
 def add_source(urls, config_file=MENU_CONFIG, free_text=None):
@@ -1087,7 +1094,11 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
             continue
         if match_credit(url, config_file):
             continue
+        if match_loc(url, config_file):
+            continue
         if match_statscan_catalog(url, config_file):
+            continue
+        if match_iso_country_all(url, config_file):
             continue
 
         # Check if base URL already matches an existing source; skip download if so.
@@ -1123,7 +1134,7 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
         tmp_fd, tmp_path = tempfile.mkstemp()
         os.close(tmp_fd)
         downloaded_filename = ""
-        ok, cd_or_err = _fetch_to_file(url, tmp_path)
+        ok, cd_or_err, _http_ct = _fetch_to_file(url, tmp_path)
         if not ok:
             print(f"  Error fetching {url}: {cd_or_err}", file=sys.stderr)
             os.unlink(tmp_path)
@@ -1158,18 +1169,42 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
         if match_linkml(url, tmp_path, config_file, process_fn=process_sources):
             continue
 
-        # Remaining: JSON (LOINC)
+        # Remaining: JSON (LOINC) or document (→ FreeText)
         _url_base = url.split("?")[0].rstrip("/").split("/")[-1]
         _ext = _url_base.rsplit(".", 1)[1].lower() if "." in _url_base else ""
+        if not _ext and _http_ct:
+            # No file extension in URL — infer type from HTTP Content-Type header
+            _ct_base = _http_ct.lower().split(";")[0].strip()
+            _ext = {
+                "application/json": "json",
+                "application/pdf": "pdf",
+                "text/html": "html",
+                "text/plain": "txt",
+                "text/csv": "csv",
+            }.get(_ct_base, "")
+            if _ext:
+                print(f"  Content-Type: {_ct_base} — treating as .{_ext}")
         if _ext != "json":
-            _ext_disp = _ext or "(none)"
-            print(f"  Skipping {url}", file=sys.stderr)
-            print(f"  REASON: unrecognised file extension '{_ext_disp}'"
-                  " — expected .json, .yaml, or .yml", file=sys.stderr)
-            if not _ext:
-                print(f"  Tip: if this is a web page you want Claude to extract"
-                      f" terms from, add --free_text 'topic'", file=sys.stderr)
             os.unlink(tmp_path)
+            if not _ext or _ext in ("html", "htm", "pdf", "txt"):
+                # Web page or document — route to FreeText handler
+                try:
+                    with open(config_file) as _pf:
+                        _pre_keys = set((yaml.safe_load(_pf) or {}).get("sources", {}).keys())
+                except Exception:
+                    _pre_keys = set()
+                match_freetext(url, None, config_file)
+                try:
+                    with open(config_file) as _pf:
+                        _post_keys = set((yaml.safe_load(_pf) or {}).get("sources", {}).keys())
+                except Exception:
+                    _post_keys = set()
+                for _new_key in (_post_keys - _pre_keys):
+                    _upsert_source_in_index(_new_key)
+            else:
+                print(f"  Skipping {url}", file=sys.stderr)
+                print(f"  REASON: unrecognised file extension '{_ext}'"
+                      " — expected .json, .yaml, or .yml", file=sys.stderr)
             continue
 
         try:
@@ -1289,7 +1324,12 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
             continue
 
         if content_type == "ISO_COUNTRY":
-            if not _require_source_file(key, "html"): continue
+            _zip = f"sources/{key}.zip"
+            _html = f"sources/{key}.html"
+            if not os.path.exists(_zip) and not os.path.exists(_html):
+                print(f"Skipping {key}: no archive found — run '-f {key}' to fetch first",
+                      file=sys.stderr)
+                continue
             process_iso_country_source(key, source, config_file, locales=locales)
             continue
 
@@ -1373,6 +1413,10 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
 
         if content_type == "CRediT":
             process_credit_source(key, source, locales=locales)
+            continue
+
+        if content_type == "LOC_CLASSIFICATION":
+            process_loc_source(key, source, locales=locales)
             continue
 
         if content_type == "FreeText":
@@ -3167,6 +3211,9 @@ def main():
             # CRediT: Zenodo direct download returns 403; use API content endpoint instead.
             if content_type == "CRediT":
                 fetch_credit_source(key, source, config_file)
+                continue
+            if content_type == "LOC_CLASSIFICATION":
+                fetch_loc_source(key, source, config_file)
                 continue
             uri = (source.get("reachable_from") or {}).get("source_ontology")
             if not uri:
