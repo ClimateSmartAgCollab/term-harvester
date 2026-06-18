@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Transform schema.yaml into entry_code_picklists.json using a mapping/diff file.
 
-The mapping file (picklists_mapping.yaml) records structural differences between
+The mapping file (agrifoodca_mapping.yaml) records structural differences between
 the schema enum representation and the JSON picklist format:
   - enum key renames (schema key → JSON key)
   - per-PV code remaps (schema PV key → JSON Code)
@@ -13,16 +13,16 @@ agrifoodca_sssom.tsv (SSSOM format).  The schema's own locale extensions supply
 FR for enums it already knows; the SSSOM file covers the remainder.
 
 Usage:
-    python schema_to_picklists.py [--generate] [--build]
-        --generate   Write/refresh picklists_mapping.yaml and agrifoodca_sssom.tsv
+    python schema_to_picklists.py [--calibrate] [--build]
+        --calibrate  Write/refresh agrifoodca_mapping.yaml and agrifoodca_sssom.tsv
                      from schema.yaml + existing entry_code_picklists.json.
         --build      Produce entry_code_picklists.json from schema.yaml +
-                     picklists_mapping.yaml + agrifoodca_sssom.tsv (default).
+                     agrifoodca_mapping.yaml + agrifoodca_sssom.tsv (default).
 
 Files (all relative to this script's directory):
     schema.yaml                   input schema
     entry_code_picklists.json     reference / output JSON
-    picklists_mapping.yaml        generated diff/mapping config
+    agrifoodca_mapping.yaml       generated diff/mapping config
     agrifoodca_sssom.tsv          SSSOM FR translations not in schema.yaml
 
 NOTE: In the future we may move to have the schema.yaml AgriFoodCA_Picklists be
@@ -41,7 +41,7 @@ import yaml
 _DIR = os.path.dirname(os.path.abspath(__file__))
 _SCHEMA_PATH   = os.path.join(_DIR, "schema.yaml")
 _JSON_PATH     = os.path.join(_DIR, "entry_code_picklists.json")
-_MAPPING_PATH  = os.path.join(_DIR, "picklists_mapping.yaml")
+_MAPPING_PATH  = os.path.join(_DIR, "agrifoodca_mapping.yaml")
 _SSSOM_PATH    = os.path.join(_DIR, "agrifoodca_sssom.tsv")
 
 # ---------------------------------------------------------------------------
@@ -326,7 +326,7 @@ def generate_mapping():
     ordered = dict(sorted(mapping.items(), key=lambda kv: kv[1].get("id", 0)))
 
     header = (
-        "# picklists_mapping.yaml — diff/mapping from schema.yaml to entry_code_picklists.json\n"
+        "# agrifoodca_mapping.yaml — diff/mapping from schema.yaml to entry_code_picklists.json\n"
         "# Edit this file to update names, descriptions, keywords, FR translations,\n"
         "# code remaps, and extra columns.  Re-run --build to regenerate the JSON.\n"
         "# Entries with 'static: true' have no schema source and are fully defined here.\n"
@@ -462,15 +462,15 @@ def build_json():
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--generate", action="store_true",
-                        help="Generate/refresh picklists_mapping.yaml")
+    parser.add_argument("--calibrate", action="store_true",
+                        help="Write/refresh agrifoodca_mapping.yaml and agrifoodca_sssom.tsv")
     parser.add_argument("--build", action="store_true",
                         help="Build entry_code_picklists.json (default)")
     args = parser.parse_args()
 
-    if args.generate:
+    if args.calibrate:
         generate_mapping()
-    if args.build or not args.generate:
+    if args.build or not args.calibrate:
         build_json()
 
 
