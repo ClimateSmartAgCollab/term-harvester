@@ -36,13 +36,16 @@ import json
 import os
 import re
 import sys
+import tempfile
 import urllib.request
+import zipfile
 import yaml
 
 from source_utils import (
     MENU_CONFIG,
     BROWSER_HEADERS,
     IndentedDumper,
+    get_api_key,
     make_config_schema,
     make_source_entry,
     add_permissible_value,
@@ -66,7 +69,7 @@ The JSON must have this structure:
     {
       "key": "PascalCaseEnumIdentifier",
       "title": "Human-readable enum title",
-      "description": "Brief description of what this enum represents",
+      "description": "One sentence (25 words max) naming what is measured and its range.",
       "permissible_values": [
         {
           "code": "the code or identifier string",
@@ -107,6 +110,10 @@ Rules:
 - TITLES: Keep titles concise (2–6 words). source_key and each enum key must be
   PascalCase identifiers that reflect the content (e.g. "LodgingScale",
   "GrainAppearanceScale").
+- DESCRIPTIONS: Each enum description must be exactly one sentence, 25 words
+  maximum. State what the enum measures and the range or type of its values.
+  Do not quote source text or list individual values — summarise only.
+  Example: "Nine-point scale rating lodging severity from erect to prostrate."
 - VERSION: If a "Source URL:" line is present, scan it for version patterns
   (e.g. "Ver4", "v2.1", "V4", "-ver-4", ".V4.", "version_2"). Also scan the
   first ~500 characters of text for explicit version labels such as "Version 4",
@@ -115,17 +122,18 @@ Rules:
   plausible is found — do not guess.
 - INTERMEDIATES: When a numeric scale has only a few explicitly stated anchor
   points (e.g. "1 = Erect, 9 = Prostrate") but implies all integer steps exist,
-  you may include the unstated intermediates. Mark each with "is_intermediate": true
-  and leave its "title" as "" — a second pass will generate "between X and Y"
-  labels. Explicitly stated values must have "is_intermediate": false. Only
-  generate intermediates for continuous numeric scales; never for categorical or
-  text-ordered lists.
+  you MUST include ALL integer steps between the first and last anchor. Mark each
+  unstated step with "is_intermediate": true and set its "title" to "" — do NOT
+  invent titles for intermediate steps; a second pass generates "between X and Y"
+  labels automatically. Explicitly stated values must have "is_intermediate": false.
+  Only generate intermediates for continuous numeric scales; never for categorical
+  or text-ordered lists.
 - Return only the JSON object, no surrounding text."""
 
 
 def _get_anthropic_client():
     """Return an Anthropic client, or None with a warning if unavailable."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = get_api_key("ANTHROPIC_API_KEY")
     if not api_key:
         print(
             "Warning: ANTHROPIC_API_KEY environment variable not set"
@@ -198,12 +206,110 @@ def _call_claude(free_text):
         return None
 
 
+_SYNONYMY_SCALE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "synonymy_scale.yaml")
+_synonymy_scales_cache = None
+
+
+def _load_synonymy_scales():
+    """Load and cache synonymy_scale.yaml; returns enums dict."""
+    global _synonymy_scales_cache
+    if _synonymy_scales_cache is not None:
+        return _synonymy_scales_cache
+    try:
+        with open(_SYNONYMY_SCALE_PATH, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        _synonymy_scales_cache = data.get("enums") or {}
+    except Exception:
+        _synonymy_scales_cache = {}
+    return _synonymy_scales_cache
+
+
+def _match_dimension(anchor_titles):
+    """Match anchor titles to the best-fitting synonymy scale dimension.
+
+    Matching is case-insensitive substring: an anchor matches a PV if the
+    anchor contains (or is contained by) the canonical key or any alias.
+
+    Returns (dim_name, ordered_canonical_terms, midpoint_term) or (None, [], None).
+    """
+    scales = _load_synonymy_scales()
+    if not scales:
+        return None, [], None
+
+    anchors_lc = [t.lower().strip() for t in anchor_titles if t]
+    if not anchors_lc:
+        return None, [], None
+
+    def _substr_match(anchor, term):
+        return anchor in term or term in anchor
+
+    best_name, best_score = None, 0.0
+
+    for enum_name, enum_def in scales.items():
+        if not enum_def:
+            continue
+        pvs = enum_def.get("permissible_values") or {}
+        score = 0.0
+
+        for pv_key, pv_def in pvs.items():
+            pv_def = pv_def or {}
+            terms_lc = [pv_key.lower()] + [a.lower().strip() for a in (pv_def.get("aliases") or [])]
+            if any(_substr_match(a, t) for a in anchors_lc for t in terms_lc):
+                score += 1
+
+        # Enum-level aliases are broad trigger hints — weight half
+        for alias in (enum_def.get("aliases") or []):
+            alias_lc = alias.lower().strip()
+            if any(_substr_match(a, alias_lc) for a in anchors_lc):
+                score += 0.5
+
+        if score > best_score:
+            best_score = score
+            best_name = enum_name
+
+    if not best_name or best_score == 0:
+        return None, [], None
+
+    pvs = (scales[best_name] or {}).get("permissible_values") or {}
+    ordered = list(pvs.keys())
+    midpoint = next(
+        (k for k, v in pvs.items()
+         if str(((v or {}).get("annotations") or {}).get("is_midpoint", "")).lower() == "true"),
+        None,
+    )
+    return best_name, ordered, midpoint
+
+
 _INTERMEDIATE_LABEL_PROMPT = """\
-You are generating labels for intermediate values on a numeric rating scale.
+You are labeling intermediate steps on a numeric rating scale.
 Return ONLY a JSON object — no markdown fences, no explanation.
-Map each intermediate code (as a string key) to a concise "between X and Y" label
-where X and Y are brief 1-3 word semantic rephrasing of the nearest stated anchor
-values immediately below and above the intermediate code."""
+
+Follow this strategy in order:
+1. Determine the semantic direction of the scale from its stated anchors
+   (e.g., poor quality → excellent quality, absent → severe, slow → fast).
+2. Assign natural semantic labels to key positions first:
+   - The exact midpoint of the full range MUST use a neutral mid-scale term
+     such as "Acceptable", "Moderate", "Average", or "Medium" — never a
+     positive term like "Good" or "Very Good" at the midpoint.
+   - If the range length is even (no single midpoint), use "Acceptable"
+     at the lower middle and "Good" at the upper middle.
+   - The step just below the positive extreme gets a "Very Good" equivalent
+     (e.g. "Very Good", "Near Excellent", "High").
+   - The step just above the negative extreme gets a "Poor" equivalent
+     (e.g. "Poor", "Slight", "Low").
+   - Fill remaining positions inward with semantically appropriate terms
+     where they fit naturally (e.g. "Fair" between Poor and Acceptable).
+3. For any positions still without a natural label, use "between X and Y"
+   where X is the label of the code immediately below (code - 1) and Y is
+   the label of the code immediately above (code + 1). X and Y must be
+   adjacent codes, never skipping over an intermediate step.
+   NEVER write "between X and X" (same term twice). If a position is adjacent
+   to the highest anchor with no natural term above it, write "near [anchor]"
+   instead.
+   CONCISENESS: if X and Y share a trailing word or phrase P (e.g. both end
+   with "lodging"), drop P from X and keep it only in Y: write
+   "between Significant and Medium lodging", not
+   "between Significant lodging and Medium lodging"."""
 
 
 def _pv_sort_key(code):
@@ -212,6 +318,65 @@ def _pv_sort_key(code):
         return (0, float(code))
     except (ValueError, TypeError):
         return (1, str(code))
+
+
+def _fill_numeric_intermediates(enums):
+    """Fill integer gaps in numeric-scale enums and mark unlabeled codes as intermediate.
+
+    Two cases handled for each enum whose codes are all integers:
+      1. Gap: e.g. only {1, 9} present → inserts 2–8 as is_intermediate: true
+      2. Unlabeled: codes present but title is empty → marks is_intermediate: true
+
+    Sorted by numeric code value after any insertions.
+    Returns True if any enum was modified.
+    """
+    changed = False
+    for enum_def in enums:
+        pvs = enum_def.get("permissible_values", [])
+        if not pvs:
+            continue
+
+        # Build int→PV map; skip this enum if any code is non-integer
+        int_map = {}
+        skip = False
+        for pv in pvs:
+            code = str(pv.get("code", "")).strip()
+            try:
+                int_map[int(code)] = pv
+            except (ValueError, TypeError):
+                skip = True
+                break
+        if skip or len(int_map) < 2:
+            continue
+
+        lo, hi = min(int_map), max(int_map)
+        if hi - lo > 20:  # sanity cap — don't auto-fill open-ended scales
+            continue
+
+        enum_changed = False
+
+        # Mark any existing code whose title is absent/empty as intermediate so
+        # the second-pass labeling can generate a "between X and Y" description
+        for pv in pvs:
+            if not pv.get("is_intermediate") and not (pv.get("title") or "").strip():
+                pv["is_intermediate"] = True
+                enum_changed = True
+
+        # Insert integer steps missing entirely (e.g. only 1 and 9 were extracted)
+        for v in range(lo, hi + 1):
+            if v not in int_map:
+                new_pv = {"code": str(v), "title": "", "is_intermediate": True}
+                pvs.append(new_pv)
+                int_map[v] = new_pv
+                enum_changed = True
+
+        if enum_changed:
+            enum_def["permissible_values"] = sorted(
+                pvs, key=lambda p: _pv_sort_key(p.get("code", ""))
+            )
+            changed = True
+
+    return changed
 
 
 def _label_intermediates(enums):
@@ -240,11 +405,32 @@ def _label_intermediates(enums):
         )
         inter_codes = [str(p["code"]) for p in sorted(inters, key=lambda p: _pv_sort_key(p.get("code", "")))]
         example_key = inter_codes[0]
+
+        # Detect synonymy dimension from anchor labels and append a hint
+        anchor_titles = [p.get("title") or str(p.get("code", "")) for p in stated]
+        _dim_name, _dim_terms, _dim_mid = _match_dimension(anchor_titles)
+        if _dim_name and _dim_terms:
+            terms_str = ", ".join(
+                f"{t} [midpoint]" if t == _dim_mid else t
+                for t in _dim_terms
+            )
+            dim_hint = (
+                f"\nDimension detected: {_dim_name}."
+                f"\nCanonical scale terms (negative to positive): {terms_str}."
+                f"\nPrefer these canonical terms for intermediates that fit the numeric"
+                f" position; fall back to 'between X and Y' for positions between"
+                f" canonical steps."
+            )
+        else:
+            dim_hint = ""
+
         user_msg = (
             f'Scale: "{enum_def.get("title") or enum_def.get("key", "?")}"'
-            f"\nStated anchors:\n{anchor_lines}"
+            f"\nStated anchors (code: label):\n{anchor_lines}"
+            + dim_hint +
             f"\nGenerate labels for these intermediate codes: {', '.join(inter_codes)}"
-            f'\nReturn JSON: {{"{example_key}": "between ... and ...", ...}}'
+            f'\nReturn JSON mapping each code to its label string, e.g.'
+            f' {{"{example_key}": "Acceptable", ...}}'
         )
 
         try:
@@ -256,10 +442,17 @@ def _label_intermediates(enums):
                 messages=[{"role": "user", "content": user_msg}],
             )
             raw = resp.content[0].text.strip()
+            # Strip markdown code fences that Haiku sometimes adds despite instructions
+            if raw.startswith("```"):
+                raw = re.sub(r'^```(?:json)?\s*', '', raw)
+                raw = re.sub(r'\s*```\s*$', '', raw)
+                raw = raw.strip()
             labels = json.loads(raw)
         except Exception as e:
             print(f"  Warning: intermediate label generation failed for"
-                  f" {enum_def.get('key','?')}: {e}", file=sys.stderr)
+                  f" {enum_def.get('key','?')}: {e}"
+                  + (f"\n    (raw response: {raw!r})" if 'raw' in dir() else ""),
+                  file=sys.stderr)
             continue
 
         for pv in inters:
@@ -268,12 +461,84 @@ def _label_intermediates(enums):
                 pv["title"] = labels[code]
                 changed = True
 
+        # Dedup 1: intermediate shares label with a stated anchor → prefix "near".
+        stated_lc = {(p.get("title") or "").strip().lower()
+                     for p in stated if (p.get("title") or "").strip()}
+        for pv in inters:
+            t = (pv.get("title") or "").strip()
+            if t and t.lower() in stated_lc:
+                pv["title"] = f"near {t}"
+                changed = True
+
+        # Dedup 2: two intermediates share the same label.
+        # Keep the label for whichever is closest to the numeric midpoint of the
+        # full sorted list; rename others to "between prev-neighbor and next-neighbor".
+        sorted_all = sorted(pvs, key=lambda p: _pv_sort_key(p.get("code", "")))
+        n = len(sorted_all)
+        mid_idx = (n - 1) / 2.0
+
+        dup_map = {}  # label_lc → [(sort_index, pv), ...]
+        for i, pv in enumerate(sorted_all):
+            if pv.get("is_intermediate"):
+                t = (pv.get("title") or "").strip()
+                if t:
+                    dup_map.setdefault(t.lower(), []).append((i, pv))
+
+        for entries in dup_map.values():
+            if len(entries) <= 1:
+                continue
+            # Sort so the entry closest to midpoint is first — it keeps the label
+            entries.sort(key=lambda x: abs(x[0] - mid_idx))
+            for i, pv in entries[1:]:
+                prev_t = next(
+                    ((sorted_all[j].get("title") or "").strip()
+                     for j in range(i - 1, -1, -1)
+                     if (sorted_all[j].get("title") or "").strip()),
+                    "",
+                )
+                next_t = next(
+                    ((sorted_all[j].get("title") or "").strip()
+                     for j in range(i + 1, n)
+                     if (sorted_all[j].get("title") or "").strip()),
+                    "",
+                )
+                if prev_t and next_t and prev_t != next_t:
+                    pv["title"] = f"between {prev_t} and {next_t}"
+                elif next_t:
+                    pv["title"] = f"near {next_t}"
+                elif prev_t:
+                    pv["title"] = f"near {prev_t}"
+                changed = True
+
     return changed
 
 
 def _md_cell(s):
     """Escape pipe chars and collapse newlines for a markdown table cell."""
     return str(s or "").replace("|", "\\|").replace("\n", " ").strip()
+
+
+def _cli_enum_summary(enums):
+    """Return a CLI text summary mirroring Option 2 (separate enums) from temp.md."""
+    lines = []
+    for e in enums:
+        title = e.get("title") or ""
+        ekey  = e.get("key") or title or "?"
+        pvs   = e.get("permissible_values", [])
+        n_inter  = sum(1 for pv in pvs if pv.get("is_intermediate"))
+        n_stated = len(pvs) - n_inter
+        if n_inter:
+            count = f"{n_stated} stated, {n_inter} intermediate * = {len(pvs)} total"
+        else:
+            count = f"{len(pvs)} values"
+        header = f"{ekey} — {title}" if title and title != ekey else ekey
+        lines.append(f"  {header} ({count}):")
+        for pv in pvs:
+            code  = str(pv.get("code", ""))
+            label = (pv.get("title") or "").strip()
+            suffix = " *" if pv.get("is_intermediate") else ""
+            lines.append(f"    {code}: {label}{suffix}")
+    return "\n".join(lines)
 
 
 def _write_temp_report(enums, key, url):
@@ -369,7 +634,7 @@ def _write_temp_report(enums, key, url):
     with open("temp.tsv", "w", encoding="utf-8") as f:
         f.write("\n".join(tsv) + "\n")
 
-    return "temp.md"
+    return "temp.md", _cli_enum_summary(enums)
 
 
 def _apply_section_format(enums, merged_key, fmt):
@@ -671,8 +936,19 @@ def _fetch_for_grounding_from_file(path):
         _, ext = os.path.splitext(path.lower())
         if ext == ".pdf":
             return None
-        with open(path, encoding="utf-8", errors="replace") as f:
-            raw = f.read()
+        if ext == ".zip":
+            with zipfile.ZipFile(path) as zf:
+                names = [n for n in zf.namelist() if not n.endswith("/")]
+                if not names:
+                    return None
+                inner_name = names[0]
+                _, inner_ext = os.path.splitext(inner_name.lower())
+                if inner_ext == ".pdf":
+                    return None
+                raw = zf.read(inner_name).decode("utf-8", errors="replace")
+        else:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                raw = f.read()
         raw = _BLOCK_TAG_RE.sub(lambda m: " " + m.group(), raw)
         text = strip_tags(raw)
         text = html_module.unescape(text)
@@ -730,7 +1006,7 @@ def _diff_report(old_yaml_path, new_schema):
             ot = (old_pvs[code] or {}).get("title", "")
             nt = (new_pvs[code] or {}).get("title", "")
             if ot != nt:
-                enum_lines.append(f"      ~ '{code}': {ot!r} → {nt!r}")
+                enum_lines.append(f"      ~ '{code}': {nt!r}")
         n_old, n_new = len(old_pvs), len(new_pvs)
         n_inter = sum(1 for pv in new_pvs.values()
                       if "intermediate" in ((pv or {}).get("comments") or []))
@@ -775,7 +1051,13 @@ def _check_grounding(enums, doc_text):
     return unmatched
 
 
-_SOURCE_EXTENSIONS = ("pdf", "html", "htm", "txt", "docx")
+_SOURCE_EXTENSIONS = ("zip", "pdf", "html", "htm", "txt", "docx")
+
+
+def _pack_to_zip(raw_bytes, orig_ext, zip_path):
+    """Write raw_bytes as content.{orig_ext} inside a new zip archive."""
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(f"content.{orig_ext}", raw_bytes)
 
 
 def _detect_ext(url, content_type_header):
@@ -852,6 +1134,26 @@ def _extract_text_from_file(path, url_fragment=None):
         a tip is printed suggesting the appropriate anchor form.
     """
     _, ext = os.path.splitext(path.lower())
+
+    if ext == ".zip":
+        with zipfile.ZipFile(path) as zf:
+            names = [n for n in zf.namelist() if not n.endswith("/")]
+            if not names:
+                print(f"  Error: zip {path} is empty.", file=sys.stderr)
+                return None
+            inner_name = names[0]
+            inner_bytes = zf.read(inner_name)
+        _, inner_ext = os.path.splitext(inner_name.lower())
+        tmp_fd, tmp_path = tempfile.mkstemp(suffix=inner_ext)
+        os.close(tmp_fd)
+        try:
+            with open(tmp_path, "wb") as f:
+                f.write(inner_bytes)
+            return _extract_text_from_file(tmp_path, url_fragment=url_fragment)
+        finally:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
     directive = _parse_fragment(url_fragment)
 
     try:
@@ -998,7 +1300,8 @@ def fetch_freetext_source(key, source, config_file=MENU_CONFIG):
         return
 
     ext = _detect_ext(url, ct_header)
-    output_path = f"sources/{key}.{ext}"
+    use_zip = ext in ("pdf", "html", "htm")
+    output_path = f"sources/{key}.zip" if use_zip else f"sources/{key}.{ext}"
 
     if os.path.exists(output_path):
         existing_size = os.path.getsize(output_path)
@@ -1011,8 +1314,11 @@ def fetch_freetext_source(key, source, config_file=MENU_CONFIG):
             )
             return
 
-    with open(output_path, "wb") as f:
-        f.write(data)
+    if use_zip:
+        _pack_to_zip(data, ext, output_path)
+    else:
+        with open(output_path, "wb") as f:
+            f.write(data)
     print(f"  Saved to {output_path}")
 
     update_source_config(
@@ -1032,14 +1338,64 @@ def match_freetext(url, free_text, config_file=MENU_CONFIG):
     confirm the key, downloads the source document, writes the config entry,
     then delegates YAML generation to process_freetext_source (same as -c).
     """
-    src_file = free_text if os.path.isfile(free_text) else None
+    src_file = free_text if (free_text and os.path.isfile(free_text)) else None
     if src_file:
         src_ext = os.path.splitext(src_file)[1].lstrip(".").lower() or "txt"
 
-    # Resolve file path → plain text for the key-suggestion Claude call
-    suggestion_text = _resolve_free_text(free_text)
-    if suggestion_text is None:
-        return True
+    _prefetched_bytes = None  # page bytes fetched when free_text is None
+    _prefetched_ext = "html"
+
+    if free_text is None:
+        # No --free_text provided: fetch the page and extract its visible text as
+        # the extraction source, applying any #text= anchor from the URL fragment.
+        base_url = url.split("#")[0] if url else ""
+        if not base_url.lower().startswith(("http://", "https://")):
+            return False
+        url_fragment = url.split("#", 1)[1] if "#" in url else None
+        print(f"  Fetching {base_url} ...")
+        try:
+            req = urllib.request.Request(base_url, headers=BROWSER_HEADERS)
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                _ct_header = resp.headers.get("Content-Type", "")
+                _prefetched_bytes = resp.read()
+            _prefetched_ext = _detect_ext(url, _ct_header)
+        except Exception as e:
+            print(f"  Error fetching {base_url}: {e}", file=sys.stderr)
+            return False
+        if _prefetched_ext == "pdf":
+            tmp_fd, _pdf_tmp = tempfile.mkstemp(suffix=".pdf")
+            os.close(tmp_fd)
+            try:
+                with open(_pdf_tmp, "wb") as _f:
+                    _f.write(_prefetched_bytes)
+                suggestion_text = _extract_text_from_file(_pdf_tmp,
+                                                          url_fragment=url_fragment) or ""
+            finally:
+                if os.path.exists(_pdf_tmp):
+                    os.unlink(_pdf_tmp)
+        else:
+            _raw = _prefetched_bytes.decode("utf-8", errors="replace")
+            _raw = _BLOCK_TAG_RE.sub(lambda m: " " + m.group(), _raw)
+            _visible = strip_tags(_raw)
+            _visible = html_module.unescape(_visible)
+            _visible = re.sub(r'\s+', ' ', _visible).strip()
+            if url_fragment:
+                _dir = _parse_fragment(url_fragment)
+                if _dir and _dir['type'] == 'text':
+                    _q = _dir['query']
+                    _pos = _visible.lower().find(_q.lower())
+                    if _pos >= 0:
+                        _visible = _visible[max(0, _pos - 200):]
+                        print(f"  Anchored to text {_q!r} at position {_pos:,}")
+            suggestion_text = _visible[:10000]
+        if not suggestion_text:
+            print(f"  Error: no readable text found at {base_url}", file=sys.stderr)
+            return False
+    else:
+        # Resolve file path → plain text for the key-suggestion Claude call
+        suggestion_text = _resolve_free_text(free_text)
+        if suggestion_text is None:
+            return True
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print(
@@ -1105,6 +1461,11 @@ def match_freetext(url, free_text, config_file=MENU_CONFIG):
     if src_file:
         _raw_source_path = f"sources/{source_key}.{src_ext}"
         _raw_ext = src_ext
+    elif _prefetched_bytes:
+        # Already fetched while building suggestion_text; reuse without re-downloading
+        _raw_bytes = _prefetched_bytes
+        _raw_ext = _prefetched_ext
+        _raw_source_path = f"sources/{source_key}.{_raw_ext}"
     elif fetch_url and fetch_url.lower().startswith(("http://", "https://")):
         _shared_path, _shared_key = _find_shared_local_file(url, source_key, config_file)
         if _shared_path:
@@ -1133,11 +1494,17 @@ def match_freetext(url, free_text, config_file=MENU_CONFIG):
             d.write(s.read())
         print(f"  Copied source document to {doc_path}")
         file_format = src_ext
-    elif _raw_bytes and _raw_source_path:
-        with open(_raw_source_path, "wb") as f:
-            f.write(_raw_bytes)
-        print(f"  Saved source document to {_raw_source_path}")
-        file_format = _raw_ext
+    elif _raw_bytes:
+        if _raw_ext in ("pdf", "html", "htm"):
+            zip_path = f"sources/{source_key}.zip"
+            _pack_to_zip(_raw_bytes, _raw_ext, zip_path)
+            print(f"  Saved source document to {zip_path}")
+            file_format = "zip"
+        elif _raw_source_path:
+            with open(_raw_source_path, "wb") as f:
+                f.write(_raw_bytes)
+            print(f"  Saved source document to {_raw_source_path}")
+            file_format = _raw_ext
 
     # Register source in config before calling process_freetext_source
     entry = make_source_entry(
@@ -1249,6 +1616,11 @@ def process_freetext_source(key, source, config_file=MENU_CONFIG, locales=None, 
 
     enums_raw = result.get("enums", [])
 
+    # Fill any integer gaps and mark empty-titled codes as intermediates so the
+    # labeling pass below covers cases where Claude omitted intermediate steps or
+    # extracted codes without titles (regardless of document format).
+    _fill_numeric_intermediates(enums_raw)
+
     # Generate "between X and Y" labels for any intermediate PVs before previewing
     _has_intermediates = any(
         pv.get("is_intermediate")
@@ -1257,9 +1629,18 @@ def process_freetext_source(key, source, config_file=MENU_CONFIG, locales=None, 
     if _has_intermediates:
         print("  Generating labels for intermediate scale values ...")
         _label_intermediates(enums_raw)
+        # Sentence-case all labels in the picklist: first letter capitalised, rest lower.
+        # Skip labels that equal their code (raw code standing in as title).
+        for _e in enums_raw:
+            for _pv in _e.get("permissible_values", []):
+                _code = _pv.get("code", "")
+                _lbl = (_pv.get("title") or "").strip()
+                if _lbl and _lbl != _code:
+                    _pv["title"] = _lbl[0].upper() + _lbl[1:].lower()
 
-    # Write temp.md + temp.tsv for the user to review before any prompt
-    _write_temp_report(enums_raw, key, url)
+    # Write temp.md + temp.tsv; print the same enum listing to the terminal
+    _, _cli_summary = _write_temp_report(enums_raw, key, url)
+    print(_cli_summary)
     print("  Written temp.md and temp.tsv — review extracted content before confirming.")
 
     current_include = (source.get("include") or {}).get("concepts") or None
@@ -1304,7 +1685,12 @@ def process_freetext_source(key, source, config_file=MENU_CONFIG, locales=None, 
     see_also = url or None
     new_schema = _build_schema(result, url, key, see_also=see_also, version=version)
 
-    print(_diff_report(yaml_path, new_schema))
+    # Strip internal-only 'comments' marker (used above for intermediate counting)
+    # before writing YAML — it is not a meaningful LinkML attribute here.
+    for _ed in (new_schema.get("enums") or {}).values():
+        for _pv in (_ed or {}).get("permissible_values", {}).values():
+            if isinstance(_pv, dict):
+                _pv.pop("comments", None)
 
     yaml_content = yaml.dump(
         new_schema,
