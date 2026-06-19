@@ -431,6 +431,33 @@ def process_statscan_source(key, source, config_file=None, locales=None):
                     add_permissible_value(permissible_values, code, title=title, is_a=is_a)
             except Exception as e:
                 print(f"    Warning: structure fetch failed: {e}", file=sys.stderr)
+        else:
+            # Leaf CPV with no structure sub-page: extract code+title from the CPV page.
+            # The panel-body contains <h2 class="bg-def-1">CODE - Name</h2> followed by
+            # a <p>description</p> for leaf entries.
+            cpv_code_m = re.search(r'[?&]CPV=([^&"\'<>\s]+)', cpv_url)
+            if cpv_code_m:
+                leaf_code = html.unescape(cpv_code_m.group(1))
+                if leaf_code not in permissible_values:
+                    leaf_title = ""
+                    pb_m = re.search(r'<div\b[^>]*\bpanel-body\b[^>]*>(.*?)</div>',
+                                     cpv_html, re.IGNORECASE | re.DOTALL)
+                    if pb_m:
+                        h2_m = re.search(r'<h2\b[^>]*\bbg-def-1\b[^>]*>(.*?)</h2>',
+                                         pb_m.group(1), re.IGNORECASE | re.DOTALL)
+                        if h2_m:
+                            heading = html.unescape(strip_tags(h2_m.group(1))).strip()
+                            sep_m2 = re.match(r'^\S+\s*[-\u2013]\s*(.*)', heading)
+                            leaf_title = normalize_text(
+                                sep_m2.group(1).strip() if sep_m2 else heading)
+                        p_m = re.search(r'<p\b[^>]*>(.*?)</p>',
+                                        pb_m.group(1), re.IGNORECASE | re.DOTALL)
+                        if p_m:
+                            leaf_def = normalize_text(
+                                html.unescape(strip_tags(p_m.group(1))).strip())
+                            if leaf_def:
+                                definitions[leaf_code] = leaf_def
+                    add_permissible_value(permissible_values, leaf_code, title=leaf_title)
 
         def_m = re.search(
             r'href=["\']([^"\']*Function=getVD[^"\']*&amp;D=1[^"\']*)["\']',
@@ -536,6 +563,32 @@ def process_statscan_source(key, source, config_file=None, locales=None):
                         add_permissible_value(fr_permissible_values, code, title=title)
                 except Exception as e:
                     print(f"    Warning: French structure fetch failed: {e}", file=sys.stderr)
+            else:
+                # Leaf CPV: extract FR code+title from the FR CPV page panel-body.
+                cpv_code_m = re.search(r'[?&]CPV=([^&"\'<>\s]+)', fr_cpv_url)
+                if cpv_code_m:
+                    leaf_code = html.unescape(cpv_code_m.group(1))
+                    if leaf_code not in fr_permissible_values:
+                        leaf_title = ""
+                        pb_m = re.search(r'<div\b[^>]*\bpanel-body\b[^>]*>(.*?)</div>',
+                                         fr_cpv_html, re.IGNORECASE | re.DOTALL)
+                        if pb_m:
+                            h2_m = re.search(r'<h2\b[^>]*\bbg-def-1\b[^>]*>(.*?)</h2>',
+                                             pb_m.group(1), re.IGNORECASE | re.DOTALL)
+                            if h2_m:
+                                heading = html.unescape(strip_tags(h2_m.group(1))).strip()
+                                sep_m2 = re.match(r'^\S+\s*[-\u2013]\s*(.*)', heading)
+                                leaf_title = normalize_text(
+                                    sep_m2.group(1).strip() if sep_m2 else heading)
+                            p_m = re.search(r'<p\b[^>]*>(.*?)</p>',
+                                            pb_m.group(1), re.IGNORECASE | re.DOTALL)
+                            if p_m:
+                                leaf_def = normalize_text(
+                                    html.unescape(strip_tags(p_m.group(1))).strip())
+                                if leaf_def:
+                                    fr_definitions[leaf_code] = leaf_def
+                        add_permissible_value(fr_permissible_values, leaf_code,
+                                              title=leaf_title)
 
             def_m = re.search(
                 r'href=["\']([^"\']*Function=getVD[^"\']*&amp;D=1[^"\']*)["\']',
@@ -555,21 +608,53 @@ def process_statscan_source(key, source, config_file=None, locales=None):
                 fr_entry["description"] = normalize_text(fr_definitions[code])
 
     # ---- 6. Write YAML --------------------------------------------------
+    # Title and description: prefer config values (user-editable); extract from
+    # source HTML when absent so that -c alone is sufficient for existing sources.
+    title = source.get("title") or ""
+    if not title and source_html:
+        for meta_m in re.finditer(r'<meta\b([^>]*)>', source_html, re.IGNORECASE):
+            attrs = meta_m.group(1)
+            if re.search(r'\bname=["\']dcterms\.title["\']', attrs, re.IGNORECASE):
+                content_m = re.search(r'\bcontent=["\']([^"\']+)["\']', attrs, re.IGNORECASE)
+                if content_m:
+                    title = normalize_text(content_m.group(1).strip())
+                    break
+
+    description = source.get("description") or ""
+    if not description and source_html:
+        panel_m = re.search(r'<div\b[^>]*\bpanel-body\b[^>]*>(.*?)</div>',
+                            source_html, re.IGNORECASE | re.DOTALL)
+        if panel_m:
+            p_m = re.search(r'<p\b[^>]*>(.*?)</p>', panel_m.group(1), re.IGNORECASE | re.DOTALL)
+            if p_m:
+                desc_text = html.unescape(re.sub(r'<[^>]+>', '', p_m.group(1))).strip()
+                description = normalize_text(re.sub(r'\s+', ' ', desc_text))
+
     schema = make_config_schema(
-        id=source_url, name=key, title=source.get("title", ""),
-        description=source.get("description", ""), version=source.get("version", ""),
+        id=source_url, name=key, title=title,
+        description=description, version=source.get("version", ""),
         prefixes={"statscan": "https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD="},
         enums={key: {
             "name":               key,
-            "description":        source.get("description", ""),
+            "title":              title,
+            "description":        description,
             "permissible_values": permissible_values,
         }},
     )
 
     if fr_permissible_values:
+        fr_enum = {"permissible_values": fr_permissible_values}
+        if fr_source_html:
+            for meta_m in re.finditer(r'<meta\b([^>]*)>', fr_source_html, re.IGNORECASE):
+                attrs = meta_m.group(1)
+                if re.search(r'\bname=["\']dcterms\.title["\']', attrs, re.IGNORECASE):
+                    content_m = re.search(r'\bcontent=["\']([^"\']+)["\']', attrs, re.IGNORECASE)
+                    if content_m:
+                        fr_enum["title"] = normalize_text(content_m.group(1).strip())
+                        break
         schema["extensions"] = _make_locale_extensions(
             statscan_fr_url(source_url), key, source.get("version") or "", "fr",
-            enums={key: {"permissible_values": fr_permissible_values}},
+            enums={key: fr_enum},
         )
 
     yaml_path = f"sources/{key}.yaml"
@@ -812,10 +897,30 @@ def match_statscan(url, tmp_path, config_file=MENU_CONFIG):
     if not title:
         title = f"StatsCan Variable {tvd_id}"
 
+    # Extract description from the first <p> inside the panel-body (status/scope line)
+    description = None
+    panel_m = re.search(r'<div\b[^>]*\bpanel-body\b[^>]*>(.*?)</div>',
+                        html_text, re.IGNORECASE | re.DOTALL)
+    if panel_m:
+        p_m = re.search(r'<p\b[^>]*>(.*?)</p>', panel_m.group(1), re.IGNORECASE | re.DOTALL)
+        if p_m:
+            desc_text = html.unescape(re.sub(r'<[^>]+>', '', p_m.group(1))).strip()
+            desc_text = re.sub(r'\s+', ' ', desc_text)
+            if desc_text:
+                description = desc_text
+
+    # Version: prefer "version X" in title; fall back to dcterms.issued date
     version_m = re.search(r'\bversion\s+([A-Za-z0-9][A-Za-z0-9._-]*)', title, re.IGNORECASE)
     version = version_m.group(1) if version_m else None
+    if not version:
+        issued_m = re.search(
+            r'<meta\b[^>]+dcterms\.issued[^>]+content=["\']([^"\']+)["\']',
+            html_text, re.IGNORECASE)
+        if issued_m:
+            version = issued_m.group(1).strip()
 
-    entry = make_source_entry(key, url, "STATSCAN", "zip", title=title, version=version)
+    entry = make_source_entry(key, url, "STATSCAN", "zip",
+                              title=title, description=description, version=version)
     entry["download_date"] = datetime.date.today().isoformat()
     config.setdefault("sources", {})[key] = entry
     write_config(config, config_file)
