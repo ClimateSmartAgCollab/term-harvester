@@ -32,9 +32,11 @@ title, description, and permissible_value entries that are defined in schema.yam
 
 import argparse
 import csv
+import difflib
 import io
 import json
 import os
+import re
 import sys
 import yaml
 
@@ -197,6 +199,101 @@ def _load_sssom():
 
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Fuzzy PV matching (used when codes differ and counts don't match)
+# ---------------------------------------------------------------------------
+
+def _normalize_for_match(text):
+    """Lowercase, strip trailing parentheticals, collapse non-alphanumeric to spaces."""
+    text = text.lower()
+    text = re.sub(r'\s*\([^)]*\)\s*$', '', text).strip()  # strip "(highest)" etc.
+    text = re.sub(r"[^a-z0-9]+", " ", text).strip()
+    return text
+
+
+def _token_jaccard(text1, text2):
+    """Jaccard similarity on word token sets (order-independent)."""
+    s1 = set(text1.split())
+    s2 = set(text2.split())
+    if not s1 or not s2:
+        return 0.0
+    return len(s1 & s2) / len(s1 | s2)
+
+
+def _fuzzy_pv_match(json_rows, schema_pvs, threshold=0.96, jaccard_threshold=0.5):
+    """Return {json_code: schema_pv_key} for rows matched by title similarity.
+
+    Two-pass strategy:
+      1. SequenceMatcher on normalized labels (threshold 0.96) — handles labels that
+         differ only in minor formatting such as trailing parentheticals.
+      2. Token Jaccard on word sets (threshold 0.5) — handles labels whose words are
+         reordered between JSON and schema (e.g. duration-first vs category-first).
+
+    Handles disambiguation: when two JSON codes would map to the same schema PV,
+    the higher-scoring one wins and the other remains unmatched.
+    """
+    schema_norm = {
+        pv_key: _normalize_for_match((pv_data or {}).get("title") or pv_key)
+        for pv_key, pv_data in schema_pvs.items()
+    }
+
+    def _best_seq(norm):
+        best_score, best_key = 0.0, None
+        for pv_key, pv_norm in schema_norm.items():
+            score = difflib.SequenceMatcher(None, norm, pv_norm).ratio()
+            if score > best_score:
+                best_score, best_key = score, pv_key
+        return best_score, best_key
+
+    # Pass 1: SequenceMatcher
+    scores = {}  # json_code → (best_score, schema_pv_key)
+    for row in json_rows:
+        code = row.get("Code", "")
+        norm = _normalize_for_match(row.get("en", "") or code)
+        scores[code] = _best_seq(norm)
+
+    claimed = {}  # schema_pv_key → (score, json_code)
+    for code, (score, pv_key) in scores.items():
+        if score < threshold or pv_key is None:
+            continue
+        if pv_key not in claimed or score > claimed[pv_key][0]:
+            claimed[pv_key] = (score, code)
+    matched = {code: pv_key for pv_key, (_, code) in claimed.items()}
+
+    # Pass 2: token Jaccard for codes unmatched by pass 1
+    unmatched_codes = [r.get("Code", "") for r in json_rows
+                       if r.get("Code") not in matched]
+    if unmatched_codes:
+        unclaimed_pvs = {k: v for k, v in schema_norm.items() if k not in claimed}
+        j_scores = {}
+        for row in json_rows:
+            code = row.get("Code", "")
+            if code not in unmatched_codes:
+                continue
+            norm = _normalize_for_match(row.get("en", "") or code)
+            best_score, best_key = 0.0, None
+            for pv_key, pv_norm in unclaimed_pvs.items():
+                score = _token_jaccard(norm, pv_norm)
+                if score > best_score:
+                    best_score, best_key = score, pv_key
+            j_scores[code] = (best_score, best_key)
+
+        j_claimed = {}
+        for code, (score, pv_key) in j_scores.items():
+            if score < jaccard_threshold or pv_key is None:
+                continue
+            if pv_key not in j_claimed or score > j_claimed[pv_key][0]:
+                j_claimed[pv_key] = (score, code)
+        for pv_key, (_, code) in j_claimed.items():
+            matched[code] = pv_key
+
+    if matched:
+        still_unmatched = [r["Code"] for r in json_rows if r.get("Code") not in matched]
+        print(f"    fuzzy matched {len(matched)} PV(s)"
+              + (f"; unmatched: {still_unmatched}" if still_unmatched else ""))
+    return matched
+
+
 # --generate: build picklists_mapping.yaml from current schema + JSON
 # ---------------------------------------------------------------------------
 
@@ -239,12 +336,17 @@ def generate_mapping():
         else:
             if ref_name_en and ref_name_en != schema_name_en:
                 entry.setdefault("name", {})["en"] = ref_name_en
+                schema_name_actual = (senum.get("title") if senum else "") or ""
+                if schema_name_actual:
+                    entry.setdefault("name", {})["was_en"] = schema_name_actual
             if name_fr:
                 sssom_rows.append((f"agrifoodca:{json_key}:name", name_fr))
             elif "fr" in ref_name:
                 entry.setdefault("name", {})["fr"] = ""   # explicit empty placeholder
             if ref_desc_en and ref_desc_en != schema_desc_en:
                 entry.setdefault("description", {})["en"] = ref_desc_en
+                if schema_desc_en:
+                    entry.setdefault("description", {})["was_en"] = schema_desc_en
             if desc_fr:
                 sssom_rows.append((f"agrifoodca:{json_key}:description", desc_fr))
             elif "fr" in ref_desc:
@@ -277,6 +379,10 @@ def generate_mapping():
         schema_pv_keys = list(schema_pvs.keys())
         # Positional matching only makes sense when counts match exactly
         counts_match   = len(json_rows) == len(schema_pv_keys)
+        # Fuzzy title matching when codes differ and counts don't align
+        fuzzy_map = {}
+        if not is_static and not counts_match and schema_pvs:
+            fuzzy_map = _fuzzy_pv_match(json_rows, schema_pvs)
 
         pv_map = {}
         for row_idx, row in enumerate(json_rows):
@@ -291,6 +397,10 @@ def generate_mapping():
                     schema_pv_key = schema_pv_keys[row_idx]
                     if schema_pv_key != code:
                         pv_entry["schema_key"] = schema_pv_key
+                elif code in fuzzy_map:
+                    schema_pv_key = fuzzy_map[code]
+                    if schema_pv_key != code:
+                        pv_entry["schema_key"] = schema_pv_key
                 else:
                     schema_pv_key = code  # extra or unmatched; no schema backing
             else:
@@ -303,6 +413,9 @@ def generate_mapping():
                 en_from_json   = row.get("en", "")
                 if en_from_json and en_from_json != en_from_schema:
                     pv_entry["en"] = en_from_json
+                    en_from_schema_actual = (schema_pvs.get(schema_pv_key) or {}).get("title") or ""
+                    if en_from_schema_actual:
+                        pv_entry["was_en"] = en_from_schema_actual
 
             # FR: emit to SSSOM whenever reference differs from schema (covers overrides too)
             fr_from_schema = (fr_pvs.get(schema_key) or {}).get(schema_pv_key, "")
@@ -330,6 +443,8 @@ def generate_mapping():
         "# Edit this file to update names, descriptions, keywords, FR translations,\n"
         "# code remaps, and extra columns.  Re-run --build to regenerate the JSON.\n"
         "# Entries with 'static: true' have no schema source and are fully defined here.\n"
+        "# 'was_en' records the schema.yaml value that 'en' overrides (informational only;\n"
+        "#   ignored by --build).\n"
     )
     body = yaml.dump({"enums": ordered}, allow_unicode=True, default_flow_style=False,
                      sort_keys=False, indent=2)
