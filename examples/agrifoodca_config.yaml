@@ -30,7 +30,6 @@ apis:
     type:
       rest:
         uri: https://data.bioontology.org/
-        apikey: 75494b6d-7473-49b5-b47a-6e846f90d16b
     ontologies:
       - envo
   ols:
@@ -44,7 +43,7 @@ sources:
     name: AgriFoodCA_Picklists
     version: null
     content_type: AgriFoodCA
-    file_format: yaml
+    file_format: csv
     reachable_from:
       source_ontology: https://github.com/agrifooddatacanada/picklists_for_schemas/tree/main/picklists
     download_date: null
@@ -71,7 +70,7 @@ sources:
     file_format: pdf
     reachable_from:
       source_ontology: https://zenodo.org/records/18421449
-    download_date: '2026-06-11'
+    download_date: '2026-06-18'
     description: The Contributor Roles Taxonomy (CRediT) is a high-level taxonomy
       representing the 14 roles typically played by contributors to scientific scholarly
       output. Each role describes a specific contribution to the scholarly output.
@@ -81,25 +80,24 @@ sources:
     name: ISO_COUNTRY_CA
     version: null
     content_type: ISO_COUNTRY
-    file_format: json
+    file_format: zip
     reachable_from:
       source_ontology: https://www.iso.org/obp/ui/#iso:code:3166:CA
-    download_date: '2026-06-11'
+    download_date: '2026-06-18'
     prefixes:
       iso: https://www.iso.org/iso-3166-country-codes/
       wd: http://www.wikidata.org/entity/
-  LodgingAssessment:
-    title: Visual Lodging Estimation Before Harvest
-    name: LodgingAssessment
+  Lodging:
+    title: Lodging Assessment Scale
+    name: Lodging
     version: null
     content_type: FreeText
-    file_format: yaml
+    file_format: zip
     reachable_from:
       source_ontology: https://link.springer.com/article/10.1186/s12870-025-07322-y#text=A
-        visual estimation of lodging before
-    download_date: '2026-06-11'
-    description: A visual estimation of lodging before harvest using a scale of 1
-      - 9.
+        visual estimation of lodging before harvest
+    download_date: '2026-06-12'
+    description: lodging
     section_format: 2
   NRCSSoilFieldBook:
     title: NRCS Field Book for Describing and Sampling Soils Ver. 4
@@ -121,7 +119,7 @@ sources:
     file_format: html
     reachable_from:
       source_ontology: https://sis.agr.gc.ca/cansis/nsdb/soil/v2/snt/index.html
-    download_date: '2026-06-11'
+    download_date: '2026-06-18'
     include:
       concepts:
         - NSDB_DRAINAGE
@@ -148,7 +146,7 @@ sources:
     file_format: yaml
     reachable_from:
       source_ontology: https://iastate.pressbooks.pub/introsoilscience/chapter/soilstructure/
-    download_date: '2026-06-11'
+    download_date: '2026-06-18'
     description: Soil structural shape
   StandardsMaturityLevel:
     title: Standards Maturity Level
@@ -158,7 +156,7 @@ sources:
     file_format: yaml
     reachable_from:
       source_ontology: https://raw.githubusercontent.com/linkml/valuesets/main/src/valuesets/schema/computing/maturity_levels.yaml
-    download_date: '2026-06-11'
+    download_date: '2026-06-18'
     include:
       concepts:
         - StandardsMaturityLevel
@@ -170,7 +168,7 @@ sources:
     file_format: zip
     reachable_from:
       source_ontology: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1313722
-    download_date: '2026-06-11'
+    download_date: '2026-06-19'
   valuesets_merged_hierarchy:
     title: Merged Value Sets with Hierarchical Structure
     name: valuesets_merged_hierarchy
@@ -179,7 +177,7 @@ sources:
     file_format: yaml
     reachable_from:
       source_ontology: https://raw.githubusercontent.com/linkml/valuesets/refs/heads/main/src/valuesets/merged/merged_hierarchy.yaml
-    download_date: '2026-06-11'
+    download_date: '2026-06-18'
     include:
       concepts:
         - GenderIdentity
