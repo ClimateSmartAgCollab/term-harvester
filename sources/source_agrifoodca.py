@@ -4,12 +4,17 @@ Provides CSV parsing and LinkML YAML generation for agricultural picklist files
 from the AgriFoodData Canada repository at:
   https://github.com/agrifooddatacanada/picklists_for_schemas/tree/main/picklists
 
-Each CSV file contains 4 metadata rows (column-header / general / en / fr),
+Source files are stored locally as a ZIP archive (``sources/{key}.zip``).
+Config entries use ``file_format: csv`` to describe the source file type;
+the ZIP is the local storage mechanism, not a format designation.
+
+Each picklist file contains 4 metadata rows (column-header / general / en / fr),
 followed by 5–6 blank rows, followed by a data header and data rows.
 
 Public API used by term_harvester.py:
     process_agrifood_source(key, source, config_file=None, locales=None)
-    refetch_agrifood_dir(key, source, locales=None)
+    process_agrifood_dir_source(key, source, config_file=MENU_CONFIG, locales=None)
+    refetch_agrifood_dir(key, source, config_file=MENU_CONFIG, locales=None)
     match_agrifood_csv(url, tmp_path, config_file)
     match_agrifood_dir(url, config_file)
 """
@@ -23,6 +28,7 @@ import sys
 import urllib.parse
 import urllib.request
 import yaml
+import zipfile
 
 from source_utils import (
     add_permissible_value,
@@ -31,6 +37,7 @@ from source_utils import (
     _make_locale_extensions,
     IndentedDumper,
     make_source_entry,
+    normalize_text,
     write_config,
     to_pascal_case_key,
     MENU_CONFIG,
@@ -376,7 +383,7 @@ def process_agrifood_source(key, source, config_file=None, locales=None):
 
 
 def _add_agrifood_from_csv(url, filename, csv_text, config_file, locales=None):
-    """Parse *csv_text*, save the CSV, add a config entry, and generate the YAML.
+    """Parse *csv_text*, save the file in a zip, add a config entry, and generate the YAML.
 
     Returns the source key string on success, or None when skipped (key already
     exists, file does not match AgriFoodCA format, or no key column found).
@@ -406,11 +413,11 @@ def _add_agrifood_from_csv(url, filename, csv_text, config_file, locales=None):
     if source_doc:
         entry["see_also"] = source_doc
 
-    # Save the CSV to sources/
-    output_path = f"sources/{key}.csv"
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(csv_text)
-    print(f"Saved to {output_path}")
+    # Save the source file to sources/{key}.zip
+    zip_path = f"sources/{key}.zip"
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(filename, csv_text.encode("utf-8"))
+    print(f"Saved to {zip_path}")
 
     config.setdefault("sources", {})[key] = entry
     write_config(config, config_file)
@@ -419,7 +426,7 @@ def _add_agrifood_from_csv(url, filename, csv_text, config_file, locales=None):
     # Re-read written config to get the canonical source entry, then process
     with open(config_file) as f:
         config = yaml.safe_load(f) or {}
-    process_agrifood_source(key, config["sources"][key], config_file, locales=locales)
+    process_agrifood_dir_source(key, config["sources"][key], config_file, locales=locales)
 
     return key
 
@@ -444,7 +451,7 @@ def _build_combined_yaml(results, source_url, key, locales=None):
         if parsed['title_en']:
             enum_entry["title"] = parsed['title_en']
         if parsed['description_en']:
-            enum_entry["description"] = parsed['description_en']
+            enum_entry["description"] = normalize_text(parsed['description_en'])
         all_enums_en[enum_key] = enum_entry
 
         if parsed['fr_permissible_values']:
@@ -467,17 +474,68 @@ def _build_combined_yaml(results, source_url, key, locales=None):
     return schema
 
 
-def refetch_agrifood_dir(key, source, locales=None):
-    """Re-download all CSVs from the AgriFoodCA GitHub picklists directory and
-    regenerate ``sources/{key}.yaml``.
+def process_agrifood_dir_source(key, source, config_file=MENU_CONFIG, locales=None):
+    """Build ``sources/{key}.yaml`` from the cached ``sources/{key}.zip`` archive.
 
-    Used by the ``-f`` handler to refresh a combined-directory AgriFoodCA source
-    that was originally added via ``-a`` (and therefore has ``file_format: yaml``).
-    Unlike ``match_agrifood_dir``, this function does not mutate ``harvester_config.yaml``
-    and does not check whether the key already exists in config.
+    The zip contains one TSV/CSV file per picklist, stored under the original
+    filenames (e.g. ``thirty_two_point_cardinality.tsv``).  Each file is parsed
+    with :func:`parse_agrifood_picklist` and the results are assembled into a
+    single combined YAML via :func:`_build_combined_yaml`.
+
+    Called by the ``-c`` handler for AgriFoodCA sources with ``file_format: tsv``.
     """
+    zip_path   = f"sources/{key}.zip"
+    yaml_path  = f"sources/{key}.yaml"
     source_url = (source.get("reachable_from") or {}).get("source_ontology", "")
 
+    if not os.path.exists(zip_path):
+        print(f"  Skipping {key}: {zip_path} not found — run '-f {key}' to download first",
+              file=sys.stderr)
+        return
+
+    results = []
+    skipped = 0
+    with zipfile.ZipFile(zip_path) as zf:
+        csv_names = sorted(n for n in zf.namelist() if n.lower().endswith(".csv"))
+        for name in csv_names:
+            csv_text = zf.read(name).decode("utf-8-sig", errors="replace")
+            parsed = parse_agrifood_picklist(csv_text)
+            if parsed is None:
+                print(f"    Warning: {name} does not match AgriFoodCA format — skipped",
+                      file=sys.stderr)
+                skipped += 1
+                continue
+            results.append((_filename_to_key(name), parsed))
+
+    if not results:
+        print(f"  No valid picklists found in {zip_path}.", file=sys.stderr)
+        return
+
+    if locales is None:
+        try:
+            with open(config_file) as f:
+                locales = (yaml.safe_load(f) or {}).get("locales") or ["en"]
+        except Exception:
+            locales = ["en"]
+
+    schema = _build_combined_yaml(results, source_url, key, locales=locales)
+    with open(yaml_path, "w") as f:
+        yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
+    for enum_key, parsed in results:
+        fr_count = len(parsed['fr_permissible_values'])
+        log_extraction(enum_key, count=len(parsed['permissible_values']),
+                       lang_counts={"fr": fr_count} if fr_count else None)
+    if skipped:
+        print(f"  ({skipped} file(s) skipped)")
+
+
+def _download_agrifood_csvs_to_zip(zip_path):
+    """Download all CSV files from the AgriFoodCA GitHub picklists directory
+    and write them into *zip_path*.
+
+    Returns a list of ``(filename, csv_text)`` tuples for the files that were
+    successfully downloaded, or an empty list on error.
+    """
     print("Fetching AgriFoodCA picklist directory via GitHub API ...")
     try:
         req = urllib.request.Request(
@@ -491,7 +549,7 @@ def refetch_agrifood_dir(key, source, locales=None):
             listing = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         print(f"  Error fetching GitHub API listing: {e}", file=sys.stderr)
-        return
+        return []
 
     csv_files = [
         item for item in listing
@@ -499,11 +557,11 @@ def refetch_agrifood_dir(key, source, locales=None):
     ]
     if not csv_files:
         print("  No CSV files found in the picklists directory.", file=sys.stderr)
-        return
+        return []
 
     print(f"  Found {len(csv_files)} CSV file(s); downloading ...")
 
-    results = []
+    downloaded = []
     skipped = 0
     for item in csv_files:
         filename = item["name"]
@@ -512,27 +570,50 @@ def refetch_agrifood_dir(key, source, locales=None):
 
         print(f"  Downloading {filename} ...")
         try:
-            req = urllib.request.Request(
-                raw_url,
-                headers={"User-Agent": "menu_manager/1.0"}
-            )
+            req = urllib.request.Request(raw_url, headers={"User-Agent": "menu_manager/1.0"})
             with urllib.request.urlopen(req, timeout=30) as resp:
                 charset  = resp.headers.get_content_charset() or "utf-8"
                 csv_text = resp.read().decode(charset, errors="replace")
-            if csv_text.startswith('﻿'):
+            if csv_text.startswith('\ufeff'):
                 csv_text = csv_text[1:]
         except Exception as e:
             print(f"    Warning: failed to download {filename}: {e}", file=sys.stderr)
             skipped += 1
             continue
 
+        downloaded.append((filename, csv_text))
+
+    if downloaded:
+        with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for filename, csv_text in downloaded:
+                zf.writestr(filename, csv_text.encode("utf-8"))
+        print(f"  Saved {len(downloaded)} CSV file(s) to {zip_path}"
+              + (f" ({skipped} skipped)" if skipped else ""))
+
+    return downloaded
+
+
+def refetch_agrifood_dir(key, source, config_file=MENU_CONFIG, locales=None):
+    """Re-download all CSV files from the AgriFoodCA GitHub picklists directory,
+    save them to ``sources/{key}.zip``, and regenerate ``sources/{key}.yaml``.
+    """
+    zip_path   = f"sources/{key}.zip"
+    yaml_path  = f"sources/{key}.yaml"
+    source_url = (source.get("reachable_from") or {}).get("source_ontology", "")
+
+    downloaded = _download_agrifood_csvs_to_zip(zip_path)
+    if not downloaded:
+        return
+
+    results = []
+    skipped = 0
+    for filename, csv_text in downloaded:
         parsed = parse_agrifood_picklist(csv_text)
         if parsed is None:
             print(f"    Warning: {filename} does not match AgriFoodCA format — skipped",
                   file=sys.stderr)
             skipped += 1
             continue
-
         results.append((_filename_to_key(filename), parsed))
 
     if not results:
@@ -540,7 +621,6 @@ def refetch_agrifood_dir(key, source, locales=None):
         return
 
     schema = _build_combined_yaml(results, source_url, key, locales=locales)
-    yaml_path = f"sources/{key}.yaml"
     yaml_content = yaml.dump(schema, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
     new_size = len(yaml_content.encode("utf-8"))
     if new_size == 0:
@@ -694,7 +774,8 @@ def match_agrifood_dir(url, config_file=MENU_CONFIG):
 
     print(f"  Found {len(csv_files)} CSV file(s); downloading ...")
 
-    results = []   # list of (enum_key, parsed_dict)
+    downloaded = []  # list of (filename, csv_text) for zip archive
+    results    = []  # list of (enum_key, parsed_dict) for YAML build
     skipped = 0
     for item in csv_files:
         filename = item["name"]
@@ -724,11 +805,20 @@ def match_agrifood_dir(url, config_file=MENU_CONFIG):
             skipped += 1
             continue
 
+        downloaded.append((filename, csv_text))
         results.append((_filename_to_key(filename), parsed))
 
     if not results:
         print("  No valid picklists found.", file=sys.stderr)
         return True
+
+    # Save individual CSVs to a zip archive so -c can reprocess offline
+    zip_path = f"sources/{combined_key}.zip"
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for filename, csv_text in downloaded:
+            zf.writestr(filename, csv_text.encode("utf-8"))
+    print(f"  Saved {len(downloaded)} CSV file(s) to {zip_path}"
+          + (f" ({skipped} skipped)" if skipped else ""))
 
     # Build a single combined YAML with one enum per picklist
     schema = _build_combined_yaml(results, url, combined_key, locales=locales)
@@ -740,7 +830,7 @@ def match_agrifood_dir(url, config_file=MENU_CONFIG):
         log_extraction(enum_key, count=len(parsed['permissible_values']),
                        lang_counts={"fr": fr_count} if fr_count else None)
 
-    entry = make_source_entry(combined_key, url, "AgriFoodCA", "yaml",
+    entry = make_source_entry(combined_key, url, "AgriFoodCA", "csv",
                               title="AgriFoodCA Picklists",
                               description="Agricultural food data picklists from AgriFoodData Canada")
     config.setdefault("sources", {})[combined_key] = entry
