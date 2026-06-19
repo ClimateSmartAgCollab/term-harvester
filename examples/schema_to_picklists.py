@@ -13,11 +13,13 @@ agrifoodca_sssom.tsv (SSSOM format).  The schema's own locale extensions supply
 FR for enums it already knows; the SSSOM file covers the remainder.
 
 Usage:
-    python schema_to_picklists.py [--calibrate] [--build]
+    python schema_to_picklists.py [--calibrate] [--build] [--compare]
         --calibrate  Write/refresh agrifoodca_mapping.yaml and agrifoodca_sssom.tsv
                      from schema.yaml + existing entry_code_picklists.json.
         --build      Produce entry_code_picklists.json from schema.yaml +
                      agrifoodca_mapping.yaml + agrifoodca_sssom.tsv (default).
+        --compare    Show a unified diff of what --build would produce vs the
+                     existing entry_code_picklists.json without writing the file.
 
 Files (all relative to this script's directory):
     schema.yaml                   input schema
@@ -457,10 +459,11 @@ def generate_mapping():
 
 
 # ---------------------------------------------------------------------------
-# --build: produce entry_code_picklists.json from schema + mapping
+# --build / --compare: produce entry_code_picklists.json from schema + mapping
 # ---------------------------------------------------------------------------
 
-def build_json():
+def _build_output():
+    """Return the output dict that --build would write, without touching the file."""
     schema   = _load_schema()
     schema_enums = schema.get("enums") or {}
     fr_pvs   = _schema_fr_pvs(schema)
@@ -563,11 +566,33 @@ def build_json():
 
         output[json_key] = record
 
+    return output
+
+
+def build_json():
+    output = _build_output()
     with open(_JSON_PATH, "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
         f.write("\n")
-
     print(f"Wrote {_JSON_PATH} ({len(output)} picklists)")
+
+
+def compare_json():
+    """Show a unified diff of what --build would produce vs the existing JSON file."""
+    new_text = json.dumps(_build_output(), ensure_ascii=False, indent=2) + "\n"
+    with open(_JSON_PATH, encoding="utf-8") as f:
+        existing_text = f.read()
+    if new_text == existing_text:
+        print("No differences — --build output matches existing entry_code_picklists.json")
+        return
+    diff = list(difflib.unified_diff(
+        existing_text.splitlines(keepends=True),
+        new_text.splitlines(keepends=True),
+        fromfile="entry_code_picklists.json (existing)",
+        tofile="entry_code_picklists.json (--build output)",
+    ))
+    for line in diff:
+        print(line, end="")
 
 
 # ---------------------------------------------------------------------------
@@ -581,11 +606,16 @@ def main():
                         help="Write/refresh agrifoodca_mapping.yaml and agrifoodca_sssom.tsv")
     parser.add_argument("--build", action="store_true",
                         help="Build entry_code_picklists.json (default)")
+    parser.add_argument("--compare", action="store_true",
+                        help="Show diff of --build output vs existing entry_code_picklists.json"
+                             " without writing the file")
     args = parser.parse_args()
 
     if args.calibrate:
         generate_mapping()
-    if args.build or not args.calibrate:
+    if args.compare:
+        compare_json()
+    elif args.build or not args.calibrate:
         build_json()
 
 
