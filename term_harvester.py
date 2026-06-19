@@ -1326,13 +1326,22 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
         process_sources([key], config_file)
 
 
-def _require_source_file(key, ext):
-    """Return the source file path if it exists, else print a warning and return None."""
+def _require_source_file(key, ext, fallback_ext=None):
+    """Return the source file path if it exists, else print a warning and return None.
+
+    When fallback_ext is given, also accepts sources/{key}.{fallback_ext} if the
+    primary extension is not found (used for sources that migrated from one format
+    to another, e.g. STATSCAN html → zip).
+    """
     path = f"sources/{key}.{ext}"
-    if not os.path.exists(path):
-        print(f"Skipping {key}: {path} not found — run -f to fetch first", file=sys.stderr)
-        return None
-    return path
+    if os.path.exists(path):
+        return path
+    if fallback_ext:
+        fallback = f"sources/{key}.{fallback_ext}"
+        if os.path.exists(fallback):
+            return fallback
+    print(f"Skipping {key}: sources/{key}.{ext} not found — run -f to fetch first", file=sys.stderr)
+    return None
 
 
 
@@ -1385,12 +1394,12 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
             continue
 
         if content_type == "STATSCAN":
-            if not _require_source_file(key, "html"): continue
+            if not _require_source_file(key, "zip", fallback_ext="html"): continue
             process_statscan_source(key, source, config_file, locales=locales)
             continue
 
         if content_type == "STATSCAN_TABLE":
-            if not _require_source_file(key, "html"): continue
+            if not _require_source_file(key, "zip", fallback_ext="html"): continue
             process_statscan_table_source(key, source, config_file, locales=locales)
             continue
 
