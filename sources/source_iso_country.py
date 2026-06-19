@@ -43,6 +43,7 @@ from source_utils import (
     log_extraction,
     make_config_schema,
     make_source_entry,
+    normalize_text,
     update_source_config,
     write_config,
 )
@@ -366,9 +367,9 @@ def _build_single_yaml(key, source, data, locales=None):
                 add_permissible_value(pv_fr, code, title=title_fr)
 
     source_url = (source.get("reachable_from") or {}).get("source_ontology", "")
-    enum_entry = {"name": enum_key, "title": country_name, "permissible_values": pv_en}
+    enum_entry = {"name": enum_key, "title": normalize_text(country_name), "permissible_values": pv_en}
     if country_desc:
-        enum_entry["description"] = country_desc
+        enum_entry["description"] = normalize_text(country_desc)
     if country_qid:
         enum_entry["enum_uri"] = f"wd:{country_qid}"
 
@@ -431,11 +432,11 @@ def _build_all_yaml(source, data, locales=None):
         if pv_en:
             enum_entry = {
                 "name":   enum_key,
-                "title":  country_name or alpha2,
+                "title":  normalize_text(country_name or alpha2),
                 "permissible_values": pv_en,
             }
             if country_desc:
-                enum_entry["description"] = country_desc
+                enum_entry["description"] = normalize_text(country_desc)
             if country_qid:
                 enum_entry["enum_uri"] = f"wd:{country_qid}"
             enums[enum_key] = enum_entry

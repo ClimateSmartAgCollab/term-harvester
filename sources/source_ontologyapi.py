@@ -27,6 +27,7 @@ from source_utils import (
     log_extraction,
     make_config_schema,
     make_source_entry,
+    normalize_text,
     write_config,
     _get_type_conf,
 )
@@ -391,9 +392,9 @@ def process_skos_source(key, source, config_file=MENU_CONFIG, locales=None):
         curie = info["curie"]
         pv = {"text": curie, "meaning": curie}
         if info["label"]:
-            pv["title"] = info["label"]
+            pv["title"] = normalize_text(info["label"])
         if info.get("definition"):
-            pv["description"] = info["definition"]
+            pv["description"] = normalize_text(info["definition"])
         if curie in is_a_map:
             pv["is_a"] = is_a_map[curie]
         if info.get("deprecated"):

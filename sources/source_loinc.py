@@ -33,6 +33,7 @@ from source_utils import (
     IndentedDumper,
     MENU_CONFIG,
     make_source_entry,
+    normalize_text,
     write_config,
     update_source_config,
     rename_source_key,
@@ -203,7 +204,7 @@ def parse_loinc_table_page(html_text, base_url=""):
             if status_col is not None and len(cells) > status_col:
                 row["status"] = strip_tags(cells[status_col]).strip()
             if desc_col is not None and len(cells) > desc_col:
-                row["description"] = strip_tags(cells[desc_col]).strip()
+                row["description"] = normalize_text(strip_tags(cells[desc_col]).strip())
             rows.append(row)
 
         if rows:
@@ -412,7 +413,7 @@ def process_loinc_table_source(key, source, config_file=MENU_CONFIG):
 
         enum_def = {
             "name": enum_key,
-            "description": enum_description or row.get("description", ""),
+            "description": normalize_text(enum_description or row.get("description", "")),
         }
         if row.get("status"):
             enum_def["status"] = str(row["status"]).upper()

@@ -68,6 +68,7 @@ from source_utils import (
     _make_locale_extensions,
     IndentedDumper,
     make_source_entry,
+    normalize_text,
     update_source_config,
     write_config,
     MENU_CONFIG,
@@ -446,7 +447,7 @@ def process_statscan_source(key, source, config_file=None, locales=None):
     # ---- 4. Merge definitions into permissible_values -------------------
     for code, entry in permissible_values.items():
         if code in definitions:
-            entry["description"] = definitions[code]
+            entry["description"] = normalize_text(definitions[code])
 
     # ---- 5. Build French permissible_values -----------------------------
     fr_permissible_values = {}
@@ -551,7 +552,7 @@ def process_statscan_source(key, source, config_file=None, locales=None):
 
         for code, fr_entry in fr_permissible_values.items():
             if code in fr_definitions:
-                fr_entry["description"] = fr_definitions[code]
+                fr_entry["description"] = normalize_text(fr_definitions[code])
 
     # ---- 6. Write YAML --------------------------------------------------
     schema = make_config_schema(

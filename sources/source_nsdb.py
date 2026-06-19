@@ -58,6 +58,7 @@ from source_utils import (
     IndentedDumper,
     make_config_schema,
     make_source_entry,
+    normalize_text,
     update_source_config,
     write_config,
     MENU_CONFIG,
@@ -596,7 +597,7 @@ def process_nsdb_html_source(key, source, enum_prefix, locales=None):
 
     # Default description from first <p>
     p_m = re.search(r'<p[^>]*>(.*?)</p>', page_html, re.IGNORECASE | re.DOTALL)
-    schema["description"] = _strip_tags(p_m.group(1)).strip() if p_m else source.get("description", "")
+    schema["description"] = normalize_text(_strip_tags(p_m.group(1)).strip() if p_m else source.get("description", ""))
 
     fr_enums_pvs = {}
     fr_description = ""
@@ -624,7 +625,7 @@ def process_nsdb_html_source(key, source, enum_prefix, locales=None):
             comp_desc = find_section_paragraph(comp_html, "Description")
             if comp_desc:
                 existing = schema.get("description", "")
-                schema["description"] = (existing + "\n" + comp_desc).strip() if existing else comp_desc
+                schema["description"] = normalize_text((existing + "\n" + comp_desc).strip() if existing else comp_desc)
 
             attr_links = find_contents_table_links(comp_html, comp_url)
             print(f"    Found {len(attr_links)} attribute links")
@@ -661,11 +662,11 @@ def process_nsdb_html_source(key, source, enum_prefix, locales=None):
                     r'<meta\s[^>]*content=["\']([^"\']+)["\'][^>]*name=["\']dcterms\.title["\']',
                     page_html, re.IGNORECASE)
             if _meta_m:
-                schema["title"] = _meta_m.group(1).strip()
+                schema["title"] = normalize_text(_meta_m.group(1).strip())
 
             desc = find_section_paragraph(page_html, "Description")
             if desc:
-                schema["description"] = desc
+                schema["description"] = normalize_text(desc)
 
             if "fr" in (locales or ["en"]):
                 fr_page_url = nsdb_fr_url(base_url)
@@ -686,7 +687,7 @@ def process_nsdb_html_source(key, source, enum_prefix, locales=None):
                 print(f"  Warning: could not parse attribute label from {html_path}", file=sys.stderr)
                 return
             schema["enums"][enum_key] = enum_dict
-            schema["description"] = source.get("description") or enum_dict["description"]
+            schema["description"] = normalize_text(source.get("description") or enum_dict["description"])
 
             lang_counts = {}
             if "fr" in (locales or ["en"]):
@@ -766,7 +767,7 @@ def process_nsdb_source(key, source, locales=None):
         desc = find_section_paragraph(table_html, "Description")
         if desc:
             existing = schema.get("description", "")
-            schema["description"] = (existing + "\n" + desc).strip() if existing else desc
+            schema["description"] = normalize_text((existing + "\n" + desc).strip() if existing else desc)
 
         attr_links = find_contents_table_links(table_html, table_url)
         print(f"    Found {len(attr_links)} attribute links")

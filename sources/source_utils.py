@@ -53,7 +53,15 @@ BROWSER_HEADERS = {
 
 
 class IndentedDumper(yaml.Dumper):
-    """YAML dumper that indents list items one level under their parent key."""
+    """YAML dumper that indents list items one level under their parent key.
+
+    Sets ``allow_unicode=True`` by default so accented characters (é, à, …)
+    are written as literal UTF-8 rather than YAML \\xNN escape sequences.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.allow_unicode = True  # yaml.dump passes allow_unicode=None explicitly
+
     def increase_indent(self, flow=False, indentless=False):
         return super().increase_indent(flow=flow, indentless=False)
 
@@ -109,6 +117,8 @@ _TYPO_MAP = str.maketrans({
     "»": ">",    # right-pointing double angle quotation mark
     "≤": "<=",   # less-than or equal to
     "≥": ">=",   # greater-than or equal to
+    "\u202F": " ",  # narrow no-break space (NNBSP)
+    "\uFFFD": "-",  # Unicode replacement character (lost byte, likely em/en dash)
 })
 
 

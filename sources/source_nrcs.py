@@ -20,6 +20,7 @@ from source_utils import (
     log_extraction,
     IndentedDumper,
     make_config_schema,
+    normalize_text,
     BROWSER_HEADERS,
     MENU_CONFIG,
 )
@@ -223,7 +224,7 @@ def _parse_observation_method(page_text, defn=None):
             rows.append({
                 "code":        current_code,
                 "title":       kind,
-                "description": f"{prefix}: {desc}" if desc else "",
+                "description": normalize_text(f"{prefix}: {desc}") if desc else "",
             })
 
     raw_lines = section_m.group(1).split("\n")
@@ -381,7 +382,7 @@ def _parse_generic(page_text, defn):
             rows.append({
                 "code":        current["code"],
                 "title":       current["title"],
-                "description": " ".join(current["desc"]).strip(),
+                "description": normalize_text(" ".join(current["desc"]).strip()),
             })
             current = None
 
@@ -515,7 +516,7 @@ def process_nrcs_source(key, source, locales=None):
         schema["enums"][enum_key] = {
             "name":               enum_key,
             "title":              title,
-            "description":        description,
+            "description":        normalize_text(description),
             "see_also":           see_also,
             "permissible_values": permissible_values,
         }

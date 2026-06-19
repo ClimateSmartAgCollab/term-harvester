@@ -49,6 +49,7 @@ from source_utils import (
     make_config_schema,
     make_source_entry,
     add_permissible_value,
+    normalize_text,
     strip_tags,
     update_source_config,
     write_config,
@@ -659,7 +660,7 @@ def _apply_section_format(enums, merged_key, fmt):
         header_code = e.get("key") or re.sub(r'\W+', '', e.get("title", "Section"))
         pv = {"code": header_code, "title": e.get("title") or header_code}
         if e.get("description"):
-            pv["description"] = e["description"]
+            pv["description"] = normalize_text(e["description"])
         merged_pvs.append(pv)
         merged_pvs.extend(e.get("permissible_values", []))
     return [{"key": merged_key, "title": merged_key, "permissible_values": merged_pvs}]
@@ -792,7 +793,7 @@ def _build_schema(result, source_url, key, see_also=None, version=None):
             "title": enum_def.get("title", enum_key),
         }
         if enum_def.get("description"):
-            entry["description"] = enum_def["description"]
+            entry["description"] = normalize_text(enum_def["description"])
         if see_also:
             entry["see_also"] = see_also
         if permissible_values:

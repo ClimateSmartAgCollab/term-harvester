@@ -21,6 +21,7 @@ from source_utils import (
     make_config_schema,
     add_permissible_value,
     make_source_entry,
+    normalize_text,
     write_config,
     keys_from_minus,
 )
@@ -109,9 +110,9 @@ def _extract_owl_metadata(path):
             val = child.get(attr)
             return val.strip() if val else None
 
-        result["title"]       = (_text(ontology_el, f"{{{DC}}}title")
+        result["title"]       = normalize_text(_text(ontology_el, f"{{{DC}}}title")
                                   or _text(ontology_el, f"{{{DCT}}}title"))
-        result["description"] = (_text(ontology_el, f"{{{DC}}}description")
+        result["description"] = normalize_text(_text(ontology_el, f"{{{DC}}}description")
                                   or _text(ontology_el, f"{{{DCT}}}description"))
         result["version"]     = _text(ontology_el, f"{{{OWL}}}versionInfo")
         result["license"]     = _attr_or_text(ontology_el, f"{{{DCT}}}license")

@@ -20,6 +20,7 @@ from source_utils import (
     IndentedDumper,
     make_config_schema,
     make_source_entry,
+    normalize_text,
     write_config,
     MENU_CONFIG,
 )
@@ -306,14 +307,16 @@ def _hoist_shared_references(schema):
                 if m and m.group(1) == shared_ref:
                     prefix = desc[: m.start()].strip()
                     if prefix:
-                        entry["description"] = prefix
+                        entry["description"] = normalize_text(prefix)
                     else:
                         entry.pop("description", None)
 
             # Append to enum description if not already present
             enum_desc = enum_def.get("description") or ""
             if shared_ref not in enum_desc:
-                enum_def["description"] = (enum_desc + " " + shared_ref).strip() if enum_desc else shared_ref
+                enum_def["description"] = normalize_text(
+                    (enum_desc + " " + shared_ref).strip() if enum_desc else shared_ref
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -377,7 +380,7 @@ def process_nasis_source(key, source, locales=None):
             "permissible_values": permissible_values,
         }
         if domain["description"]:
-            enum_entry["description"] = domain["description"]
+            enum_entry["description"] = normalize_text(domain["description"])
         schema["enums"][enum_key] = enum_entry
 
     _hoist_shared_references(schema)
