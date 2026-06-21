@@ -52,56 +52,6 @@ _JSON_PATH     = os.path.join(_DIR, "entry_code_picklists.json")
 _MAPPING_PATH  = os.path.join(_DIR, "agrifoodca_mapping.yaml")
 _SSSOM_PATH    = os.path.join(_DIR, "agrifoodca_sssom.tsv")
 
-# ---------------------------------------------------------------------------
-# Default schema_key → json_key mapping.
-# This is used only when agrifoodca_mapping.yaml does not yet exist (bootstrap
-# seed for --calibrate).  Once the file exists, its schema_to_json: section is
-# the authoritative source; edit that to add or remove picklist entries.
-# ---------------------------------------------------------------------------
-_SCHEMA_TO_JSON = {
-    "AgriFoodCA_AgreementScale":        "agreement_scale",
-    "Canada":                           "canadian_provinces",
-    "AgriFoodCA_ComfortLevel":          "comfort_level",
-    "AgriFoodCA_ConceptAwareness":      "concept_awareness",
-    "AgriFoodCA_DataQualityCodes":      "data_quality_codes",
-    "AgriFoodCA_Days":                  "days",
-    "STATSCAN_1313722":                 "education_level_stats_can",
-    "AgriFoodCA_EducationLevel":        "education_level",
-    "AgriFoodCA_EightPointCardinality": "eight_point_cardinality",
-    "AgriFoodCA_Frequency":             "frequency",
-    "GenderIdentity":                   "gender",
-    "AgriFoodCA_HouseholdComposition":  "household_composition",
-    "AgriFoodCA_Months":                "months",
-    "NSDB_PMCHEM1":                     "parent_material_chemical_property",
-    "NSDB_PMTEX1":                      "parent_material_texture",
-    "AgriFoodCA_SixteenPointCardinality": "sixteen_point_cardinality",
-    "AgriFoodCA_SoilAerationStatus":    "soil_aeration_status",
-    "AgriFoodCA_SoilBulkDensity":       "soil_bulk_density",
-    "AgriFoodCA_SoilCarbonToNitrogenRatio": "soil_carbon_to_nitrogen_ratio",
-    "AgriFoodCA_SoilColloidFraction":   "soil_colloid_fraction",
-    "AgriFoodCA_SoilCompressibility":   "soil_compressibility",
-    "NSDB_DRAINAGE":                    "soil_drainage",
-    "AgriFoodCA_SoilEffectiveRootingDepth": "soil_effective_rooting_depth",
-    "AgriFoodCA_SoilErodibility":       "soil_erodibility",
-    "AgriFoodCA_SoilFertility":         "soil_fertility",
-    "AgriFoodCA_SoilMineralContentType": "soil_mineral_content_type",
-    "AgriFoodCA_SoilOrganicMatter":     "soil_organic_matter",
-    "AgriFoodCA_SoilPermeability":      "soil_permeability",
-    "NRCSSoilFieldBook_ReactionPH":     "soil_ph",
-    "AgriFoodCA_SoilPlasticity":        "soil_plasticity",
-    "AgriFoodCA_SoilPorosity":          "soil_porosity",
-    "SoilSalinityClass":                "soil_salinity",
-    "AgriFoodCA_SoilSalinityType":      "soil_salinity_type",
-    "AgriFoodCA_SoilSodicity":          "soil_sodicity",
-    "SoilStructuralShapeScale":         "soil_structure",
-    "AgriFoodCA_SoilTexture":           "soil_texture",
-    "StandardsMaturityLevel":           "standards_stages",
-    "AgriFoodCA_SupportConcept":        "support_concept",
-    "AgriFoodCA_ThirtyTwoPointCardinality": "thirty_two_point_cardinality",
-    "NSDB_WATERTBL":                    "water_table_characteristics",
-    # CRediT and LodgingScale are in schema but excluded from the JSON picklist
-}
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -378,9 +328,9 @@ def generate_mapping():
     schema_enums = schema.get("enums") or {}
     fr_pvs = _schema_fr_pvs(schema)
 
-    # schema_to_json: read from existing mapping file; fall back to in-script seed.
+    # schema_to_json: authoritative in agrifoodca_mapping.yaml; default to {} if absent.
     existing_raw = _load_mapping_raw()
-    schema_to_json = existing_raw.get("schema_to_json") or _SCHEMA_TO_JSON
+    schema_to_json = existing_raw.get("schema_to_json") or {}
 
     # Reverse map: json_key → schema_key
     json_to_schema = {v: k for k, v in schema_to_json.items()}
@@ -553,7 +503,11 @@ def add_enum(add_arg):
         sys.exit(1)
 
     raw            = _load_mapping_raw()
-    schema_to_json = dict(raw.get("schema_to_json") or _SCHEMA_TO_JSON)
+    if not raw.get("schema_to_json"):
+        print(f"Error: 'schema_to_json' section not found in {_MAPPING_PATH}. "
+              f"Add it manually or run --calibrate first.", file=sys.stderr)
+        sys.exit(1)
+    schema_to_json = dict(raw["schema_to_json"])
     enums          = dict(raw.get("enums") or {})
 
     if schema_enum_key in schema_to_json:
