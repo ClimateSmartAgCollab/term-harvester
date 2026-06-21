@@ -42,7 +42,7 @@ schema_to_json:
   SoilSalinityClass: soil_salinity
   AgriFoodCA_SoilSalinityType: soil_salinity_type
   AgriFoodCA_SoilSodicity: soil_sodicity
-  SoilStructuralShapeScale: soil_structure
+  SoilStructureShape: soil_structure
   AgriFoodCA_SoilTexture: soil_texture
   StandardsMaturityLevel: standards_stages
   AgriFoodCA_SupportConcept: support_concept
@@ -718,8 +718,7 @@ enums:
     - en
     - fr
   soil_structure:
-    schema_key: SoilStructuralShapeScale
-    static: true
+    schema_key: SoilStructureShape
     id: 35
     name:
       en: Soil structure type

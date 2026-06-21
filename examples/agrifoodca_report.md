@@ -11,6 +11,6 @@ sources now present in the schema.  Candidates to add to `minus > concepts` in
 | `AgriFoodCA_SoilPh` | `NRCSSoilFieldBook_ReactionPH` | Identical 11-class pH system; NRCS uses full text keys, AgriFoodCA uses abbreviations (UA, EA…) |
 | `AgriFoodCA_SoilSalinity` | `SoilSalinityClass` | Same 5 salinity classes; minor code differences (STS→ST, VSS→VS) |
 | `AgriFoodCA_SoilPermeability` | `NRCSSoilFieldBook_PermeabilityClass` | NRCS has 8 classes (adds impermeable + 3 intermediate speeds) vs AgriFoodCA's 5 |
-| `AgriFoodCA_SoilStructure` | `SoilStructuralShapeScale` | Same concept; NRCS splits "Blocky" into Angular/Subangular blocky and adds Wedge |
+| `AgriFoodCA_SoilStructure` | `SoilStructureShape` | Same concept; NRCS splits "Blocky" into Angular/Subangular blocky and adds Wedge |
 
 `AgriFoodCA_SoilTexture` has no equivalent in the current schema and should remain.
