@@ -1341,6 +1341,15 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
         ok, cd_or_err, _http_ct = _fetch_to_file(url, tmp_path)
         if not ok:
             print(f"  Error fetching {url}: {cd_or_err}", file=sys.stderr)
+            # If the URL has '?' but no '&', the shell may have split a multi-param
+            # URL at the first unquoted '&' (e.g. ...?a=1&b=2 → ...?a=1).
+            if "?" in url and "&" not in url:
+                print(
+                    "  Hint: if the full URL contained '&'-separated parameters,\n"
+                    "  the shell may have truncated it at '&'. Re-run with the URL quoted:\n"
+                    "    python term_harvester.py -a 'FULL_URL_HERE'",
+                    file=sys.stderr,
+                )
             os.unlink(tmp_path)
             continue
         if cd_or_err:
@@ -3560,6 +3569,15 @@ def main():
             keys_to_download = args.config
         else:
             print("No sources fetched. Provide source keys with -c, or use '-f all' to fetch every source.", file=sys.stderr)
+            freetext_keys = [k for k, v in all_sources.items()
+                             if v.get("content_type") == "FreeText"]
+            if all_sources:
+                print("Configured sources:", file=sys.stderr)
+                for k, v in all_sources.items():
+                    marker = " (*)" if v.get("content_type") == "FreeText" else ""
+                    print(f"  {k}{marker}", file=sys.stderr)
+            if freetext_keys:
+                print(f"(*) FreeText sources are skipped by '-f all' and must be fetched explicitly, e.g.: -f {freetext_keys[0]}", file=sys.stderr)
             keys_to_download = []
         invalid = [k for k in keys_to_download if k not in all_sources]
         if invalid:
@@ -3571,9 +3589,10 @@ def main():
         for key in keys_to_download:
             source = all_sources[key]
             content_type = source.get("content_type", "")
-            # FreeText: skip silently on -f all; allow only when explicitly named.
+            # FreeText: skip on -f all (requires explicit key); allow only when explicitly named.
             if content_type == "FreeText":
                 if "all" in args.fetch:
+                    print(f"  Skipping {key} (*): FreeText sources must be fetched explicitly, e.g.: -f {key}", file=sys.stderr)
                     continue
                 fetch_freetext_source(key, source, config_file)
                 continue
