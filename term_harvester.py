@@ -290,10 +290,21 @@ from source_nasis import (
     process_nasis_source,
     match_nasis,
 )
+from source_codex import (
+    process_codex_source,
+    fetch_codex_source,
+    match_codex,
+    CODEX_GSFA_URL,
+)
 from source_credit import (
     process_credit_source,
     fetch_credit_source,
     match_credit,
+)
+from source_enumber import (
+    process_enumber_source,
+    fetch_enumber_source,
+    match_enumber,
 )
 from source_loc_classification import (
     process_loc_source,
@@ -330,6 +341,7 @@ from source_utils import (
     rename_source_key,
     keys_from_minus,
     is_curie,
+    rank_and_sort_permissible_values,
 )
 
 # SSSOM predicate_id → LinkML permissible_value attribute name.
@@ -1264,6 +1276,11 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
                        f"?Function=getVD&TVD={_numeric_id}")
                 print(f"  {_statscan_key_m.group(1)} → {url}")
 
+        # Resolve the bare shorthand "CODEX" to the canonical GSFA URL.
+        if re.match(r'^CODEX$', url, re.IGNORECASE):
+            print(f"  CODEX → {CODEX_GSFA_URL}")
+            url = CODEX_GSFA_URL
+
         # FreeText: extract from provided text via Claude — no download needed.
         # Always stop after the call; do not fall through to other matchers
         # even if the API key is missing or extraction fails.
@@ -1288,11 +1305,27 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
             continue
         if match_snomed(url, config_file):
             continue
+        try:
+            with open(config_file) as _pf:
+                _pre_keys = set((yaml.safe_load(_pf) or {}).get("sources", {}).keys())
+        except Exception:
+            _pre_keys = set()
         if match_ontology_term(url, config_file):
+            try:
+                with open(config_file) as _pf:
+                    _post_keys = set((yaml.safe_load(_pf) or {}).get("sources", {}).keys())
+            except Exception:
+                _post_keys = set()
+            for _new_key in (_post_keys - _pre_keys):
+                process_sources([_new_key], config_file)
             continue
         if match_agrifood_dir(url, config_file):
             continue
         if match_nasis(url, config_file):
+            continue
+        if match_codex(url, config_file):
+            continue
+        if match_enumber(url, config_file):
             continue
         if match_credit(url, config_file):
             continue
@@ -1629,6 +1662,15 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
             process_nasis_source(key, source, locales=locales)
             continue
 
+        if content_type == "CODEX":
+            if not _require_source_file(key, "zip"): continue
+            process_codex_source(key, source, locales=locales)
+            continue
+
+        if content_type == "E_NUMBER":
+            process_enumber_source(key, source, locales=locales)
+            continue
+
         if content_type == "CRediT":
             process_credit_source(key, source, locales=locales)
             continue
@@ -1683,7 +1725,8 @@ def _report_missing_yamls(config_file):
         print(f"  {flag} {key}")
 
 
-def expand_reachable_from(yaml_path, enum_filter=None, apis=None, locales=None):
+def expand_reachable_from(yaml_path, enum_filter=None, apis=None, locales=None,
+                          source_configs=None):
     """For each enum with reachable_from.source_nodes, fetch graph data via the
     appropriate API and populate permissible_values with CURIE keys, titles,
     and is_a hierarchy.
@@ -1692,6 +1735,11 @@ def expand_reachable_from(yaml_path, enum_filter=None, apis=None, locales=None):
     enum_filter: optional set/list of enum keys to restrict processing to.
     apis: dict loaded from harvester_config.yaml 'apis' key; used by fetch_api_graph
           to route each ontology prefix to the correct API service.
+    source_configs: dict of source entries from harvester_config.yaml, keyed by
+          source key.  Used to read the 'sorted' attribute for each enum so that
+          unranked permissible values can be sorted alphabetically when requested.
+          User-set 'rank' values in the existing schema.yaml are always preserved
+          regardless of this setting.
     Writes the updated schema back to yaml_path if any enums were expanded.
     """
     with open(yaml_path, "r") as f:
@@ -1720,6 +1768,17 @@ def expand_reachable_from(yaml_path, enum_filter=None, apis=None, locales=None):
             continue
 
         print(f"  Expanding '{enum_key}' ({len(source_nodes)} source node(s))")
+
+        # Capture user-set ranks from current schema.yaml before rebuilding PVs
+        _existing_ranks = {}
+        for _curie, _pv in (enum_def.get("permissible_values") or {}).items():
+            if isinstance(_pv, dict) and "rank" in _pv:
+                _existing_ranks[_curie] = _pv["rank"]
+
+        # Look up 'sorted' config attribute for this enum's source
+        _src_key = (enum_def.get("annotations") or {}).get("imported_from")
+        _src_cfg = (source_configs or {}).get(_src_key) or {}
+        _sort_unranked = bool(_src_cfg.get("sorted", False))
 
         # Collect all nodes and edges from every source_node graph fetch
         all_nodes = {}   # iri -> {"label": str, "curie": str}
@@ -1830,6 +1889,13 @@ def expand_reachable_from(yaml_path, enum_filter=None, apis=None, locales=None):
                 pv["status"] = "DEPRECATED"
             permissible_values[curie] = pv
 
+        # Re-apply user-set ranks so they survive a -l refresh
+        for _curie, _rank in _existing_ranks.items():
+            if _curie in permissible_values:
+                permissible_values[_curie]["rank"] = _rank
+
+        permissible_values = rank_and_sort_permissible_values(
+            permissible_values, sort_unranked=_sort_unranked)
         enum_def["permissible_values"] = permissible_values
         expanded[enum_key] = len(permissible_values)
         changed = True
@@ -3498,7 +3564,8 @@ def main():
                      f"  Use -i <path> to specify a config file, or use -a <URL> to create one.")
 
     if args.add:
-        add_source(args.add, config_file, free_text=args.free_text)
+        _expanded_add = [p.strip() for arg in args.add for p in arg.split(",") if p.strip()]
+        add_source(_expanded_add, config_file, free_text=args.free_text)
     if args.delete:
         with open(config_file, "r") as f:
             config = yaml.safe_load(f)
@@ -3605,6 +3672,16 @@ def main():
                     print(f"  Skipping {key}: NRCSSoilFieldBook PDF already downloaded this run")
                 process_nrcs_source(key, source, locales=locales_cfg)
                 continue
+            # CODEX: download PDF, extract text, zip; then rebuild YAML.
+            if content_type == "CODEX":
+                fetch_codex_source(key, source, config_file)
+                process_codex_source(key, source, locales=locales_cfg)
+                continue
+            # E_NUMBER: re-query Wikidata SPARQL and rebuild YAML.
+            if content_type == "E_NUMBER":
+                fetch_enumber_source(key, source, config_file)
+                process_enumber_source(key, source, locales=locales_cfg)
+                continue
             # STATSCAN: multi-page crawl — build sources/{key}.zip.
             if content_type == "STATSCAN":
                 fetch_statscan_source(key, source, config_file, locales=locales_cfg)
@@ -3704,7 +3781,9 @@ def main():
 
             if not args.lookup:
                 # -l with no args: expand every enum in schema.yaml that has reachable_from.source_nodes
-                lookup_results.update(expand_reachable_from(schema_file, apis=_apis, locales=_locales))
+                lookup_results.update(expand_reachable_from(
+                    schema_file, apis=_apis, locales=_locales,
+                    source_configs=_lconfig.get("sources", {})))
             else:
                 all_sources = _lconfig.get("sources", {})
                 with open(schema_file, "r") as f:
@@ -3743,7 +3822,8 @@ def main():
 
                 if enum_filter:
                     lookup_results.update(expand_reachable_from(
-                        schema_file, enum_filter=enum_filter, apis=_apis, locales=_locales))
+                        schema_file, enum_filter=enum_filter, apis=_apis, locales=_locales,
+                        source_configs=_lconfig.get("sources", {})))
 
             if lookup_results:
                 print("\nLookup report:")

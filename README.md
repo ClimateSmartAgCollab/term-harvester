@@ -53,6 +53,9 @@ The term_harvester.py script fetches vocabulary sources, processes them into Lin
   - [NAPCS Canada](#napcs-canada)
   - [CRediT (Contributor Roles Taxonomy)](#credit-contributor-roles-taxonomy)
   - [AgriFoodCA picklists](#agrifoodca-picklists)
+  - [Codex Alimentarius (GSFA food additives)](#codex-alimentarius-gsfa-food-additives-codex)
+  - [E Numbers (Wikidata P628)](#e-numbers-wikidata-p628-e_number)
+  - [CANSIS Glossary of Terms in Soil Science](#cansis-glossary-of-terms-in-soil-science-cansis_glossary)
   - [FreeText](#freetext)
 - [FreeText source type](#freetext-source-type)
 - [Term Search](#term-search)
@@ -64,6 +67,8 @@ The term_harvester.py script fetches vocabulary sources, processes them into Lin
 - [`harvester_config.yaml` — source entry structure](#harvester_configyaml--source-entry-structure)
   - [`minus` — exclude content during `-b` build](#minus--exclude-content-during--b-build)
   - [`include` — restore excluded content, or whitelist-only mode](#include--restore-excluded-content-or-whitelist-only-mode)
+  - [`rank` — auto-detected permissible value ordering](#rank--auto-detected-permissible-value-ordering)
+  - [`sorted` — alphabetical ordering of unranked permissible values](#sorted--alphabetical-ordering-of-unranked-permissible-values)
   - [`concise` — trim redundant hierarchy nodes during `-b`](#concise--trim-redundant-hierarchy-nodes-during--b)
 - [`minus` / `include` processing](#minus--include-processing--which-attributes-apply-to-which-content-types)
 - [API configuration](#api-configuration)
@@ -250,31 +255,36 @@ during `-c`) combined with optional API and AI scoring.  See
 
 ---
 
+Check source section for details on command line configuration.
+
 ## Supported source types and auto-detection
 
 | Detected as | Detection method |
 |---|---|
-| `OntologyAPI` | URL matches `aims.fao.org/aos/agrovoc/{id}` (pre-download) |
-| `OntologyAPI` | URL matches `snomed.info/id/{conceptId}` (pre-download) |
-| `OntologyAPI` | Bare CURIE `ENVO:00010483`, OBO shorthand `ENVO_00010483`, or OBO IRI `http://purl.obolibrary.org/obo/ENVO_00010483` (pre-download; routes to configured API or OLS4) |
-| `NSDBSNT` | URL contains `/snt/` under the NSDB soil domain |
-| `NSDBSLT` | URL contains `/slt/` under the NSDB soil domain |
-| `NSDB` | URL matches `sis.agr.gc.ca/cansis/nsdb/soil` prefix |
-| `NSDBSLC` | URL matches `sis.agr.gc.ca` + `/nsdb/slc/` |
-| `LOINC` | URL from `terminology.hl7.org` with `.html` extension (listing page, not a single ValueSet/CodeSystem detail) |
-| `OWL` | URL extension `.owl`, `.ofn`, `.rdf`, `.ttl`, `.n3`; or file contains RDF/OWL content markers |
-| `LOINCCodeSystem` | `.json` file with `resourceType: CodeSystem` |
-| `LOINCValueSet` | `.json` file with `resourceType: ValueSet` |
-| `LinkML` | `.yaml`/`.yml` file that is a dict containing `enums` or `id` |
-| `STATSCAN` | URL from `statcan.gc.ca` containing `p3VD.pl` and `Function=getVD` |
-| `STATSCAN_TABLE` | URL from `www12.statcan.gc.ca/.../ref/dict/tab/index-eng.cfm?ID=` |
-| `ISO_COUNTRY` | URL from `iso.org/obp/ui/#iso:code:3166:` followed by a 2-letter country code |
-| `CRediT` | URL from `zenodo.org/records/{id}` — bare record URL containing "credit", or a `/files/` path containing "credit" and ".pdf" |
+| [`AGROVOC`](#agrovoc) → `OntologyAPI` | URL matches `aims.fao.org/aos/agrovoc/{id}` (pre-download) |
+| [`SNOMED CT`](#snomed-ct-via-ols4) → `OntologyAPI` | URL matches `snomed.info/id/{conceptId}` (pre-download) |
+| [OBO terms](#obo-ontology-terms-envo-go-uberon-) → `OntologyAPI` | Bare CURIE `ENVO:00010483`, OBO shorthand `ENVO_00010483`, or OBO IRI `http://purl.obolibrary.org/obo/ENVO_00010483` (pre-download; routed to configured API or OLS4) |
+| [`NSDBSNT`](#nsdb-national-soil-database) | URL contains `/snt/` under the NSDB soil domain |
+| [`NSDBSLT`](#nsdb-national-soil-database) | URL contains `/slt/` under the NSDB soil domain |
+| [`NSDB`](#nsdb-national-soil-database) | URL matches `sis.agr.gc.ca/cansis/nsdb/soil` prefix |
+| [`NSDBSLC`](#nsdb-national-soil-database) | URL matches `sis.agr.gc.ca` + `/nsdb/slc/` |
+| [`LOINC`](#loinc-codesystems-and-valuesets) | URL from `terminology.hl7.org` with `.html` extension (listing page, not a single ValueSet/CodeSystem detail) |
+| [`OWL`](#owl-ontologies) | URL extension `.owl`, `.ofn`, `.rdf`, `.ttl`, `.n3`; or file contains RDF/OWL content markers |
+| [`LOINCCodeSystem`](#loinc-codesystems-and-valuesets) | `.json` file with `resourceType: CodeSystem` |
+| [`LOINCValueSet`](#loinc-codesystems-and-valuesets) | `.json` file with `resourceType: ValueSet` |
+| [`LinkML`](#linkml) | `.yaml`/`.yml` file that is a dict containing `enums` or `id` |
+| [`STATSCAN`](#statistics-canada) | URL from `statcan.gc.ca` containing `p3VD.pl` and `Function=getVD` |
+| [`STATSCAN_TABLE`](#statistics-canada-census-dictionary-tables-statscan_table) | URL from `www12.statcan.gc.ca/.../ref/dict/tab/index-eng.cfm?ID=` |
+| [`ISO_COUNTRY`](#iso-3166-2-country-subdivisions-iso_country) | URL from `iso.org/obp/ui/#iso:code:3166:` followed by a 2-letter country code |
+| [`CRediT`](#credit-contributor-roles-taxonomy) | URL from `zenodo.org/records/{id}` — bare record URL containing "credit", or a `/files/` path containing "credit" and ".pdf" |
 | `LOC_CLASSIFICATION` | Exact URL `https://www.loc.gov/catdir/cpso/lcco/` |
-| `NAPCSCanada` | CSV content with NAPCS-specific column headers |
-| `AgriFoodCA` | GitHub directory URL for `agrifooddatacanada/picklists_for_schemas` (pre-download) |
-| `AgriFoodCA` | CSV first row matches `,title,description,keywords,source` (content-based) |
-| `NASIS` | URL from `nrcs.usda.gov` containing `NASIS` with `.pdf` extension |
+| [`NAPCSCanada`](#napcs-canada) | CSV content with NAPCS-specific column headers |
+| [`AgriFoodCA`](#agrifoodca-picklists) | GitHub directory URL for `agrifooddatacanada/picklists_for_schemas` (pre-download) |
+| [`AgriFoodCA`](#agrifoodca-picklists) | CSV first row matches `,title,description,keywords,source` (content-based) |
+| [`NASIS`](#nasis-usda-nrcs-national-soil-information-system) | URL from `nrcs.usda.gov` containing `NASIS` with `.pdf` extension |
+| [`CODEX`](#codex-alimentarius-gsfa-food-additives-codex) | URL from `fao.org/gsfaonline/docs/` or `fao.org/input/download/standards/4/CXS_192` (pre-download) |
+| [`E_NUMBER`](#e-numbers-wikidata-p628-e_number) | URL matches `wikidata.org/wiki/Q207810` (E number concept), or Wikidata SPARQL URL containing `P628` (pre-download) |
+| [`CANSIS_GLOSSARY`](#cansis-glossary-of-terms-in-soil-science-cansis_glossary) | Exact URL `https://sis.agr.gc.ca/cansis/glossary/` (pre-download) |
 
 ---
 
@@ -760,6 +770,136 @@ When a source document URL is found in the CSV metadata (the `source` column of 
 
 ---
 
+### Codex Alimentarius (GSFA food additives) (CODEX)
+
+The [Codex General Standard for Food Additives](https://www.fao.org/gsfaonline/)
+(CXS 192-1995) is the FAO/WHO international standard governing permitted food
+additives.  The source PDF is parsed into three enums per revision year:
+
+| Enum key | Contents |
+|---|---|
+| `CODEX_{year}_FoodCategories` | Hierarchical food category tree (dotted-decimal codes, e.g. `01.0`, `01.1.1`) |
+| `CODEX_{year}_Additives` | Permitted additives from TABLE ONE (INS codes as keys, sorted numerically by INS code) |
+| `CODEX_{year}_FOOTNOTES` | Footnote definitions referenced by the permission tables |
+
+```bash
+# Add the current revision (URL always points to the latest PDF)
+python term_harvester.py -a "https://www.fao.org/gsfaonline/docs/CXS_192e.pdf"
+
+# Or add a specific dated edition:
+python term_harvester.py -a "https://www.fao.org/input/download/standards/4/CXS_192_2015e.pdf"
+
+# Rebuild schema.yaml
+python term_harvester.py -b
+```
+
+The source key is `CODEX_{year}` (e.g. `CODEX_2025`), where the year is extracted
+from the "CODEX STAN" or "CXS" revision line in the PDF.  The PDF is extracted
+with `pdfplumber` (visual reading order, correct for multi-column tables) and
+cached in `sources/{key}.zip` for fast reprocessing.  Requires the `pdfplumber`
+package (`pip install pdfplumber`).
+
+To refresh after a new Codex revision is published:
+
+```bash
+python term_harvester.py -f CODEX_2025   # re-downloads PDF, re-extracts text
+python term_harvester.py -c CODEX_2025   # regenerates sources/CODEX_2025.yaml
+python term_harvester.py -b              # rebuilds schema.yaml
+```
+
+---
+
+### E Numbers (Wikidata P628) (E_NUMBER)
+
+EU/UK food additive E numbers fetched from Wikidata via SPARQL property P628.
+The resulting enum is organised into nine parent permissible values (one per EU
+numeric range category) with individual E numbers as children carrying `is_a`
+pointing to their range category.
+
+Each permissible value carries:
+- `title` — English Wikidata label (e.g. `curcumin`)
+- `description` — Wikidata short description and/or P366 "has use" functional-role values collected during fetch
+- `is_a` — parent range category key (e.g. `colours`, `preservatives`)
+- `meaning: wd:Qxxx` — Wikidata entity CURIE for semantic linking
+
+```bash
+# Add the E number source (fetches SPARQL results immediately)
+python term_harvester.py -a "https://www.wikidata.org/wiki/Q207810"
+
+# Rebuild schema.yaml
+python term_harvester.py -b
+
+# Refresh from Wikidata (re-queries SPARQL, updates sources/E_NUMBER.json)
+python term_harvester.py -f E_NUMBER
+python term_harvester.py -c E_NUMBER
+python term_harvester.py -b
+```
+
+The source key is always `E_NUMBER`.  Results are cached in
+`sources/E_NUMBER.json`.  The `wd:` prefix is written to the config's
+`prefix_dict` and synced into `schema.yaml` by `-b`.
+
+**Parent range categories added to the enum:**
+
+| Key | Title |
+|---|---|
+| `colours` | Colours (E100-E199) |
+| `preservatives` | Preservatives (E200-E299) |
+| `antioxidants` | Antioxidants and acidity regulators (E300-E399) |
+| `thickeners` | Thickeners, stabilisers and emulsifiers (E400-E499) |
+| `acidity_regulators` | Acidity regulators and anti-caking agents (E500-E599) |
+| `flavour_enhancers` | Flavour enhancers (E600-E699) |
+| `antibiotics` | Antibiotics (E700-E799) |
+| `glazing_agents` | Glazing agents, gases and sweeteners (E900-E999) |
+| `additional_additives` | Additional additives (E1000-E1599) |
+
+---
+
+### CANSIS Glossary of Terms in Soil Science (CANSIS_GLOSSARY)
+
+The Canadian National Soil DataBase [CANSIS Glossary](https://sis.agr.gc.ca/cansis/glossary/)
+contains English and French term/definition pairs for soil science terminology
+published by Agriculture and Agri-Food Canada.
+
+```bash
+# Add the glossary (downloads all A-Z letter pages, EN and FR)
+python term_harvester.py -a "https://sis.agr.gc.ca/cansis/glossary/"
+
+# Rebuild schema.yaml
+python term_harvester.py -b
+```
+
+The source key is `CANSIS_GLOSSARY`.  All letter pages (A–Z plus numeric
+entries) plus four supplementary table pages are downloaded and stored in
+`sources/CANSIS_GLOSSARY.zip`.  The `-c` step parses `<dl><dt><dd>` term/
+definition pairs from the English pages and writes a flat enum.
+
+**French locale extensions** are handled by a separate utility script
+(`sources/source_cansis_translate.py`) that bridges the independent French
+glossary via machine translation and fuzzy term matching.  It requires
+`pip install deep-translator` and produces output for human review before
+applying:
+
+```bash
+# Translate FR glossary entries to EN for matching (requires deep-translator)
+python sources/source_cansis_translate.py --translate
+# Review CANSIS_GLOSSARY_translated_fr.tsv, then apply
+python sources/source_cansis_translate.py --apply [--threshold 0.65]
+# Re-run -c or -b to incorporate the FR extensions
+python term_harvester.py -c CANSIS_GLOSSARY
+python term_harvester.py -b
+```
+
+To refresh the glossary:
+
+```bash
+python term_harvester.py -f CANSIS_GLOSSARY   # re-downloads all pages into zip
+python term_harvester.py -c CANSIS_GLOSSARY   # regenerates sources/CANSIS_GLOSSARY.yaml
+python term_harvester.py -b
+```
+
+---
+
 ### FreeText
 
 For picklists described in free prose — inline text, a `.txt` file, or a `.pdf`
@@ -1156,6 +1296,73 @@ MySource:
     concepts: [BiomeEnum, HabitatEnum]            # only these two enums are imported
 ```
 
+### `rank` — auto-detected permissible value ordering
+
+When permissible values are written by `-c` (for `OntologyAPI` / AGROVOC SKOS
+sources) or by `-l` (expansion into `schema.yaml`), the tool scans each sibling
+group — values sharing the same `is_a` parent, or values with no `is_a` — for a
+leading alphanumeric rank code in the title.
+
+**Detection rule:** if at least two siblings share the same prefix before a
+number (e.g. `LP.` in `LP.07 seven leaves visible stage`, or an empty prefix for
+bare integers like `3 establishment of tissue systems stage`), and those numbers
+form a consecutive integer sequence starting at `0` or `1`, every matched value
+receives a `rank:` attribute equal to the parsed integer and the group is sorted
+by rank.  Unmatched siblings within the same group are placed after the ranked
+values.
+
+```yaml
+# Example: children of PO:0007520 after auto-ranking
+PO:0007505:
+  title: 1 root primordium formation stage
+  is_a: PO:0007520
+  rank: 1
+PO:0007527:
+  title: 2 root meristem formation stage
+  is_a: PO:0007520
+  rank: 2
+# … ranks 3-5 …
+PO:0025475:
+  title: coleorhiza emergence stage   # no code → no rank → follows ranked items
+  is_a: PO:0007520
+PO:0007015:
+  title: radicle emergence stage
+  is_a: PO:0007520
+```
+
+**Preserving user-set ranks:** if a `rank:` value is already present on a
+permissible value in `schema.yaml` (set by the user or from a previous run),
+it is never overwritten by auto-detection.  This lets you manually override the
+order of any individual term without losing the change on the next `-c` or `-l`
+refresh.
+
+---
+
+### `sorted` — alphabetical ordering of unranked permissible values
+
+Set `sorted: true` on a source entry to have unranked permissible values within
+each sibling group sorted case-insensitively by title.  This applies wherever
+that source's enums are processed: `-c` writes the sorted order to
+`sources/{key}.yaml`, and `-l` applies the same ordering when updating
+`schema.yaml`.
+
+```yaml
+# harvester_config.yaml
+MyOntologySource:
+  content_type: OntologyAPI
+  sorted: true
+  reachable_from:
+    source_nodes: [ENVO:00000428]
+    include_self: true
+```
+
+Ranked items (those with an auto-detected or user-set `rank:`) are always placed
+first within each group; `sorted: true` controls only the trailing unranked
+items.  To add a case-sensitive sort option, a `sorted: case-sensitive` value
+may be supported in a future release.
+
+---
+
 ### `concise` — trim redundant hierarchy nodes during `-b`
 
 When `concise: true`, nodes whose title exactly matches their parent's title are
@@ -1407,4 +1614,8 @@ echo $ANTHROPIC_API_KEY
 | `source_zenodo.py` | Shared Zenodo REST API utilities: `is_zenodo_record_url`, `to_zenodo_api_url`, `fetch_zenodo_file` — used by `source_credit.py` | |
 | `source_credit.py` | `content_type: CRediT` — CRediT contributor roles; fetches PDF via Zenodo API, parses with `pypdf` | |
 | `source_loc_classification.py` | `content_type: LOC_CLASSIFICATION` — Library of Congress Classification; downloads HTML index + ~20 class PDFs; hierarchy via numeric range containment | [Index](https://www.loc.gov/catdir/cpso/lcco/) |
+| `source_codex.py` | `content_type: CODEX` — FAO/WHO Codex General Standard for Food Additives (CXS 192-1995) PDF; produces three enums per revision year: food categories (dotted-decimal hierarchy), TABLE ONE additives (INS codes), and footnotes | [GSFA PDF](https://www.fao.org/gsfaonline/docs/CXS_192e.pdf) |
+| `source_enumber.py` | `content_type: E_NUMBER` — EU/UK food additive E numbers via Wikidata SPARQL property P628; fetches labels, `schema:description`, and P366 functional-use values; produces a two-level enum with nine EU numeric range parent PVs; `meaning` compressed to `wd:Qxxx` | [Wikidata Q207810](https://www.wikidata.org/wiki/Q207810) |
+| `source_cansis_glossary.py` | `content_type: CANSIS_GLOSSARY` — CANSIS Glossary of Terms in Soil Science; downloads all A-Z letter pages (EN + FR) into a zip; parses `<dl>` term/definition pairs; FR locale extensions handled by `source_cansis_translate.py` (separate utility, requires `deep-translator`) | [Glossary index](https://sis.agr.gc.ca/cansis/glossary/) |
+| `source_cansis_translate.py` | Standalone utility (not a source module); bridges the independent CANSIS French glossary to the EN enum via Google Translate + fuzzy label matching; run manually after `-c` to produce and apply `CANSIS_GLOSSARY_translated_fr.tsv` | |
 | `source_freetext.py` | `content_type: FreeText` — Claude API enum extraction from free text | |

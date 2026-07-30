@@ -26,6 +26,7 @@ Public API:
     keys_from_minus(value)
     is_curie(value)
     _get_type_conf(api_conf, type_name)
+    rank_and_sort_permissible_values(permissible_values)
 """
 
 import datetime
@@ -493,6 +494,100 @@ def is_curie(value):
         return False
     pfx = value.split(":")[0]
     return bool(pfx) and "/" not in pfx and pfx.lower() not in ("http", "https", "urn")
+
+
+# Matches a leading alphanumeric rank code: optional letters then optional separator
+# then digits, e.g. "LP.07", "1", "BBCH-10".  Anchored to start; requires
+# at least a space or end-of-string after the digits so bare-word titles don't match.
+_RANK_PREFIX_PAT = re.compile(r'^([A-Za-z]*[._-]?)(\d+)(?:\s|$)')
+
+
+def rank_and_sort_permissible_values(permissible_values, sort_unranked=False):
+    """Detect consecutive numeric prefix patterns within is_a sibling groups,
+    add a 'rank' attribute to each matched permissible value, and return a
+    reordered dict.
+
+    For each group of PVs sharing the same is_a parent (or sharing no is_a):
+      - Extract any leading code of the form '{letters}{sep}{digits}' or bare
+        '{digits}' from the title (e.g. 'LP.07', '3').
+      - If at least two items in the group share the same prefix and their
+        extracted numbers form a consecutive sequence starting at 0 or 1,
+        assign rank=<number> to each matched PV that does not already carry a
+        'rank' attribute (existing ranks — e.g. user-set — are preserved).
+      - Reorder the group: ranked items first (ascending by rank), then
+        unranked items in their original insertion order, or alphabetically by
+        title (case-insensitive) when sort_unranked=True.
+
+    sort_unranked: when True, unranked PVs within each group are sorted
+        case-insensitively by title; when False (default) they retain their
+        existing order.
+    Mutates each matched pv dict in-place to add 'rank'.
+    Returns a new ordered dict (all original keys present, reordered within
+    sibling groups).
+    """
+    from collections import defaultdict
+
+    # Group PV keys by their is_a value (None for items with no is_a)
+    groups = defaultdict(list)  # parent_or_None -> [curie, ...]
+    group_order = []            # first-seen order of each parent key
+
+    for curie, pv in permissible_values.items():
+        parent = pv.get("is_a")
+        if parent not in groups:
+            group_order.append(parent)
+        groups[parent].append(curie)
+
+    # Detect rank pattern in each group and assign rank attributes
+    for parent, curies in groups.items():
+        if len(curies) < 2:
+            continue
+
+        # Extract (prefix, number) from titles and group by prefix
+        by_prefix = defaultdict(list)  # prefix -> [(number, curie), ...]
+        for curie in curies:
+            title = (permissible_values[curie].get("title") or "").strip()
+            m = _RANK_PREFIX_PAT.match(title)
+            if m:
+                by_prefix[m.group(1)].append((int(m.group(2)), curie))
+
+        for prefix, num_curies in by_prefix.items():
+            if len(num_curies) < 2:
+                continue
+            numbers = sorted(n for n, _ in num_curies)
+            min_n = numbers[0]
+            if min_n not in (0, 1):
+                continue
+            if numbers != list(range(min_n, min_n + len(numbers))):
+                continue
+            # Consecutive sequence confirmed — assign ranks (preserve any user-set rank)
+            for number, curie in num_curies:
+                if "rank" not in permissible_values[curie]:
+                    permissible_values[curie]["rank"] = number
+
+    # Rebuild dict: within each group ranked items first (by rank), then
+    # unranked items (alphabetically by title when sort_unranked=True,
+    # otherwise in their original insertion order).
+    result = {}
+    for parent in group_order:
+        ranked = []
+        unranked = []
+        for curie in groups[parent]:
+            pv = permissible_values[curie]
+            if "rank" in pv:
+                ranked.append((pv["rank"], curie))
+            else:
+                unranked.append(curie)
+        for _, curie in sorted(ranked):
+            result[curie] = permissible_values[curie]
+        if sort_unranked:
+            unranked = sorted(
+                unranked,
+                key=lambda c: (permissible_values[c].get("title") or "").lower(),
+            )
+        for curie in unranked:
+            result[curie] = permissible_values[curie]
+
+    return result
 
 
 def keys_from_minus(value):

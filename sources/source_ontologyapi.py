@@ -15,6 +15,7 @@ Public API used by term_harvester.py:
 """
 
 import json
+import os
 import re
 import sys
 import urllib.parse
@@ -28,6 +29,7 @@ from source_utils import (
     make_config_schema,
     make_source_entry,
     normalize_text,
+    rank_and_sort_permissible_values,
     write_config,
     _get_type_conf,
 )
@@ -387,6 +389,22 @@ def process_skos_source(key, source, config_file=MENU_CONFIG, locales=None):
 
     is_a_map = {e["child_curie"]: e["parent_curie"] for e in all_edges}
 
+    # Preserve any user-set ranks from an existing sources/{key}.yaml so that
+    # a -c refresh does not overwrite ranks the user has manually assigned.
+    _existing_ranks = {}
+    if os.path.exists(yaml_path):
+        try:
+            with open(yaml_path) as _ef:
+                _existing = yaml.safe_load(_ef) or {}
+            _existing_pvs = (
+                (_existing.get("enums") or {}).get(key) or {}
+            ).get("permissible_values") or {}
+            for _curie, _pv in _existing_pvs.items():
+                if isinstance(_pv, dict) and "rank" in _pv:
+                    _existing_ranks[_curie] = _pv["rank"]
+        except Exception:
+            pass
+
     permissible_values = {}
     for _iri, info in sorted(all_nodes.items(), key=lambda x: x[1]["curie"]):
         curie = info["curie"]
@@ -400,6 +418,16 @@ def process_skos_source(key, source, config_file=MENU_CONFIG, locales=None):
         if info.get("deprecated"):
             pv["status"] = "DEPRECATED"
         permissible_values[curie] = pv
+
+    # Re-apply preserved ranks before auto-detection so they take priority
+    for _curie, _rank in _existing_ranks.items():
+        if _curie in permissible_values:
+            permissible_values[_curie]["rank"] = _rank
+
+    permissible_values = rank_and_sort_permissible_values(
+        permissible_values,
+        sort_unranked=bool(source.get("sorted", False)),
+    )
 
     pfx_id = next(iter(prefixes.values()), "") if prefixes else ""
     schema = make_config_schema(
@@ -579,5 +607,5 @@ def match_ontology_term(url, config_file=MENU_CONFIG):
     config.setdefault("sources", {})[key] = entry
     write_config(config, config_file)
     print(f"Added source '{key}' (api={api_name}, title={title!r}) to {config_file}")
-    print(f"  Run: term_harvester.py -l {key}  to expand the hierarchy via {api_name}")
+    print(f"  Run: term_harvester.py -b -l  to build schema.yaml and expand the full hierarchy via {api_name}")
     return True
