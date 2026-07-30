@@ -51,6 +51,7 @@ The term_harvester.py script fetches vocabulary sources, processes them into Lin
   - [NASIS (USDA NRCS National Soil Information System)](#nasis-usda-nrcs-national-soil-information-system)
   - [NRCS Field Book (field description enumerations)](#nrcs-field-book-field-description-enumerations)
   - [NAPCS Canada](#napcs-canada)
+  - [Library of Congress Classification](#library-of-congress-classification-loc_classification)
   - [CRediT (Contributor Roles Taxonomy)](#credit-contributor-roles-taxonomy)
   - [AgriFoodCA picklists](#agrifoodca-picklists)
   - [Codex Alimentarius (GSFA food additives)](#codex-alimentarius-gsfa-food-additives-codex)
@@ -259,32 +260,34 @@ Check source section for details on command line configuration.
 
 ## Supported source types and auto-detection
 
-| Detected as | Detection method |
+| Detected as | Description |
 |---|---|
-| [`AGROVOC`](#agrovoc) → `OntologyAPI` | URL matches `aims.fao.org/aos/agrovoc/{id}` (pre-download) |
-| [`SNOMED CT`](#snomed-ct-via-ols4) → `OntologyAPI` | URL matches `snomed.info/id/{conceptId}` (pre-download) |
-| [OBO terms](#obo-ontology-terms-envo-go-uberon-) → `OntologyAPI` | Bare CURIE `ENVO:00010483`, OBO shorthand `ENVO_00010483`, or OBO IRI `http://purl.obolibrary.org/obo/ENVO_00010483` (pre-download; routed to configured API or OLS4) |
-| [`NSDBSNT`](#nsdb-national-soil-database) | URL contains `/snt/` under the NSDB soil domain |
-| [`NSDBSLT`](#nsdb-national-soil-database) | URL contains `/slt/` under the NSDB soil domain |
-| [`NSDB`](#nsdb-national-soil-database) | URL matches `sis.agr.gc.ca/cansis/nsdb/soil` prefix |
-| [`NSDBSLC`](#nsdb-national-soil-database) | URL matches `sis.agr.gc.ca` + `/nsdb/slc/` |
-| [`LOINC`](#loinc-codesystems-and-valuesets) | URL from `terminology.hl7.org` with `.html` extension (listing page, not a single ValueSet/CodeSystem detail) |
-| [`OWL`](#owl-ontologies) | URL extension `.owl`, `.ofn`, `.rdf`, `.ttl`, `.n3`; or file contains RDF/OWL content markers |
-| [`LOINCCodeSystem`](#loinc-codesystems-and-valuesets) | `.json` file with `resourceType: CodeSystem` |
-| [`LOINCValueSet`](#loinc-codesystems-and-valuesets) | `.json` file with `resourceType: ValueSet` |
-| [`LinkML`](#linkml) | `.yaml`/`.yml` file that is a dict containing `enums` or `id` |
-| [`STATSCAN`](#statistics-canada) | URL from `statcan.gc.ca` containing `p3VD.pl` and `Function=getVD` |
-| [`STATSCAN_TABLE`](#statistics-canada-census-dictionary-tables-statscan_table) | URL from `www12.statcan.gc.ca/.../ref/dict/tab/index-eng.cfm?ID=` |
-| [`ISO_COUNTRY`](#iso-3166-2-country-subdivisions-iso_country) | URL from `iso.org/obp/ui/#iso:code:3166:` followed by a 2-letter country code |
-| [`CRediT`](#credit-contributor-roles-taxonomy) | URL from `zenodo.org/records/{id}` — bare record URL containing "credit", or a `/files/` path containing "credit" and ".pdf" |
-| `LOC_CLASSIFICATION` | Exact URL `https://www.loc.gov/catdir/cpso/lcco/` |
-| [`NAPCSCanada`](#napcs-canada) | CSV content with NAPCS-specific column headers |
-| [`AgriFoodCA`](#agrifoodca-picklists) | GitHub directory URL for `agrifooddatacanada/picklists_for_schemas` (pre-download) |
-| [`AgriFoodCA`](#agrifoodca-picklists) | CSV first row matches `,title,description,keywords,source` (content-based) |
-| [`NASIS`](#nasis-usda-nrcs-national-soil-information-system) | URL from `nrcs.usda.gov` containing `NASIS` with `.pdf` extension |
-| [`CODEX`](#codex-alimentarius-gsfa-food-additives-codex) | URL from `fao.org/gsfaonline/docs/` or `fao.org/input/download/standards/4/CXS_192` (pre-download) |
-| [`E_NUMBER`](#e-numbers-wikidata-p628-e_number) | URL matches `wikidata.org/wiki/Q207810` (E number concept), or Wikidata SPARQL URL containing `P628` (pre-download) |
-| [`CANSIS_GLOSSARY`](#cansis-glossary-of-terms-in-soil-science-cansis_glossary) | Exact URL `https://sis.agr.gc.ca/cansis/glossary/` (pre-download) |
+| **Agricultural** | |
+| [`AgriFoodCA`](#agrifoodca-picklists) | AgriFoodData Canada bilingual (EN/FR) agricultural picklist CSVs; add an entire GitHub directory or a single CSV file.<br>(GitHub directory URL for `agrifooddatacanada/picklists_for_schemas`, pre-download; or CSV with first row matching `,title,description,keywords,source`, content-based) |
+| [`AGROVOC`](#agrovoc) → `OntologyAPI` | FAO multilingual agricultural thesaurus covering farming, food, fisheries, and natural resources (~40 000 concepts).<br>(URL matches `aims.fao.org/aos/agrovoc/{id}`, pre-download) |
+| [`CANSIS_GLOSSARY`](#cansis-glossary-of-terms-in-soil-science-cansis_glossary) | Agriculture and Agri-Food Canada glossary of soil science terms with English definitions and French translations.<br>(Exact URL `https://sis.agr.gc.ca/cansis/glossary/`, pre-download) |
+| [`NAPCSCanada`](#napcs-canada) | North American Product Classification System Canada with a hierarchical product and service code taxonomy.<br>(CSV content with NAPCS-specific column headers) |
+| [`NASIS`](#nasis-usda-nrcs-national-soil-information-system) | USDA NRCS National Soil Information System domain tables (~450 enumerations) for all categorical soil survey fields.<br>(URL from `nrcs.usda.gov` containing `NASIS` with `.pdf` extension) |
+| [`NSDB`](#nsdb-national-soil-database) | Combined Canadian National Soil DataBase soil name and layer classification tables.<br>(URL matches `sis.agr.gc.ca/cansis/nsdb/soil` prefix) |
+| [`NSDBSLC`](#nsdb-national-soil-database) | Canadian National Soil DataBase Soil Landscapes of Canada polygon-level classification data.<br>(URL matches `sis.agr.gc.ca` + `/nsdb/slc/`) |
+| [`NSDBSLT`](#nsdb-national-soil-database) | Canadian National Soil DataBase Soil Layer Table with horizon-level soil property classifications.<br>(URL contains `/slt/` under the NSDB soil domain) |
+| [`NSDBSNT`](#nsdb-national-soil-database) | Canadian National Soil DataBase Soil Name Table with soil series classification and profile data.<br>(URL contains `/snt/` under the NSDB soil domain) |
+| **Human and animal health** | |
+| [`CODEX`](#codex-alimentarius-gsfa-food-additives-codex) | FAO/WHO Codex General Standard for Food Additives listing all internationally permitted additives by food category.<br>(URL from `fao.org/gsfaonline/docs/` or `fao.org/input/download/standards/4/CXS_192`, pre-download) |
+| [`E_NUMBER`](#e-numbers-wikidata-p628-e_number) | EU/UK food additive E numbers with functional-use annotations, organised by numeric range category, sourced from Wikidata.<br>(URL matches `wikidata.org/wiki/Q207810` or Wikidata SPARQL URL containing `P628`, pre-download) |
+| [`LOINC`](#loinc-codesystems-and-valuesets) | HL7 LOINC listing page covering all available clinical observation, lab test, and measurement code systems and value sets.<br>(URL from `terminology.hl7.org` with `.html` extension — listing page, not a single ValueSet/CodeSystem detail) |
+| [`LOINCCodeSystem`](#loinc-codesystems-and-valuesets) | A single HL7 LOINC clinical terminology code system in FHIR JSON format.<br>(`.json` file with `resourceType: CodeSystem`) |
+| [`LOINCValueSet`](#loinc-codesystems-and-valuesets) | A curated HL7 LOINC subset of clinical codes for a specific use case, in FHIR JSON format.<br>(`.json` file with `resourceType: ValueSet`) |
+| [`SNOMED CT`](#snomed-ct-via-ols4) → `OntologyAPI` | Comprehensive clinical health terminology covering diseases, procedures, findings, and anatomy.<br>(URL matches `snomed.info/id/{conceptId}`, pre-download) |
+| **General** | |
+| [`CRediT`](#credit-contributor-roles-taxonomy) | 14-role contributor roles taxonomy for scholarly output attribution, published on Zenodo as a PDF.<br>(URL from `zenodo.org/records/{id}` — bare record URL containing "credit", or a `/files/` path containing "credit" and ".pdf") |
+| [`ISO_COUNTRY`](#iso-3166-2-country-subdivisions-iso_country) | ISO 3166-2 first-level country subdivisions (provinces, states, territories) fetched via Wikidata SPARQL.<br>(URL from `iso.org/obp/ui/#iso:code:3166:` followed by a 2-letter country code) |
+| [`LinkML`](#linkml) | LinkML YAML schema containing one or more named enumerations with permissible values.<br>(`.yaml`/`.yml` file that is a dict containing `enums` or `id`) |
+| [`LOC_CLASSIFICATION`](#library-of-congress-classification-loc_classification) | Library of Congress subject heading hierarchy spanning all academic disciplines, useful for general topic or domain picklists.<br>(Exact URL `https://www.loc.gov/catdir/cpso/lcco/`) |
+| [OBO terms](#obo-ontology-terms-envo-go-uberon-) → `OntologyAPI` | Open Biological and Biomedical Ontologies covering environments, gene functions, anatomical structures, and more.<br>(Bare CURIE `ENVO:00010483`, OBO shorthand `ENVO_00010483`, or OBO IRI `http://purl.obolibrary.org/obo/ENVO_00010483`; pre-download, routed to configured API or OLS4) |
+| [`OWL`](#owl-ontologies) | Web Ontology Language file defining a class hierarchy with properties and formal logical relationships.<br>(URL extension `.owl`, `.ofn`, `.rdf`, `.ttl`, `.n3`; or file contains RDF/OWL content markers) |
+| [`STATSCAN`](#statistics-canada) | Statistics Canada classification variable with hierarchical codes from the IMDB concepts portal.<br>(URL from `statcan.gc.ca` containing `p3VD.pl` and `Function=getVD`) |
+| [`STATSCAN_TABLE`](#statistics-canada-census-dictionary-tables-statscan_table) | Statistics Canada Census Dictionary reference table such as province/territory abbreviations.<br>(URL from `www12.statcan.gc.ca/.../ref/dict/tab/index-eng.cfm?ID=`) |
 
 ---
 
@@ -703,6 +706,40 @@ https://www.statcan.gc.ca/en/media/5274 for the CSV download.
 python term_harvester.py -a "https://www.statcan.gc.ca/en/media/5274"
 python term_harvester.py -c NAPCSCanada2022
 ```
+
+### Library of Congress Classification (LOC_CLASSIFICATION)
+
+The [Library of Congress Classification](https://www.loc.gov/catdir/cpso/lcco/) is
+a hierarchical system of subject headings used to organise library collections across
+all areas of knowledge.  As a broad, well-maintained subject taxonomy it is useful for
+picklists that require general topic or discipline selection — for example, a metadata
+field for the subject area of a dataset or publication.
+
+The classification is structured in two levels: top-level lettered classes (e.g. `S` —
+Agriculture, `Q` — Science, `R` — Medicine) with subclasses beneath them (e.g. `S1-972`
+— Agriculture general, `SF1-1100` — Animal culture).  Hierarchy within each subclass
+is determined by numeric range containment.  The single enum produced is
+`LOCClassification`.
+
+```bash
+python term_harvester.py -a "https://www.loc.gov/catdir/cpso/lcco/"
+python term_harvester.py -b
+```
+
+The source downloads the HTML index page plus approximately 20 class PDFs, extracts
+their text immediately via `pypdf`, and stores all text files in
+`sources/LOC_CLASSIFICATION.zip`.  The PDFs are not retained after extraction.
+The source key is always `LOC_CLASSIFICATION`.
+
+To refresh:
+
+```bash
+python term_harvester.py -f LOC_CLASSIFICATION
+python term_harvester.py -c LOC_CLASSIFICATION
+python term_harvester.py -b
+```
+
+---
 
 ### CRediT (Contributor Roles Taxonomy)
 
