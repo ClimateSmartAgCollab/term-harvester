@@ -1,0 +1,61 @@
+{
+  "_comment": "Edit this file to configure your paper. Run ceur_pdf.py to regenerate the PDF. File: paper_config.json",
+  "doc_url": "https://docs.google.com/document/d/1_dQ0sqDHB6YBK-mZfTVrzFZF1_DjpQlu-CQ6ETL0GIE",
+  "export_format": "docx",
+  "output_pdf": "paper.pdf",
+  "pdf_engine": "auto",
+  "title": "Term Harvester: A FAIR data tool to map or reuse trusted online vocabularies in Agriculture and Health Science Research Project data schemas",
+  "title_note": "",
+  "conference": "Proceedings of FOIS 2026 Satellite events co-located with the 16th International Conference on Formal Ontology in Information Systems (FOIS 2026), September 21-25, 2026, Vit\u00f3ria, Brazil.",
+  "copyrightyear": "2026",
+  "copyrightclause": "Copyright for this paper by its authors. Use permitted under Creative Commons License Attribution 4.0 International (CC BY 4.0).",
+  "abstract": "",
+  "abstract_from_doc": true,
+  "abstract_heading": "Abstract",
+  "remove_abstract_from_body": true,
+  "keywords": [
+    "data sharing",
+    "FAIR principles",
+    "ontology",
+    "agriculture",
+    "research",
+    "standards"
+  ],
+  "keywords_heading": "Keywords",
+  "remove_keywords_from_body": true,
+  "authors": [
+    {
+      "name": "Damion Dooley",
+      "affils": "1",
+      "orcid": "0000-0002-8844-9165",
+      "email": "damion_dooley@sfu.ca",
+      "url": "",
+      "corresponding": true,
+      "equal_contribution": false
+    },
+    {
+      "name": "William Hsiao",
+      "affils": "1",
+      "orcid": "0000-0002-1342-4043",
+      "email": "",
+      "url": "",
+      "corresponding": false,
+      "equal_contribution": false
+    }
+  ],
+  "affiliations": [
+    {
+      "num": "1",
+      "text": "Center for Infectious Disease Genomics and One Health, Simon Fraser University, Burnaby, Canada"
+    }
+  ],
+  "cortext": "Corresponding author.",
+  "acknowledgments": "",
+  "genai_uses": [
+    "text_creation"
+  ],
+  "genai_tools": "Claude",
+  "genai_declaration": "During the preparation of this work, the author(s) used AI (Claude) for: Drafting Content. After using this tool/service, the author(s) reviewed and edited the content as needed and take(s) full responsibility for the publication's content.",
+  "bib_file": "",
+  "pandoc_extra_args": []
+}
