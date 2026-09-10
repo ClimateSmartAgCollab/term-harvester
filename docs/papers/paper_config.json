@@ -4,7 +4,7 @@
   "export_format": "docx",
   "output_pdf": "paper.pdf",
   "pdf_engine": "auto",
-  "title": "Term Harvester: A FAIR data tool to map or reuse trusted online vocabularies in Agriculture and Health Science Research Project data schemas",
+  "title": "Term Harvester: A FAIR Data Tool to Map or Reuse Trusted Online Vocabularies in Agriculture and Health Science Research Project Data Schemas",
   "title_note": "",
   "conference": "Proceedings of FOIS 2026 Satellite events co-located with the 16th International Conference on Formal Ontology in Information Systems (FOIS 2026), September 21-25, 2026, Vit\u00f3ria, Brazil.",
   "copyrightyear": "2026",
@@ -46,16 +46,17 @@
   "affiliations": [
     {
       "num": "1",
-      "text": "Center for Infectious Disease Genomics and One Health, Simon Fraser University, Burnaby, Canada"
+      "text": "Centre for Infectious Disease Genomics and One Health, Simon Fraser University, 8888 University Drive, Burnaby, Canada"
     }
   ],
   "cortext": "Corresponding author.",
-  "acknowledgments": "",
+  "acknowledgments": "The authors would like to acknowledge support from Genome Canada's Climate-Smart Data Collaboration Centre project 322DCC under Genome Canada's Climate-Smart Agriculture and Food Systems initiative.",
   "genai_uses": [
+    "formatting",
     "text_creation"
   ],
-  "genai_tools": "Claude",
-  "genai_declaration": "During the preparation of this work, the author(s) used AI (Claude) for: Drafting Content. After using this tool/service, the author(s) reviewed and edited the content as needed and take(s) full responsibility for the publication's content.",
+  "genai_tools": "Claude on Table 1",
+  "genai_declaration": "During the preparation of this work, the author(s) used AI (Claude on Table 1) for: Formatting Assistance, Drafting Content. After using this tool/service, the author(s) reviewed and edited the content as needed and take(s) full responsibility for the publication's content.",
   "bib_file": "",
   "pandoc_extra_args": []
 }
