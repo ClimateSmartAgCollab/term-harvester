@@ -942,7 +942,11 @@ def _fetch_for_grounding_from_file(path):
                 names = [n for n in zf.namelist() if not n.endswith("/")]
                 if not names:
                     return None
-                inner_name = names[0]
+                # Prefer content.* (original document) over extracted_text.txt for
+                # grounding, since grounding benefits from full untruncated source text
+                inner_name = next(
+                    (n for n in names if n != "extracted_text.txt"), names[0]
+                )
                 _, inner_ext = os.path.splitext(inner_name.lower())
                 if inner_ext == ".pdf":
                     return None
@@ -1055,10 +1059,17 @@ def _check_grounding(enums, doc_text):
 _SOURCE_EXTENSIONS = ("zip", "pdf", "html", "htm", "txt", "docx")
 
 
-def _pack_to_zip(raw_bytes, orig_ext, zip_path):
-    """Write raw_bytes as content.{orig_ext} inside a new zip archive."""
+def _pack_to_zip(raw_bytes, orig_ext, zip_path, extracted_text=None):
+    """Write raw_bytes as content.{orig_ext} inside a new zip archive.
+
+    If extracted_text is provided, also writes extracted_text.txt so that
+    process_freetext_source can recover the extraction window directly without
+    re-parsing the full source document on subsequent -c runs.
+    """
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr(f"content.{orig_ext}", raw_bytes)
+        if extracted_text:
+            zf.writestr("extracted_text.txt", extracted_text)
 
 
 def _detect_ext(url, content_type_header):
@@ -1142,6 +1153,9 @@ def _extract_text_from_file(path, url_fragment=None):
             if not names:
                 print(f"  Error: zip {path} is empty.", file=sys.stderr)
                 return None
+            # Prefer the pre-extracted text window stored at -a time
+            if "extracted_text.txt" in names:
+                return zf.read("extracted_text.txt").decode("utf-8", errors="replace") or None
             inner_name = names[0]
             inner_bytes = zf.read(inner_name)
         _, inner_ext = os.path.splitext(inner_name.lower())
@@ -1353,7 +1367,6 @@ def match_freetext(url, free_text, config_file=MENU_CONFIG):
         if not base_url.lower().startswith(("http://", "https://")):
             return False
         url_fragment = url.split("#", 1)[1] if "#" in url else None
-        print(f"  Fetching {base_url} ...")
         try:
             req = urllib.request.Request(base_url, headers=BROWSER_HEADERS)
             with urllib.request.urlopen(req, timeout=30) as resp:
@@ -1498,7 +1511,7 @@ def match_freetext(url, free_text, config_file=MENU_CONFIG):
     elif _raw_bytes:
         if _raw_ext in ("pdf", "html", "htm"):
             zip_path = f"sources/{source_key}.zip"
-            _pack_to_zip(_raw_bytes, _raw_ext, zip_path)
+            _pack_to_zip(_raw_bytes, _raw_ext, zip_path, extracted_text=suggestion_text)
             print(f"  Saved source document to {zip_path}")
             file_format = "zip"
         elif _raw_source_path:
@@ -1506,12 +1519,32 @@ def match_freetext(url, free_text, config_file=MENU_CONFIG):
                 f.write(_raw_bytes)
             print(f"  Saved source document to {_raw_source_path}")
             file_format = _raw_ext
+    else:
+        # Inline text with no downloadable source — persist the extraction window
+        # to a zip so -c [key] can reuse it without the description field
+        if suggestion_text:
+            zip_path = f"sources/{source_key}.zip"
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("extracted_text.txt", suggestion_text)
+            print(f"  Saved extracted text to {zip_path}")
+            file_format = "zip"
+
+    # Build a short description from Claude's per-enum descriptions
+    _desc_parts = []
+    for _e in (result.get("enums") or []):
+        _etitle = (_e.get("title") or _e.get("key") or "").strip()
+        _edesc  = (_e.get("description") or "").strip()
+        if _edesc:
+            _desc_parts.append(f"{_etitle}: {_edesc}" if _etitle else _edesc)
+        elif _etitle:
+            _desc_parts.append(_etitle)
+    _short_desc = " ".join(_desc_parts)[:500] or None
 
     # Register source in config before calling process_freetext_source
     entry = make_source_entry(
         source_key, url, "FreeText", file_format,
         title=result.get("source_title"),
-        description=suggestion_text,
+        description=_short_desc,
     )
     if src_file or _raw_bytes:
         entry["download_date"] = today
@@ -1543,9 +1576,11 @@ def process_freetext_source(key, source, config_file=MENU_CONFIG, locales=None, 
     """Extract enums via Claude for an explicitly named FreeText -c [key].
 
     Text source priority (first non-empty source wins):
-      1. Locally downloaded file  sources/{key}.{ext}  (saved by -f [key])
+      1. Locally downloaded file  sources/{key}.{ext}  (saved by -a or -f [key])
+         For zips, returns extracted_text.txt directly if present (written at -a time),
+         otherwise re-extracts text from the embedded content.* document.
       2. URI fetched temporarily — NOT saved to disk
-      3. Stored description text from harvester_config.yaml
+      3. Stored description text from harvester_config.yaml (legacy fallback)
 
     Prints a diff of changes versus the existing sources/{key}.yaml before
     writing the new YAML.  Pass debug=True (--debug flag) to also print the

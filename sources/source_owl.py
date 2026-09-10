@@ -332,12 +332,16 @@ def match_owl(url, tmp_path, config_file=MENU_CONFIG, process_fn=None):
 
     Returns False if the file does not look like OWL.
     """
-    _url_path = url.split("?")[0].rstrip("/").lower()
+    _url_path = url.split("#")[0].split("?")[0].rstrip("/").lower()
     _is_owl = any(_url_path.endswith(e) for e in ('.owl', '.ofn', '.rdf', '.ttl', '.n3'))
     if not _is_owl:
         try:
             with open(tmp_path, encoding='utf-8', errors='replace') as _f:
                 _sample = _f.read(4096)
+            # PDFs embed XMP metadata using <rdf:RDF> — exclude them explicitly
+            # so that journal PDFs are not misidentified as OWL ontologies.
+            if _sample.startswith('%PDF-'):
+                return False
             _is_owl = ('<rdf:RDF' in _sample or '<owl:Ontology' in _sample
                        or ('Ontology(' in _sample
                            and ('SubClassOf(' in _sample or 'Declaration(' in _sample)))
@@ -347,7 +351,7 @@ def match_owl(url, tmp_path, config_file=MENU_CONFIG, process_fn=None):
     if not _is_owl:
         return False
 
-    _filename = url.split("?")[0].rstrip("/").split("/")[-1]
+    _filename = url.split("#")[0].split("?")[0].rstrip("/").split("/")[-1]
     if "." in _filename:
         _stem_noext, _ext = _filename.rsplit(".", 1)
     else:

@@ -1367,7 +1367,7 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
                       f" -a 'URL' --free_text 'topic'", file=sys.stderr)
             continue
 
-        print(f"Fetching {url} ...")
+        print(f"Fetching {url.split('#')[0]} ...")
         tmp_fd, tmp_path = tempfile.mkstemp()
         os.close(tmp_fd)
         downloaded_filename = ""
@@ -1416,7 +1416,7 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
             continue
 
         # Remaining: JSON (LOINC) or document (→ FreeText)
-        _url_base = url.split("?")[0].rstrip("/").split("/")[-1]
+        _url_base = url.split("#")[0].split("?")[0].rstrip("/").split("/")[-1]
         _ext = _url_base.rsplit(".", 1)[1].lower() if "." in _url_base else ""
         if not _ext and _http_ct:
             # No file extension in URL — infer type from HTTP Content-Type header

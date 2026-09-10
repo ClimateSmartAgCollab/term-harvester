@@ -109,7 +109,7 @@ def match_linkml(url, tmp_path, config_file=MENU_CONFIG, process_fn=None):
     Returns False if the URL does not end in .yaml or .yml.
     Returns True (handled) for any other outcome, including skipped files.
     """
-    _url_base = url.split("?")[0].rstrip("/").split("/")[-1]
+    _url_base = url.split("#")[0].split("?")[0].rstrip("/").split("/")[-1]
     _ext = _url_base.rsplit(".", 1)[1].lower() if "." in _url_base else ""
     if _ext not in ("yaml", "yml"):
         return False

@@ -436,7 +436,7 @@ def match_loinc_table(url, tmp_path, config_file=MENU_CONFIG):
     Matches pages like valuesets.html / valuesets-fhir.html but not individual
     detail pages such as ValueSet-pronouns.html or CodeSystem-*.html.
     """
-    url_stem = url.split("?")[0].rstrip("/").split("/")[-1]
+    url_stem = url.split("#")[0].split("?")[0].rstrip("/").split("/")[-1]
     if not ("terminology.hl7.org" in url and url_stem.endswith(".html")
             and not url_stem.startswith("ValueSet-")
             and not url_stem.startswith("CodeSystem-")):

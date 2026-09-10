@@ -807,7 +807,7 @@ def match_nsdb_snt(url, tmp_path, config_file=MENU_CONFIG):
     if not (url.startswith("https://sis.agr.gc.ca/cansis/nsdb/") and "/snt/" in url):
         return False
 
-    url_no_query = url.split("?")[0]
+    url_no_query = url.split("#")[0].split("?")[0]
     ver_m = re.search(r'/nsdb/[^/]+/([^/]+)/snt/', url_no_query)
     version = re.sub(r'^[vV]', '', ver_m.group(1)) if ver_m else ""
 
@@ -867,7 +867,7 @@ def match_nsdb_slt(url, tmp_path, config_file=MENU_CONFIG):
     if not (url.startswith("https://sis.agr.gc.ca/cansis/nsdb/") and "/slt/" in url):
         return False
 
-    url_no_query = url.split("?")[0]
+    url_no_query = url.split("#")[0].split("?")[0]
     ver_m = re.search(r'/nsdb/[^/]+/([^/]+)/slt/', url_no_query)
     version = re.sub(r'^[vV]', '', ver_m.group(1)) if ver_m else ""
 
@@ -927,7 +927,7 @@ def match_nsdb_soil(url, tmp_path, config_file=MENU_CONFIG):
     if not url.startswith("https://sis.agr.gc.ca/cansis/nsdb/soil"):
         return False
 
-    url_no_query = url.split("?")[0].rstrip("/")
+    url_no_query = url.split("#")[0].split("?")[0].rstrip("/")
     parts = url_no_query.split("/")
     if "index.html" in parts:
         version_label = parts[parts.index("index.html") - 1]
