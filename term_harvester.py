@@ -281,6 +281,12 @@ from source_nsdb import (
     match_nsdb_soil,
     match_nsdb_slc,
 )
+from source_cssc import (
+    cssc_fr_url,
+    fetch_cssc_source,
+    process_cssc_source,
+    match_cssc,
+)
 from source_nrcs import (
     process_nrcs_source,
     fetch_nrcs_pdf,
@@ -1401,6 +1407,7 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
                 match_nsdb_slt(url, tmp_path, config_file) or
                 match_nsdb_soil(url, tmp_path, config_file) or
                 match_nsdb_slc(url, tmp_path, config_file) or
+                match_cssc(url, tmp_path, config_file) or
                 match_loinc_table(url, tmp_path, config_file) or
                 match_statscan_table(url, tmp_path, config_file) or
                 match_statscan(url, tmp_path, config_file) or
@@ -1626,6 +1633,10 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
                       file=sys.stderr)
                 continue
             process_nsdb_html_source(key, source, enum_prefix="NSDBSLC", locales=locales)
+            continue
+
+        if content_type == "CSSC":
+            process_cssc_source(key, source, config_file, locales=locales)
             continue
 
         if content_type == "LOINC":
@@ -3701,6 +3712,10 @@ def main():
             if content_type == "NSDB":
                 fetch_nsdb_source(key, source, config_file, locales=locales_cfg)
                 process_nsdb_source(key, source, locales=locales_cfg)
+                continue
+            if content_type == "CSSC":
+                fetch_cssc_source(key, source, config_file, locales=locales_cfg)
+                process_cssc_source(key, source, config_file, locales=locales_cfg)
                 continue
             # AgriFoodCA: re-download CSVs to zip and rebuild YAML.
             if content_type == "AgriFoodCA":
