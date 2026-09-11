@@ -13,7 +13,7 @@ JSON picklist file consumed by DataHarmonizer).
 | `entry_code_picklists.json` | Output — JSON picklist file for DataHarmonizer |
 | `agrifoodca_mapping.yaml` | Mapping/diff config between schema and JSON |
 | `agrifoodca_sssom.tsv` | French translations not covered by the schema |
-| `schema_to_picklists.py` | Script that reads the above and produces the JSON |
+| `agrifoodca_postharvest.py` | Script that reads the above and produces the JSON |
 
 ---
 
@@ -109,7 +109,7 @@ Translation priority during `--build` (highest wins):
 ### Normal rebuild of entry_code_picklists.json (schema changed, mapping unchanged)
 
 ```bash
-python schema_to_picklists.py --build
+python agrifoodca_postharvest.py --build
 ```
 
 Reads `schema.yaml` + `agrifoodca_mapping.yaml` + `agrifoodca_sssom.tsv` and
@@ -119,7 +119,7 @@ that affects picklist enums.
 ### Calibrate (JSON picklist is the reference; update mapping to match)
 
 ```bash
-python schema_to_picklists.py --calibrate
+python agrifoodca_postharvest.py --calibrate
 ```
 
 Reads `schema.yaml` + the current `entry_code_picklists.json` (treated as
@@ -135,8 +135,8 @@ ground truth) and regenerates both `agrifoodca_mapping.yaml` and
 After `--calibrate`, run `--build` to verify the round-trip is exact:
 
 ```bash
-python schema_to_picklists.py --calibrate
-python schema_to_picklists.py --build
+python agrifoodca_postharvest.py --calibrate
+python agrifoodca_postharvest.py --build
 ```
 
 The rebuilt JSON should be identical to the reference (modulo a trailing
@@ -145,7 +145,7 @@ newline).
 ### Adding a new enum from schema.yaml
 
 ```bash
-python schema_to_picklists.py --add SchemaEnumKey:json_picklist_key
+python agrifoodca_postharvest.py --add SchemaEnumKey:json_picklist_key
 ```
 
 Registers the enum by:

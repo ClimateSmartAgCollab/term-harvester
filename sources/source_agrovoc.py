@@ -11,12 +11,15 @@ Public API used by term_harvester.py:
     match_agrovoc(url, config_file)
 """
 
+import datetime
 import json
+import os
 import sys
 import urllib.parse
-import yaml
-from source_utils import MENU_CONFIG, make_source_entry, write_config, _get_type_conf
 import urllib.request
+import yaml
+import zipfile
+from source_utils import MENU_CONFIG, make_source_entry, update_source_config, write_config, _get_type_conf
 
 
 # SPARQL query for fetching a full SKOS concept hierarchy rooted at {concept_iri}.
@@ -189,6 +192,34 @@ def _fetch_agrovoc_graph(term_id, api_conf, locales=None):
     return _fetch_agrovoc_sparql_graph(root_iri, sparql_uri, locales=locales)
 
 
+_AGROVOC_ZIP = "sources/AGROVOC.zip"
+
+
+def _save_agrovoc_graph_zip(key, graph, config_file=None):
+    """Store key's AGROVOC graph in the shared sources/AGROVOC.zip.
+
+    Loads the existing combined dict (if any), updates the entry for key,
+    and writes the zip back.  Updates download_date in harvester_config.yaml
+    when config_file is supplied.
+    """
+    combined = {}
+    if os.path.exists(_AGROVOC_ZIP):
+        with zipfile.ZipFile(_AGROVOC_ZIP) as zf:
+            combined = json.loads(zf.read("graph.json").decode("utf-8"))
+    combined[key] = graph
+    data = json.dumps(combined, ensure_ascii=False, indent=2).encode("utf-8")
+    with zipfile.ZipFile(_AGROVOC_ZIP, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("graph.json", data)
+    print(f"  Updated {_AGROVOC_ZIP} ({len(combined)} source key(s)); "
+          f"{len(graph.get('nodes') or [])} nodes for '{key}'")
+    if config_file:
+        update_source_config(
+            key,
+            {"download_date": datetime.date.today().isoformat()},
+            config_file,
+        )
+
+
 def match_agrovoc(url, config_file=MENU_CONFIG):
     """Return True if *url* is an AGROVOC concept IRI or shorthand key and was handled.
 
@@ -236,4 +267,14 @@ def match_agrovoc(url, config_file=MENU_CONFIG):
     config.setdefault("sources", {})[key] = entry
     write_config(config, config_file)
     print(f"Added source '{key}' to {config_file}")
+    if _sparql_uri:
+        print(f"  Fetching full AGROVOC hierarchy for {concept_iri} ...")
+        full_graph = _fetch_agrovoc_sparql_graph(concept_iri, _sparql_uri, locales=_locales)
+        if full_graph:
+            _save_agrovoc_graph_zip(key, full_graph, config_file)
+    else:
+        print(f"  No SPARQL endpoint configured — run '-f {key}' after adding apis.agrovoc",
+              file=sys.stderr)
+    print(f"  Run: term_harvester.py -c {key}  to generate sources/{key}.yaml, "
+          f"then -b to rebuild schema.yaml")
     return True

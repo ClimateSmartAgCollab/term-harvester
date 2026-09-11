@@ -203,7 +203,9 @@ from source_ontologyapi import (
     iri_to_curie,
     get_ols4_inner_iri,
     fetch_api_graph,
+    fetch_ontologyapi_source,
     process_skos_source,
+    remove_ontologyapi_zip_entry,
     match_snomed,
     match_ontology_term,
 )
@@ -1530,9 +1532,8 @@ def _require_source_file(key, ext, fallback_ext=None):
 def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
     """Store per-source prefix dicts into harvester_config.yaml from fetched source files.
 
-    For OntologyAPI sources: fetches the concept hierarchy via the configured API
-    (e.g. AGROVOC SPARQL, OLS4) and writes a LinkML enum YAML to sources/{key}.yaml
-    directly — no downloaded file required.
+    For OntologyAPI sources: reads the graph from sources/{key}.zip (written by -f)
+    and writes a LinkML enum YAML to sources/{key}.yaml.
     For NSDB sources: runs process_nsdb_source to fetch and parse HTML attribute pages.
     For LOINC sources: parses the saved HTML listing page, fetches each ValueSet JSON
     by constructing the URL from the Name column, and writes the combined YAML file.
@@ -1714,7 +1715,8 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
 
 
 # Content types whose yaml is generated via -c (API fetch), not -f (file download).
-_REGEN_C_TYPES = {"OntologyAPI", "AGROVOC"}
+# OntologyAPI now uses -f + -c like all other sources (graph cached in sources/{key}.zip).
+_REGEN_C_TYPES = set()
 
 
 def _report_missing_yamls(config_file):
@@ -3585,9 +3587,13 @@ def main():
         # Delete any keys that are config file source entries
         config_keys = [k for k in args.delete if k in all_sources]
         for key in config_keys:
+            _src_entry = all_sources[key]
             del config["sources"][key]
             print(f"Deleted source '{key}' from {config_file}")
-            # Remove all sources/ files associated with this key
+            # OntologyAPI: remove key from the shared OLS4.zip / AGROVOC.zip.
+            if _src_entry.get("content_type") == "OntologyAPI":
+                remove_ontologyapi_zip_entry(key, _src_entry)
+            # Remove all per-key sources/ files (yaml, per-key zips, html, etc.)
             _source_exts = ("yaml", "zip", "html", "htm", "pdf", "json", "csv", "txt")
             for _ext in _source_exts:
                 _p = f"sources/{key}.{_ext}"
@@ -3730,6 +3736,9 @@ def main():
                 continue
             if content_type == "CANSIS_GLOSSARY":
                 fetch_cansis_glossary_source(key, source, config_file)
+                continue
+            if content_type == "OntologyAPI":
+                fetch_ontologyapi_source(key, source, config_file, locales=locales_cfg)
                 continue
             uri = (source.get("reachable_from") or {}).get("source_ontology")
             if not uri:

@@ -1169,28 +1169,42 @@ python term_harvester.py -b
 
 To ground a `--free_text`-initiated source in the actual document:
 
-**Later, to keep a FreeText source up-to-date**, `-f` and `-c` have distinct,
-separated roles:
+### What is stored locally
+
+The table below summarises what is saved to `sources/` for each FreeText scenario.
+Claude always receives at most 10 000 characters regardless of the original document size.
+
+| Trigger | Local file | Contents |
+|---|---|---|
+| `-a URL` (no `--free_text`) — PDF or HTML | `sources/{key}.zip` | `content.{ext}` — **full original document**; `extracted_text.txt` — the ≤10 000-char window sent to Claude (cached so repeated `-c` runs use the same text) |
+| `-a URL` (no `--free_text`) — other format | `sources/{key}.{ext}` | Full original document |
+| `-a URL --free_text FILE` | `sources/{key}.{ext}` | Full original source file copied as-is; Claude receives ≤10 000 chars extracted from it |
+| `-a URL --free_text TEXT` (inline string) | `sources/{key}.zip` | `extracted_text.txt` — the inline string only; no original document is downloaded |
+| `-f key` | `sources/{key}.zip` or `sources/{key}.{ext}` | Full original document re-downloaded; no cached extraction window — the next `-c` re-extracts with a fresh ≤10 000-char cap |
+
+Running `-f` discards any cached extraction window and forces a fresh re-extraction on the next `-c`.
+
+**Later, to keep a FreeText source up-to-date**, use `-f` which re-downloads the full
+document and immediately re-runs Claude extraction:
 
 | Command | What it does |
 |---|---|
-| `python term_harvester.py -f SoilAerationStatus` | Downloads the source PDF to `sources/SoilAerationStatus.pdf`. No Claude. No YAML change. |
-| `python term_harvester.py -c SoilAerationStatus` | Runs Claude on the best available text (downloaded file → temp URI fetch → stored description). Prints a diff. Writes `sources/SoilAerationStatus.yaml`. |
+| `python term_harvester.py -f SoilAerationStatus` | Re-downloads the full source document to `sources/SoilAerationStatus.zip` (stored as `content.{ext}`), then immediately runs Claude extraction and writes `sources/SoilAerationStatus.yaml`. |
+| `python term_harvester.py -c SoilAerationStatus` | Runs Claude on the best available local text: `extracted_text.txt` from the zip if present (the cached window from `-a` time), otherwise re-extracted from `content.{ext}`, otherwise the `description` field from `harvester_config.yaml`. Prints a diff and writes `sources/SoilAerationStatus.yaml`. |
 
-A typical refresh cycle is therefore:
+A typical refresh cycle:
 
 ```bash
-python term_harvester.py -f SoilAerationStatus   # download fresh copy of the PDF
-python term_harvester.py -c SoilAerationStatus   # extract enums, review diff
-python term_harvester.py -b                       # rebuild schema.yaml
+python term_harvester.py -f SoilAerationStatus   # re-download full document + re-run Claude
+python term_harvester.py -b                       # rebuild schema.yaml after reviewing output
 ```
 
-`-f` and `-c` may also be used independently:
+To re-run Claude on an already-downloaded document without re-fetching:
 
-- `-c SoilAerationStatus` without a prior `-f` will fetch the URI temporarily
-  (without saving to disk) or fall back to the stored `description` text.
-- `-f SoilAerationStatus` without a subsequent `-c` simply archives the document
-  locally for inspection; `sources/SoilAerationStatus.yaml` is unchanged.
+```bash
+python term_harvester.py -c SoilAerationStatus   # re-extract from cached local file
+python term_harvester.py -b
+```
 
 **BECAUSE AI PARSING OF SOURCE IS NONDETERMINISTIC, regeneration of FreeText
 content types has to be explicitly and manually performed and reviewed.**
@@ -1561,6 +1575,25 @@ apis:
 ---
 
 ## OntologyAPI metadata population
+
+### Local storage behaviour
+
+API-based sources (`OntologyAPI`, `AGROVOC`) do **not** cache API responses to disk.
+
+| Phase | What is written locally |
+|---|---|
+| `-a` | `harvester_config.yaml` only — 1–2 lightweight API calls populate the `title`, `version`, and `description` fields; no source file is downloaded |
+| `-f` | **Not applicable.** `-f` is a no-op for these source types (the tool prints a reminder to use `-c` instead). There is no downloadable document to save. |
+| `-c` | `sources/{key}.yaml` only — live API calls fetch the full hierarchy at process time; the raw API response (JSON / SPARQL result) is not cached; each `-c` run re-queries the endpoint |
+| `-l` | Updates `schema.yaml` in place; no new local files |
+
+Because there is no local snapshot, the vocabulary in `sources/{key}.yaml` reflects
+the state of the remote API at the time `-c` was last run.  To pick up upstream
+changes, re-run `-c {key}` followed by `-b`.
+
+> **Contrast with `ISO_COUNTRY`** (Wikidata SPARQL): that source type *does* cache
+> the full SPARQL result as structured JSON inside `sources/{key}.zip`.  `-f` re-queries
+> Wikidata and refreshes the cache; `-c` reads from the zip without any network access.
 
 ### Source-level metadata (written to `harvester_config.yaml` by `-a`)
 

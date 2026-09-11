@@ -13,7 +13,7 @@ agrifoodca_sssom.tsv (SSSOM format).  The schema's own locale extensions supply
 FR for enums it already knows; the SSSOM file covers the remainder.
 
 Usage:
-    python schema_to_picklists.py [--calibrate] [--build] [--compare]
+    python agrifoodca_postharvest.py [--calibrate] [--build] [--compare]
                                   [--add SchemaEnumKey:json_picklist_key]
         --calibrate  Write/refresh agrifoodca_mapping.yaml and agrifoodca_sssom.tsv
                      from schema.yaml + existing entry_code_picklists.json.

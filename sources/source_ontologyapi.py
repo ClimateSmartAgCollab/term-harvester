@@ -9,11 +9,14 @@ Public API used by term_harvester.py:
     resolve_ols4_iri_base(ontology, api_conf=None)
     get_ols4_inner_iri(ontology, term_id, apis=None)
     fetch_api_graph(ontology, term_id, apis=None, locales=None)
+    fetch_ontologyapi_source(key, source, config_file=None, locales=None)
     process_skos_source(key, source, config_file=None, locales=None)
+    remove_ontologyapi_zip_entry(key, source)
     match_snomed(url, config_file=MENU_CONFIG)
     match_ontology_term(url, config_file=MENU_CONFIG)
 """
 
+import datetime
 import json
 import os
 import re
@@ -21,6 +24,7 @@ import sys
 import urllib.parse
 import urllib.request
 import yaml
+import zipfile
 from source_utils import (
     MENU_CONFIG,
     IndentedDumper,
@@ -30,6 +34,7 @@ from source_utils import (
     make_source_entry,
     normalize_text,
     rank_and_sort_permissible_values,
+    update_source_config,
     write_config,
     _get_type_conf,
 )
@@ -40,6 +45,53 @@ _OBO_IRI_BASE_TEMPLATE = "http://purl.obolibrary.org/obo/{ontology}_"
 
 # Per-session cache: ontology_key.lower() -> {"iri_base": str, "version": str|None}
 _OLS4_META_CACHE = {}
+
+_GRAPH_JSON = "graph.json"
+_OLS4_ZIP    = "sources/OLS4.zip"
+_AGROVOC_ZIP = "sources/AGROVOC.zip"
+
+
+def _api_zip_path(api_name):
+    """Return the combined zip path for the given api_name."""
+    return _AGROVOC_ZIP if api_name == "agrovoc" else _OLS4_ZIP
+
+
+def _load_api_zip(api_name):
+    """Load the combined {key: {nodes, edges}} dict from OLS4.zip or AGROVOC.zip.
+
+    Returns an empty dict when the zip does not yet exist.
+    """
+    path = _api_zip_path(api_name)
+    if not os.path.exists(path):
+        return {}
+    with zipfile.ZipFile(path) as zf:
+        return json.loads(zf.read(_GRAPH_JSON).decode("utf-8"))
+
+
+def _save_api_zip(api_name, combined):
+    """Write the combined {key: {nodes, edges}} dict to OLS4.zip or AGROVOC.zip."""
+    path = _api_zip_path(api_name)
+    data = json.dumps(combined, ensure_ascii=False, indent=2).encode("utf-8")
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(_GRAPH_JSON, data)
+    print(f"  Updated {path} ({len(combined)} source key(s))")
+
+
+def remove_ontologyapi_zip_entry(key, source):
+    """Remove key from OLS4.zip or AGROVOC.zip when a source is deleted.
+
+    Reads the api_name from source.reachable_from.api, loads the appropriate
+    combined zip, removes the key entry if present, and saves the zip back.
+    Does nothing if the zip does not exist or the key is not in it.
+    """
+    api_name = next(iter((source.get("reachable_from") or {}).get("api") or {}), None)
+    if not api_name:
+        return
+    combined = _load_api_zip(api_name)
+    if key in combined:
+        del combined[key]
+        _save_api_zip(api_name, combined)
+        print(f"  Removed '{key}' from {_api_zip_path(api_name)}")
 
 
 def _fetch_ols4_ontology_meta(ontology, api_conf=None):
@@ -300,8 +352,85 @@ def fetch_api_graph(ontology, term_id, apis=None, locales=None):
         return _fetch_ols4_graph(ontology, term_id, api_conf if api_name == "ols" else None)
 
 
+def fetch_ontologyapi_source(key, source, config_file=MENU_CONFIG, locales=None):
+    """Fetch a SKOS hierarchy via the API and store the graph in the combined zip.
+
+    Reads source_nodes and api_routing from source.reachable_from, then calls
+    the appropriate API (AGROVOC SPARQL, BioPortal, or OLS4) for each source_node.
+    Combines all results (deduplicating nodes by IRI and edges by (src, tgt, label)
+    tuple).  The result is stored as a single key entry inside the shared
+    sources/OLS4.zip or sources/AGROVOC.zip (determined by api_name).
+
+    Updates download_date in harvester_config.yaml after saving.
+    """
+    reachable_from = source.get("reachable_from") or {}
+    source_nodes   = reachable_from.get("source_nodes") or []
+    api_routing    = reachable_from.get("api") or {}
+
+    if not source_nodes:
+        print(f"  Skipping {key}: no source_nodes in reachable_from", file=sys.stderr)
+        return
+
+    api_name = next(iter(api_routing), None)
+    if not api_name:
+        print(f"  Skipping {key}: reachable_from.api is empty", file=sys.stderr)
+        return
+
+    with open(config_file) as _cf:
+        config_data = yaml.safe_load(_cf) or {}
+    apis = config_data.get("apis") or {}
+    api_conf = apis.get(api_name) or {}
+    locales = locales or config_data.get("locales") or ["en"]
+
+    nodes_by_iri = {}   # iri -> node dict
+    edges_seen   = {}   # (src, tgt, label) -> True
+
+    for node_ref in source_nodes:
+        if ":" not in node_ref:
+            print(f"    Warning: source_node '{node_ref}' not in PREFIX:ID format — skipping",
+                  file=sys.stderr)
+            continue
+        ontology, term_id = node_ref.split(":", 1)
+
+        if api_name == "agrovoc":
+            graph = _fetch_agrovoc_graph(term_id, api_conf, locales=locales)
+        else:
+            graph = fetch_api_graph(ontology, term_id, apis=apis, locales=locales)
+
+        if not graph:
+            continue
+
+        for node in (graph.get("nodes") or []):
+            iri = node.get("iri") or ""
+            if iri and iri not in nodes_by_iri:
+                nodes_by_iri[iri] = node
+
+        for edge in (graph.get("edges") or []):
+            edge_key = (edge.get("source", ""), edge.get("target", ""), edge.get("label", ""))
+            if edge_key not in edges_seen:
+                edges_seen[edge_key] = edge
+
+    if not nodes_by_iri:
+        print(f"  Warning: {key}: no nodes returned — combined zip not updated", file=sys.stderr)
+        return
+
+    graph = {
+        "nodes": list(nodes_by_iri.values()),
+        "edges": list(edges_seen.values()),
+    }
+    combined = _load_api_zip(api_name)
+    combined[key] = graph
+    _save_api_zip(api_name, combined)
+    print(f"  Stored {len(graph['nodes'])} nodes for '{key}'")
+    update_source_config(
+        key,
+        {"download_date": datetime.date.today().isoformat()},
+        config_file,
+    )
+
+
 def process_skos_source(key, source, config_file=MENU_CONFIG, locales=None):
-    """Fetch a SKOS hierarchy via the API named in reachable_from.api and write
+    """Process a cached SKOS hierarchy from the combined OLS4/AGROVOC zip and write
     a LinkML enum YAML to sources/{key}.yaml.
 
     The source config entry must have:
@@ -330,57 +459,52 @@ def process_skos_source(key, source, config_file=MENU_CONFIG, locales=None):
         print(f"  Skipping {key}: reachable_from.api is empty", file=sys.stderr)
         return
 
-    with open(config_file) as _cf:
-        config_data = yaml.safe_load(_cf) or {}
-    api_conf = (config_data.get("apis") or {}).get(api_name) or {}
+    combined = _load_api_zip(api_name)
+    if key not in combined:
+        zip_label = _api_zip_path(api_name)
+        print(f"  Skipping {key}: not found in {zip_label} — run '-f {key}' to download",
+              file=sys.stderr)
+        return
+
+    graph = combined[key]
+
+    # Build skip_iris: root IRI of each source_node when include_self is False
+    skip_iris = set()
+    if not include_self:
+        for node_ref in source_nodes:
+            if ":" not in node_ref:
+                continue
+            ontology, term_id = node_ref.split(":", 1)
+            pfx_uri = prefixes.get(ontology, "")
+            if pfx_uri:
+                skip_iris.add(f"{pfx_uri}{term_id}")
 
     all_nodes = {}   # iri -> {label, curie, definition, deprecated}
     all_edges = []   # [{child_curie, parent_curie}]
 
-    for node_ref in source_nodes:
-        if ":" not in node_ref:
-            print(f"    Warning: source_node '{node_ref}' not in PREFIX:ID format — skipping",
-                  file=sys.stderr)
+    for node in (graph.get("nodes") or []):
+        iri = node.get("iri") or ""
+        if not iri or iri in skip_iris:
             continue
-        ontology, term_id = node_ref.split(":", 1)
+        raw_def    = node.get("definition") or ""
+        definition = (raw_def[0] if isinstance(raw_def, list) else raw_def) or ""
+        all_nodes[iri] = {
+            "label":      node.get("label") or "",
+            "curie":      iri_to_curie(iri, prefixes),
+            "definition": definition,
+            "deprecated": bool(node.get("deprecated")),
+        }
 
-        if api_name == "agrovoc":
-            graph = _fetch_agrovoc_graph(term_id, api_conf, locales=locales)
-        else:
-            graph = fetch_api_graph(ontology, term_id,
-                                    apis=config_data.get("apis") or {},
-                                    locales=locales)
-        if not graph:
+    for edge in (graph.get("edges") or []):
+        if edge.get("label") != "subClassOf":
             continue
-
-        # Determine root IRI so include_self can be applied correctly
-        pfx_uri  = prefixes.get(ontology, "")
-        root_iri = f"{pfx_uri}{term_id}" if pfx_uri else None
-        skip_iris = {root_iri} if (root_iri and not include_self) else set()
-
-        for node in (graph.get("nodes") or []):
-            iri = node.get("iri") or ""
-            if not iri or iri in skip_iris:
-                continue
-            raw_def    = node.get("definition") or ""
-            definition = (raw_def[0] if isinstance(raw_def, list) else raw_def) or ""
-            all_nodes[iri] = {
-                "label":      node.get("label") or "",
-                "curie":      iri_to_curie(iri, prefixes),
-                "definition": definition,
-                "deprecated": bool(node.get("deprecated")),
-            }
-
-        for edge in (graph.get("edges") or []):
-            if edge.get("label") != "subClassOf":
-                continue
-            src_iri = edge.get("source") or ""
-            tgt_iri = edge.get("target") or ""
-            if src_iri in all_nodes and tgt_iri in all_nodes:
-                all_edges.append({
-                    "child_curie":  all_nodes[src_iri]["curie"],
-                    "parent_curie": all_nodes[tgt_iri]["curie"],
-                })
+        src_iri = edge.get("source") or ""
+        tgt_iri = edge.get("target") or ""
+        if src_iri in all_nodes and tgt_iri in all_nodes:
+            all_edges.append({
+                "child_curie":  all_nodes[src_iri]["curie"],
+                "parent_curie": all_nodes[tgt_iri]["curie"],
+            })
 
     if not all_nodes:
         print(f"  Warning: {key}: no nodes returned — {yaml_path} not written",
@@ -507,6 +631,10 @@ def match_snomed(url, config_file=MENU_CONFIG):
     write_config(config, config_file)
     print(f"Added source '{key}' (title={title!r}, version={version!r}, "
           f"description={'set' if description else 'not available'}) to {config_file}")
+    print(f"  Fetching full hierarchy for '{key}' ...")
+    fetch_ontologyapi_source(key, entry, config_file)
+    print(f"  Run: term_harvester.py -c {key}  to generate sources/{key}.yaml, "
+          f"then -b to rebuild schema.yaml")
     return True
 
 
@@ -607,5 +735,8 @@ def match_ontology_term(url, config_file=MENU_CONFIG):
     config.setdefault("sources", {})[key] = entry
     write_config(config, config_file)
     print(f"Added source '{key}' (api={api_name}, title={title!r}) to {config_file}")
-    print(f"  Run: term_harvester.py -b -l  to build schema.yaml and expand the full hierarchy via {api_name}")
+    print(f"  Fetching full hierarchy for '{key}' via {api_name} ...")
+    fetch_ontologyapi_source(key, entry, config_file)
+    print(f"  Run: term_harvester.py -c {key}  to generate sources/{key}.yaml, "
+          f"then -b to rebuild schema.yaml")
     return True
