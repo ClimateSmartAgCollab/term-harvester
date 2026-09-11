@@ -2,8 +2,6 @@
 
 **Authors:** Damion Dooley and Claude (Anthropic claude-sonnet-4-6)
 
-Abstract
-
 Data specifications need to draw upon established or defacto-standards for measurement and metadata variable content, including picklist choices.  There are many online sources of controlled vocabulary that can go into data specifications, ranging from ontologies to SKOS vocabularies like AGROVOC, terminology portals like BioPortal or EMBL-EBI Ontology Lookup Service, and even web pages like STATSCAN or pdf documents from USDA.  
 
 Organizing and keeping up-to-date controlled vocabulary from all these sources is quite a challenge.  The term_harvester.py script and its library of /sources/ fetch-and-parse scripts enable retrieval of known-good vocabulary according to a configuration file for use by a particular project or more broadly, by an agency.
@@ -25,17 +23,23 @@ The term_harvester.py script fetches vocabulary sources, processes them into Lin
 
 ## Table of Contents
 
+- [Overview](#overview)
 - [Quick-start workflow](#quick-start-workflow)
 - [Command reference](#command-reference)
-  - [`-a` — Add a source from a URL](#-a--add-a-source-from-a-url)
-  - [`-f` — Fetch (download) sources](#-f--fetch-download-sources)
-  - [`-c` — Process sources](#-c--process-sources-update-prefix-dicts)
-  - [`-b` — Build schema.yaml](#-b--build-schemayaml)
-  - [`-l` — Expand reachable_from source nodes via API](#-l--expand-reachable_from-source-nodes-via-api)
-  - [`-r` — Enum report](#-r--enum-report)
-  - [`--free_text` — Extract from free text](#--free_text--extract-from-free-text)
-  - [`-i` — Specify configuration file](#-i--specify-configuration-file)
-  - [`--search` — Search for terms](#--search--search-for-terms)
+  - [Specify configuration file: `-i`](#specify-configuration-file--i)
+  - Retrieve Sources:
+    - [Add a source from a URL: `-a`](#add-a-source-from-a-url--a)
+    - [Extract from free text: `--free_text`](#extract-from-free-text---free_text)
+    - [Fetch (download) sources: `-f`](#fetch-download-sources--f)
+  - Parsing:
+    - [Process sources: `-c`](#process-sources--c)
+  - Combining:
+    - [Build schema.yaml: `-b`](#build-schemayaml--b)
+    - [Expand reachable_from source nodes via API: `-l`](#expand-reachable_from-source-nodes-via-api--l)
+    - [SSSOM ontology mappings](#sssom-ontology-mappings)
+  - Miscellaneous:
+    - [Enum report: `-r`](#enum-report--r)
+    - [Search for terms: `--search`](#search-for-terms---search)
 - [Supported source types and auto-detection](#supported-source-types-and-auto-detection)
 - [Example `-a` invocations by source type](#example--a-invocations-by-source-type)
   - [SNOMED CT (via OLS4)](#snomed-ct-via-ols4)
@@ -84,6 +88,23 @@ The term_harvester.py script fetches vocabulary sources, processes them into Lin
 
 ---
 
+## Overview
+
+Term Harvester processes authoritative vocabulary sources into a single merged, normalized file in 3 stages:
+
+1. **Source reference vocabulary download**: The objective at this stage is to download a version or snapshot of one or more raw vocabulary documents from a particular source, including API sources. These are usually stored in .zip files, one for each source. Subsequent stages of work are only done on the local source document materials.
+    - The `--add` and `--fetch` options apply here. The `--add` action sets up an initial configuration file entry for the added source, which can subsequently be manually adjusted. `--fetch` just re-downloads documents according to an existing configuration.
+    - Typically raw PDF, HTML, OWL or other textual documents are retrieved; API results are also included.
+    - In the case where free-text live (AI account) LLM parsing of an online document section is required, a relevant 10,000 character document segment is extracted and stored (as `extracted_text.txt`).
+
+2. **Source local document parsing**: The objective here is to parse a source's local documents into a normalized [LinkML](https://linkml.io) YAML source format according to the particular configuration and document requirements of the source. Work on refining and validating exactly what terms are parsed occurs here. As well, this enables bringing new parsing algorithms to stage 1 captured documents.
+
+3. **Merging of sources**: The `--build` parameter causes all sources or a given source to be merged into a single output LinkML `schema.yaml` file where extra include/exclude term filtering occurs, and where mappings via SSSOM tables can be included.
+
+Stage 3 yields a normalized format of reference vocabularies which can then be transformed into the format (and locale) required by an agency or project's network and database infrastructure. A demonstration of this post-processing is given in the Term Harvester [examples/agrifoodca_postharvest.py](https://github.com/ClimateSmartAgCollab/term-harvester/blob/main/examples/agrifoodca_postharvest.py) script (see [readme](https://github.com/ClimateSmartAgCollab/term-harvester/blob/main/examples/README_agrifoodca.md)).
+
+---
+
 ## Quick-start workflow
 
 **Note that some terminals access python as "python3". ALSO, term_harvester.py needs to be run within the context of the folder you want to generate schema.yaml in. If term_harvester.py location is not set in the shell environment then you will need to reference it using a relative path to the DataHarmonizer script/ folder, e.g. `python ../../../script/menu_manager/term_harvester.py`.**
@@ -106,15 +127,32 @@ python term_harvester.py -b
 python term_harvester.py -f all -c -b
 ```
 
-One strategy with a new menu management installation is to pick a few libraries that you know contain enumerations / picklists useful in a project.  So for example, soil:
-python term_harvester.py -a https://example.org/some-valueset.json
+One strategy with a new menu management installation is to pick a few libraries that you know contain enumerations / picklists useful in a project.  So for example, the MIxS specification which includes soil and other sample data fields:
+python term_harvester.py -a https://raw.githubusercontent.com/GenomicsStandardsConsortium/mixs/refs/heads/main/src/mixs/schema/mixs.yaml
 
 
 ---
 
 ## Command reference
 
-### `-a` — Add a source from a URL
+### Specify configuration file: `-i`
+
+```bash
+python term_harvester.py -i path/to/myconfig.yaml -f all -c -b
+python term_harvester.py --input examples/agrifoodca_config.yaml -r
+```
+
+Overrides the default configuration file name (`harvester_config.yaml`).  All
+commands (`-a`, `-f`, `-c`, `-b`, `-d`, `-l`, `-r`, `-s`) read from and write to
+the specified file.  Useful when managing multiple independent schemas from the
+same working directory, or when using a pre-built config from the `examples/`
+folder as a starting point.
+
+---
+
+### Retrieve Sources:
+
+#### Add a source from a URL: `-a`
 
 Auto-detects the source type, downloads the file, adds an entry to
 `harvester_config.yaml`, and runs initial processing.
@@ -124,11 +162,19 @@ python term_harvester.py -a https://example.org/some-valueset.json
 ```
 
 Combine with `--free_text` to extract a picklist from prose rather than a
-structured file (see [`--free_text`](#--free_text--extract-from-free-text) below).
+structured file (see [`--free_text`](#extract-from-free-text---free_text) below).
 
 ---
 
-### `-f` — Fetch (download) sources
+#### Extract from free text: `--free_text`
+
+Used with `-a` to extract enumerations from a textual document rather than a structured
+source file.  See the dedicated [FreeText source type](#freetext-source-type)
+section for full usage, file-input support, and API key setup.
+
+---
+
+#### Fetch (download) sources: `-f`
 
 Re-download source files for sources already in `harvester_config.yaml`.
 
@@ -141,7 +187,9 @@ python term_harvester.py -f              # no-op; prints reminder to use -f all 
 
 ---
 
-### `-c` — Process sources (update prefix dicts)
+### Parsing:
+
+#### Process sources: `-c`
 
 ```bash
 python term_harvester.py -c                   # process all sources
@@ -153,7 +201,9 @@ stores the resulting prefix dict in `harvester_config.yaml`.
 
 ---
 
-### `-b` — Build schema.yaml
+### Combining:
+
+#### Build schema.yaml: `-b`
 
 Create or update `schema.yaml` with the LinkML top-level structure, enums, and
 prefixes drawn from all sources in `harvester_config.yaml`.
@@ -173,7 +223,7 @@ item should be removed or retained.
 
 ---
 
-### `-l` — Expand `reachable_from` source nodes via API
+#### Expand reachable_from source nodes via API: `-l`
 
 Always operates on `schema.yaml`; run after `-b`.
 
@@ -196,7 +246,9 @@ OLS4 is the default fallback.  BioPortal requires an `apikey` under
 
 ---
 
-### `-r` — Enum report
+### Miscellaneous:
+
+#### Enum report: `-r`
 
 ```bash
 python term_harvester.py -r     # space-padded output
@@ -209,30 +261,7 @@ is configured.
 
 ---
 
-### `--free_text` — Extract from free text
-
-Used with `-a` to extract enumerations from a textual document rather than a structured
-source file.  See the dedicated [FreeText source type](#freetext-source-type)
-section for full usage, file-input support, and API key setup.
-
----
-
-### `-i` — Specify configuration file
-
-```bash
-python term_harvester.py -i path/to/myconfig.yaml -f all -c -b
-python term_harvester.py --input examples/agrifoodca_config.yaml -r
-```
-
-Overrides the default configuration file name (`harvester_config.yaml`).  All
-commands (`-a`, `-f`, `-c`, `-b`, `-d`, `-l`, `-r`, `-s`) read from and write to
-the specified file.  Useful when managing multiple independent schemas from the
-same working directory, or when using a pre-built config from the `examples/`
-folder as a starting point.
-
----
-
-### `--search` — Search for terms
+#### Search for terms: `--search`
 
 Search for terms and enumerations across all sources that have been processed
 with `-c`.
@@ -1578,22 +1607,20 @@ apis:
 
 ### Local storage behaviour
 
-API-based sources (`OntologyAPI`, `AGROVOC`) do **not** cache API responses to disk.
+API-based sources (`OntologyAPI`, `AGROVOC`) follow the same download-then-parse
+pipeline as all other source types.  All network activity is confined to the `-a`
+and `-f` stages; `-c` reads only from local files.
 
 | Phase | What is written locally |
 |---|---|
-| `-a` | `harvester_config.yaml` only — 1–2 lightweight API calls populate the `title`, `version`, and `description` fields; no source file is downloaded |
-| `-f` | **Not applicable.** `-f` is a no-op for these source types (the tool prints a reminder to use `-c` instead). There is no downloadable document to save. |
-| `-c` | `sources/{key}.yaml` only — live API calls fetch the full hierarchy at process time; the raw API response (JSON / SPARQL result) is not cached; each `-c` run re-queries the endpoint |
+| `-a` | `harvester_config.yaml` entry (title/version/description from a lightweight OLS4/SPARQL lookup) **plus** a full graph download stored in `sources/OLS4.zip` or `sources/AGROVOC.zip` |
+| `-f` | Refreshes the key's entry inside `sources/OLS4.zip` (OLS4/BioPortal) or `sources/AGROVOC.zip` (AGROVOC) — multiple source keys share one combined zip per API |
+| `-c` | `sources/{key}.yaml` only — reads the cached graph from the combined zip; no network access |
 | `-l` | Updates `schema.yaml` in place; no new local files |
 
-Because there is no local snapshot, the vocabulary in `sources/{key}.yaml` reflects
-the state of the remote API at the time `-c` was last run.  To pick up upstream
-changes, re-run `-c {key}` followed by `-b`.
-
-> **Contrast with `ISO_COUNTRY`** (Wikidata SPARQL): that source type *does* cache
-> the full SPARQL result as structured JSON inside `sources/{key}.zip`.  `-f` re-queries
-> Wikidata and refreshes the cache; `-c` reads from the zip without any network access.
+The combined zip stores one graph entry per source key.  Adding, refreshing, or
+deleting a key updates only that entry; other keys in the same zip are unaffected.
+To pick up upstream changes, re-run `-f {key}` followed by `-c {key}` and `-b`.
 
 ### Source-level metadata (written to `harvester_config.yaml` by `-a`)
 
