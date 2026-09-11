@@ -57,6 +57,7 @@ The term_harvester.py script fetches vocabulary sources, processes them into Lin
   - [Codex Alimentarius (GSFA food additives)](#codex-alimentarius-gsfa-food-additives-codex)
   - [E Numbers (Wikidata P628)](#e-numbers-wikidata-p628-e_number)
   - [CANSIS Glossary of Terms in Soil Science](#cansis-glossary-of-terms-in-soil-science-cansis_glossary)
+  - [CSSC (Canadian System of Soil Classification)](#cssc-canadian-system-of-soil-classification)
   - [FreeText](#freetext)
 - [FreeText source type](#freetext-source-type)
 - [Term Search](#term-search)
@@ -263,32 +264,33 @@ Check source section for details on command line configuration.
 | Detected as | Description |
 |---|---|
 | **Agricultural** | |
-| [`AgriFoodCA`](#agrifoodca-picklists) | AgriFoodData Canada bilingual (EN/FR) agricultural picklist CSVs; add an entire GitHub directory or a single CSV file.<br>(GitHub directory URL for `agrifooddatacanada/picklists_for_schemas`, pre-download; or CSV with first row matching `,title,description,keywords,source`, content-based) |
-| [`AGROVOC`](#agrovoc) → `OntologyAPI` | FAO multilingual agricultural thesaurus covering farming, food, fisheries, and natural resources (~40 000 concepts).<br>(URL matches `aims.fao.org/aos/agrovoc/{id}`, pre-download) |
-| [`CANSIS_GLOSSARY`](#cansis-glossary-of-terms-in-soil-science-cansis_glossary) | Agriculture and Agri-Food Canada glossary of soil science terms with English definitions and French translations.<br>(Exact URL `https://sis.agr.gc.ca/cansis/glossary/`, pre-download) |
-| [`NAPCSCanada`](#napcs-canada) | North American Product Classification System Canada with a hierarchical product and service code taxonomy.<br>(CSV content with NAPCS-specific column headers) |
-| [`NASIS`](#nasis-usda-nrcs-national-soil-information-system) | USDA NRCS National Soil Information System domain tables (~450 enumerations) for all categorical soil survey fields.<br>(URL from `nrcs.usda.gov` containing `NASIS` with `.pdf` extension) |
-| [`NSDB`](#nsdb-national-soil-database) | Combined Canadian National Soil DataBase soil name and layer classification tables.<br>(URL matches `sis.agr.gc.ca/cansis/nsdb/soil` prefix) |
-| [`NSDBSLC`](#nsdb-national-soil-database) | Canadian National Soil DataBase Soil Landscapes of Canada polygon-level classification data.<br>(URL matches `sis.agr.gc.ca` + `/nsdb/slc/`) |
-| [`NSDBSLT`](#nsdb-national-soil-database) | Canadian National Soil DataBase Soil Layer Table with horizon-level soil property classifications.<br>(URL contains `/slt/` under the NSDB soil domain) |
-| [`NSDBSNT`](#nsdb-national-soil-database) | Canadian National Soil DataBase Soil Name Table with soil series classification and profile data.<br>(URL contains `/snt/` under the NSDB soil domain) |
+| [`AgriFoodCA`](#agrifoodca-picklists)<br>~400 terms | AgriFoodData Canada bilingual (EN/FR) agricultural picklist CSVs; add an entire GitHub directory or a single CSV file.<br>(GitHub directory URL for `agrifooddatacanada/picklists_for_schemas`, pre-download; or CSV with first row matching `,title,description,keywords,source`, content-based) |
+| [`AGROVOC`](#agrovoc) → `OntologyAPI`<br>~40,000 terms (subtree on request) | FAO multilingual agricultural thesaurus covering farming, food, fisheries, and natural resources (~40 000 concepts).<br>(URL matches `aims.fao.org/aos/agrovoc/{id}`, pre-download) |
+| [`CANSIS_GLOSSARY`](#cansis-glossary-of-terms-in-soil-science-cansis_glossary)<br>~830 terms | Agriculture and Agri-Food Canada glossary of soil science terms with English definitions and French translations.<br>(Exact URL `https://sis.agr.gc.ca/cansis/glossary/`, pre-download) |
+| [`CSSC`](#cssc-canadian-system-of-soil-classification)<br>272 terms | Canadian System of Soil Classification (Third Edition), all three taxonomic levels in a single hierarchical enumeration: 10 Soil Orders, ~31 Great Groups, ~231 Subgroups, with EN/FR bilingual labels and descriptions.<br>(URL from `sis.agr.gc.ca/cansis/taxa/cssc3/` — index page or any chapter page) |
+| [`NAPCSCanada`](#napcs-canada)<br>900+ terms | North American Product Classification System Canada with a hierarchical product and service code taxonomy.<br>(CSV content with NAPCS-specific column headers) |
+| [`NASIS`](#nasis-usda-nrcs-national-soil-information-system)<br>10,000+ terms (~450 enums) | USDA NRCS National Soil Information System domain tables (~450 enumerations) for all categorical soil survey fields.<br>(URL from `nrcs.usda.gov` containing `NASIS` with `.pdf` extension) |
+| [`NSDB`](#nsdb-national-soil-database)<br>~400 terms | Combined Canadian National Soil DataBase soil name and layer classification tables.<br>(URL matches `sis.agr.gc.ca/cansis/nsdb/soil` prefix) |
+| [`NSDBSLC`](#nsdb-national-soil-database)<br>~120 terms | Canadian National Soil DataBase Soil Landscapes of Canada polygon-level classification data.<br>(URL matches `sis.agr.gc.ca` + `/nsdb/slc/`) |
+| [`NSDBSLT`](#nsdb-national-soil-database)<br>~370 terms | Canadian National Soil DataBase Soil Layer Table with horizon-level soil property classifications.<br>(URL contains `/slt/` under the NSDB soil domain) |
+| [`NSDBSNT`](#nsdb-national-soil-database)<br>~370 terms | Canadian National Soil DataBase Soil Name Table with soil series classification and profile data.<br>(URL contains `/snt/` under the NSDB soil domain) |
 | **Human and animal health** | |
-| [`CODEX`](#codex-alimentarius-gsfa-food-additives-codex) | FAO/WHO Codex General Standard for Food Additives listing all internationally permitted additives by food category.<br>(URL from `fao.org/gsfaonline/docs/` or `fao.org/input/download/standards/4/CXS_192`, pre-download) |
-| [`E_NUMBER`](#e-numbers-wikidata-p628-e_number) | EU/UK food additive E numbers with functional-use annotations, organised by numeric range category, sourced from Wikidata.<br>(URL matches `wikidata.org/wiki/Q207810` or Wikidata SPARQL URL containing `P628`, pre-download) |
-| [`LOINC`](#loinc-codesystems-and-valuesets) | HL7 LOINC listing page covering all available clinical observation, lab test, and measurement code systems and value sets.<br>(URL from `terminology.hl7.org` with `.html` extension — listing page, not a single ValueSet/CodeSystem detail) |
-| [`LOINCCodeSystem`](#loinc-codesystems-and-valuesets) | A single HL7 LOINC clinical terminology code system in FHIR JSON format.<br>(`.json` file with `resourceType: CodeSystem`) |
-| [`LOINCValueSet`](#loinc-codesystems-and-valuesets) | A curated HL7 LOINC subset of clinical codes for a specific use case, in FHIR JSON format.<br>(`.json` file with `resourceType: ValueSet`) |
-| [`SNOMED CT`](#snomed-ct-via-ols4) → `OntologyAPI` | Comprehensive clinical health terminology covering diseases, procedures, findings, and anatomy.<br>(URL matches `snomed.info/id/{conceptId}`, pre-download) |
+| [`CODEX`](#codex-alimentarius-gsfa-food-additives-codex)<br>~640 terms | FAO/WHO Codex General Standard for Food Additives listing all internationally permitted additives by food category.<br>(URL from `fao.org/gsfaonline/docs/` or `fao.org/input/download/standards/4/CXS_192`, pre-download) |
+| [`E_NUMBER`](#e-numbers-wikidata-p628-e_number)<br>~580 terms | EU/UK food additive E numbers with functional-use annotations, organised by numeric range category, sourced from Wikidata.<br>(URL matches `wikidata.org/wiki/Q207810` or Wikidata SPARQL URL containing `P628`, pre-download) |
+| [`LOINC`](#loinc-codesystems-and-valuesets)<br>varies by ValueSet | HL7 LOINC listing page covering all available clinical observation, lab test, and measurement code systems and value sets.<br>(URL from `terminology.hl7.org` with `.html` extension — listing page, not a single ValueSet/CodeSystem detail) |
+| [`LOINCCodeSystem`](#loinc-codesystems-and-valuesets)<br>varies by CodeSystem | A single HL7 LOINC clinical terminology code system in FHIR JSON format.<br>(`.json` file with `resourceType: CodeSystem`) |
+| [`LOINCValueSet`](#loinc-codesystems-and-valuesets)<br>varies by ValueSet (~1,400 typical) | A curated HL7 LOINC subset of clinical codes for a specific use case, in FHIR JSON format.<br>(`.json` file with `resourceType: ValueSet`) |
+| [`SNOMED CT`](#snomed-ct-via-ols4) → `OntologyAPI`<br>350,000+ terms (subtree on request) | Comprehensive clinical health terminology covering diseases, procedures, findings, and anatomy.<br>(URL matches `snomed.info/id/{conceptId}`, pre-download) |
 | **General** | |
-| [`CRediT`](#credit-contributor-roles-taxonomy) | 14-role contributor roles taxonomy for scholarly output attribution, published on Zenodo as a PDF.<br>(URL from `zenodo.org/records/{id}` — bare record URL containing "credit", or a `/files/` path containing "credit" and ".pdf") |
-| [`FreeText`](#freetext-source-type) | Claude API extraction of picklist enumerations from any human-readable source: URL, inline text, plain-text file, or PDF; useful when no structured vocabulary file exists.<br>(Any HTTP/HTTPS URL passed with `--free_text`, or a local file path / inline string supplied as `--free_text` without a URL) |
-| [`ISO_COUNTRY`](#iso-3166-2-country-subdivisions-iso_country) | ISO 3166-2 first-level country subdivisions (provinces, states, territories) fetched via Wikidata SPARQL.<br>(URL from `iso.org/obp/ui/#iso:code:3166:` followed by a 2-letter country code) |
-| [`LinkML`](#linkml) | LinkML YAML schema containing one or more named enumerations with permissible values.<br>(`.yaml`/`.yml` file that is a dict containing `enums` or `id`) |
-| [`LOC_CLASSIFICATION`](#library-of-congress-classification-loc_classification) | Library of Congress subject heading hierarchy spanning all academic disciplines, useful for general topic or domain picklists.<br>(Exact URL `https://www.loc.gov/catdir/cpso/lcco/`) |
-| [OBO terms](#obo-ontology-terms-envo-go-uberon-) → `OntologyAPI` | Open Biological and Biomedical Ontologies covering environments, gene functions, anatomical structures, and more.<br>(Bare CURIE `ENVO:00010483`, OBO shorthand `ENVO_00010483`, or OBO IRI `http://purl.obolibrary.org/obo/ENVO_00010483`; pre-download, routed to configured API or OLS4) |
-| [`OWL`](#owl-ontologies) | Web Ontology Language file defining a class hierarchy with properties and formal logical relationships.<br>(URL extension `.owl`, `.ofn`, `.rdf`, `.ttl`, `.n3`; or file contains RDF/OWL content markers) |
-| [`STATSCAN`](#statistics-canada) | Statistics Canada classification variable with hierarchical codes from the IMDB concepts portal.<br>(URL from `statcan.gc.ca` containing `p3VD.pl` and `Function=getVD`) |
-| [`STATSCAN_TABLE`](#statistics-canada-census-dictionary-tables-statscan_table) | Statistics Canada Census Dictionary reference table such as province/territory abbreviations.<br>(URL from `www12.statcan.gc.ca/.../ref/dict/tab/index-eng.cfm?ID=`) |
+| [`CRediT`](#credit-contributor-roles-taxonomy)<br>14 roles | 14-role contributor roles taxonomy for scholarly output attribution, published on Zenodo as a PDF.<br>(URL from `zenodo.org/records/{id}` — bare record URL containing "credit", or a `/files/` path containing "credit" and ".pdf") |
+| [`FreeText`](#freetext-source-type)<br>varies | Claude API extraction of picklist enumerations from any human-readable source: URL, inline text, plain-text file, or PDF; useful when no structured vocabulary file exists.<br>(Any HTTP/HTTPS URL passed with `--free_text`, or a local file path / inline string supplied as `--free_text` without a URL) |
+| [`ISO_COUNTRY`](#iso-3166-2-country-subdivisions-iso_country)<br>~14 terms per country (5,400+ all countries) | ISO 3166-2 first-level country subdivisions (provinces, states, territories) fetched via Wikidata SPARQL.<br>(URL from `iso.org/obp/ui/#iso:code:3166:` followed by a 2-letter country code) |
+| [`LinkML`](#linkml)<br>varies by source | LinkML YAML schema containing one or more named enumerations with permissible values.<br>(`.yaml`/`.yml` file that is a dict containing `enums` or `id`) |
+| [`LOC_CLASSIFICATION`](#library-of-congress-classification-loc_classification)<br>~6,600 terms | Library of Congress subject heading hierarchy spanning all academic disciplines, useful for general topic or domain picklists.<br>(Exact URL `https://www.loc.gov/catdir/cpso/lcco/`) |
+| [OBO terms](#obo-ontology-terms-envo-go-uberon-) → `OntologyAPI`<br>varies by ontology (1,000–40,000+) | Open Biological and Biomedical Ontologies covering environments, gene functions, anatomical structures, and more.<br>(Bare CURIE `ENVO:00010483`, OBO shorthand `ENVO_00010483`, or OBO IRI `http://purl.obolibrary.org/obo/ENVO_00010483`; pre-download, routed to configured API or OLS4) |
+| [`OWL`](#owl-ontologies)<br>varies by ontology | Web Ontology Language file defining a class hierarchy with properties and formal logical relationships.<br>(URL extension `.owl`, `.ofn`, `.rdf`, `.ttl`, `.n3`; or file contains RDF/OWL content markers) |
+| [`STATSCAN`](#statistics-canada)<br>varies (~20–7,000+ per classification) | Statistics Canada classification variable with hierarchical codes from the IMDB concepts portal.<br>(URL from `statcan.gc.ca` containing `p3VD.pl` and `Function=getVD`) |
+| [`STATSCAN_TABLE`](#statistics-canada-census-dictionary-tables-statscan_table)<br>typically <100 terms | Statistics Canada Census Dictionary reference table such as province/territory abbreviations.<br>(URL from `www12.statcan.gc.ca/.../ref/dict/tab/index-eng.cfm?ID=`) |
 
 ---
 
@@ -938,6 +940,58 @@ python term_harvester.py -b
 
 ---
 
+### CSSC (Canadian System of Soil Classification)
+
+The [Canadian System of Soil Classification](https://sis.agr.gc.ca/cansis/taxa/cssc3/)
+(Third Edition, 1998) defines a hierarchical taxonomy of Canadian soils across three
+categorical levels — Order, Great Group, and Subgroup — all produced as a single enum
+(`CSSC_SoilOrder`) with `is_a` links connecting each level to its parent.
+
+```bash
+python term_harvester.py -a "https://sis.agr.gc.ca/cansis/taxa/cssc3/index.html"
+python term_harvester.py -b
+```
+
+The source key is always `CSSCv3_SoilOrder`.  All 84 HTML pages (index, chapters 4–13,
+and all Great Group pages, in English and French) are downloaded and stored in
+`sources/CSSCv3_SoilOrder.zip`.
+
+**Enum structure:**
+
+| Level | Count | Code format | Example | `is_a` |
+|---|---|---|---|---|
+| Soil Order | 10 | 2-letter | `BR` (Brunisolic Order) | — |
+| Great Group | ~31 | `{ORDER}.{GG}` | `BR.MB` (Melanic Brunisol) | order code |
+| Subgroup | ~231 | `{PREFIX}.{GG}` | `O.MB` (Orthic Melanic Brunisol) | great group code |
+
+The `is_a` hierarchy enables `reachable_from` with `source_nodes` to retrieve any
+branch of the taxonomy.  For example, to include only the Brunisolic order and all
+its great groups and subgroups:
+
+```yaml
+# harvester_config.yaml
+CSSCv3_SoilOrder:
+  content_type: CSSC
+  reachable_from:
+    source_ontology: https://sis.agr.gc.ca/cansis/taxa/cssc3/index.html
+    source_nodes: [BR]
+    include_self: true
+```
+
+English and French titles and descriptions are included for all 272 terms.  French
+translations are stored in the `extensions.locales.value.fr` block of
+`sources/CSSCv3_SoilOrder.yaml`.
+
+To refresh:
+
+```bash
+python term_harvester.py -f CSSCv3_SoilOrder   # re-downloads all 84 HTML pages into zip
+python term_harvester.py -c CSSCv3_SoilOrder   # regenerates sources/CSSCv3_SoilOrder.yaml
+python term_harvester.py -b                    # rebuilds schema.yaml
+```
+
+---
+
 ### FreeText
 
 For picklists described in free prose — inline text, a `.txt` file, or a `.pdf`
@@ -1559,7 +1613,7 @@ namespace.
 ## SSSOM ontology mappings
 
 SSSOM (Simple Standard for Sharing Ontology Mappings) files can be applied to
-`schema.yaml` permissible values using `-s`.  SSSOM maps `subject_id` values
+`schema.yaml` permissible values using `-s` / `--sssom`.  SSSOM maps `subject_id` values
 matching a permissible value's `meaning` field to LinkML mapping attributes:
 
 | SSSOM predicate | LinkML attribute |
@@ -1656,4 +1710,5 @@ echo $ANTHROPIC_API_KEY
 | `source_enumber.py` | `content_type: E_NUMBER` — EU/UK food additive E numbers via Wikidata SPARQL property P628; fetches labels, `schema:description`, and P366 functional-use values; produces a two-level enum with nine EU numeric range parent PVs; `meaning` compressed to `wd:Qxxx` | [Wikidata Q207810](https://www.wikidata.org/wiki/Q207810) |
 | `source_cansis_glossary.py` | `content_type: CANSIS_GLOSSARY` — CANSIS Glossary of Terms in Soil Science; downloads all A-Z letter pages (EN + FR) into a zip; parses `<dl>` term/definition pairs; FR locale extensions handled by `source_cansis_translate.py` (separate utility, requires `deep-translator`) | [Glossary index](https://sis.agr.gc.ca/cansis/glossary/) |
 | `source_cansis_translate.py` | Standalone utility (not a source module); bridges the independent CANSIS French glossary to the EN enum via Google Translate + fuzzy label matching; run manually after `-c` to produce and apply `CANSIS_GLOSSARY_translated_fr.tsv` | |
+| `source_cssc.py` | `content_type: CSSC` — Canadian System of Soil Classification (Third Edition); crawls index, chapters 4–13, and all Great Group pages (EN + FR); stores all 84 pages in `sources/CSSCv3_SoilOrder.zip`; produces a unified three-level `CSSC_SoilOrder` enum (10 orders → ~31 great groups → ~231 subgroups) with `is_a` hierarchy and bilingual EN/FR titles and descriptions | [CSSC index](https://sis.agr.gc.ca/cansis/taxa/cssc3/index.html) |
 | `source_freetext.py` | `content_type: FreeText` — Claude API enum extraction from free text | |
