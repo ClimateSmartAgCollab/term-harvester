@@ -75,6 +75,22 @@ sources:
       representing the 14 roles typically played by contributors to scientific scholarly
       output. Each role describes a specific contribution to the scholarly output.
     see_also: https://credit.niso.org/
+  CSSCv3_SoilOrder:
+    title: CSSC Soil Order
+    name: CSSCv3_SoilOrder
+    version: '3'
+    content_type: CSSC
+    file_format: zip
+    reachable_from:
+      source_ontology: https://sis.agr.gc.ca/cansis/taxa/cssc3/index.html
+    download_date: '2026-09-11'
+    description: Taxa at the order level are based on properties of the pedon that
+      reflect the nature of the soil environment and the effects of the dominant soil-forming
+      processes. The order is the highest categorical level of the Canadian System
+      of Soil Classification; ten orders are recognized in Canada, each defined by
+      distinct morphological and chemical horizon properties that express major differences
+      in pedogenesis.
+    see_also: https://sis.agr.gc.ca/cansis/taxa/cssc3/index.html
   ISO_COUNTRY_CA:
     title: Canada
     name: ISO_COUNTRY_CA
@@ -169,6 +185,23 @@ sources:
     reachable_from:
       source_ontology: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1313722
     download_date: '2026-06-19'
+  TAXRANK_0000000:
+    title: taxonomic_rank
+    name: TAXRANK_0000000
+    version: http://purl.obolibrary.org/obo/taxrank/releases/2025-09-24/taxrank.owl
+    content_type: OntologyAPI
+    file_format: json
+    reachable_from:
+      api:
+        ols:
+          type: rest
+      source_nodes:
+        - TAXRANK:0000000
+      include_self: true
+    download_date: '2026-09-10'
+    description: A level of depth of a taxon in a taxonomic hierarchy.
+    prefixes:
+      TAXRANK: http://purl.obolibrary.org/obo/TAXRANK_
   valuesets_merged_hierarchy:
     title: Merged Value Sets with Hierarchical Structure
     name: valuesets_merged_hierarchy
