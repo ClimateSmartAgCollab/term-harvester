@@ -1,0 +1,35 @@
+# AgriFoodCA term_harvester setup instructions
+# Run all commands from within this folder (examples/agrifoodca/).
+# Config: config.yaml (this folder)  →  schema: agrifoodca_schema.yaml (this folder)
+
+# --- Initial setup ---
+
+# Download all source files, process into sources/*.yaml, assemble schema
+python ../../term_harvester.py -f all
+python ../../term_harvester.py -c
+python ../../term_harvester.py -b
+
+
+# --- FreeText sources (require ANTHROPIC_API_KEY) ---
+#
+# FreeText sources extract structured enumerations from web pages or documents
+# using the Claude API.  They are not fetched by -f all; each must be added
+# once with -a --free_text, after which -c and -b handle them like any other source.
+#
+# The Lodging source extracts a cereal grain visual assessment scale from a
+# Springer article on wheat lodging and grain appearance.  It produces two enums:
+#   LodgingScale        — 9-point scale from severe lodging (1) to no lodging (9)
+#   GrainAppearanceScale — 9-point scale from unsatisfactory (1) to excellent (9)
+#
+# This replaces AgriFoodCA_LodgingWheat from the picklists (excluded in config.yaml
+# under AgriFoodCA_Picklists minus.concepts).
+#
+# During -c you will be prompted to choose a section_format for how the extracted
+# enum entries are structured; select 2 (flat numeric scale).  The choice is stored
+# in config.yaml as section_format: 2 for all subsequent -c runs.
+
+python ../../term_harvester.py -a 'https://link.springer.com/article/10.1186/s12870-025-07322-y#text=A visual estimation of lodging before harvest' --free_text 'lodging'
+
+# After -a, process and rebuild:
+python ../../term_harvester.py -c Lodging
+python ../../term_harvester.py -b
