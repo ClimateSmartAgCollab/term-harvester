@@ -58,7 +58,7 @@ python3 ../../term_harvester.py -a ENVO:00000428
 #  - a section_format; select 2 (flat numeric scale).
 # Later We will sssom map this term to https://browser.planteome.org/amigo/term/TO:0000068
 
-python3 ../../term_harvester.py -a 'https://link.springer.com/article/10.1186/s12870-025-07322-y#text=A visual estimation of lodging before harvest' --free_text
+python3 ../../term_harvester.py -a 'https://link.springer.com/article/10.1186/s12870-025-07322-y#text=A visual estimation of lodging before harvest'
 
 python3 ../../term_harvester.py -c CerealGrainLodging
 
