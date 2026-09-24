@@ -1,0 +1,20 @@
+# sawgraph_sssom.tsv — ontology mappings for schema.yaml enum, slot, and class definitions
+#
+# subject_id patterns:
+#   enums:{EnumKey}     — enum definition  → enum_uri  (skos:exactMatch)
+#   slots:{SlotKey}     — slot definition  → slot_uri  (skos:exactMatch)
+#   classes:{ClassName} — class definition → class_uri (skos:exactMatch)
+#
+# PV-level rows use the permissible_value meaning CURIE directly as subject_id.
+# Other predicates (skos:broadMatch, skos:narrowMatch, etc.) write to the
+# corresponding mapping list on the definition rather than the *_uri field.
+curie_map:
+  enums: https://example.org/sawgraph/enums/
+  TO: http://purl.obolibrary.org/obo/TO_
+  skos: http://www.w3.org/2004/02/skos/core#
+  semapv: https://w3id.org/semapv/vocab/
+mapping_set_id: https://example.org/sawgraph/sawgraph_sssom
+mapping_set_description: Ontology mappings for SAWGraph schema enums, slots, and classes
+---
+subject_id	predicate_id	object_id	subject_label	object_label	mapping_justification	author_id	confidence	comment
+enums:LodgingScale	skos:exactMatch	TO:0000068	LodgingScale	lodging	semapv:ManualMappingCuration

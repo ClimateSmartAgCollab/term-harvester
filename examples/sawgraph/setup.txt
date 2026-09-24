@@ -1,0 +1,136 @@
+# SAWGraph term_harvester setup instructions
+# Run all commands from within this folder (examples/sawgraph/).
+# Config: config.yaml (this folder)  →  schema: schema.yaml (this folder)
+
+# --- Initial setup ---
+
+# Add ISO 3166-2 US subdivisions (states + territories + DC)
+
+python3 ../../term_harvester.py -a ISO_COUNTRY_US
+
+
+# Add AGROVOC farmland hierarchy (_2808)
+
+python3 ../../term_harvester.py -a AGROVOC_c_2808  
+
+# Example apis block, uncomment whichever APIS you want to use.
+#   apis:
+#     ols:
+#       type:
+#         rest:
+#           uri: http://www.ebi.ac.uk/ols4/api/ontologies/{ontology}/terms/{double_encoded}/graph
+#       ontologies: [ENVO, GO, UBERON]
+#     bioportal:
+#       type:
+#         rest:
+#           uri: https://data.bioontology.org
+#           apikey: YOUR_BIOPORTAL_KEY
+#       ontologies: [MESH, NCIT, SNOMEDCT]
+#     agrovoc:
+#       type:
+#         sparql:
+#           uri: https://agrovoc.fao.org/sparql/
+#       ontologies: [agrovoc]
+
+# Add ENVO Landform and its descendents
+
+python3 ../../term_harvester.py -a http://purl.obolibrary.org/obo/ENVO_01001886
+
+# Add Biome and descendents
+
+python3 ../../term_harvester.py -a ENVO:00000428
+
+# --- FreeText sources (currently require ANTHROPIC_API_KEY) ---
+# Note: Lodging is defined as the permanent displacement of a stem (or part of a stem) from a vertical
+# posture (https://ahdb.org.uk/knowledge-library/an-introduction-to-lodging-in-cereals) 
+# Lodging Assessment Scale — cereal grain visual scoring (1–9 scale)
+# Extracts LodgingScale and GrainAppearanceScale from a Springer article on
+# wheat visual assessment.  During -c you will be prompted to choose:
+#  - a name for the enumeration. Try: "CerealGrainLodging"
+#  - a section_format; select 2 (flat numeric scale).
+# Later We will sssom map this term to https://browser.planteome.org/amigo/term/TO:0000068
+
+python3 ../../term_harvester.py -a 'https://link.springer.com/article/10.1186/s12870-025-07322-y#text=A visual estimation of lodging before harvest' --free_text
+
+python3 ../../term_harvester.py -c CerealGrainLodging
+
+python3 ../../term_harvester.py --sssom
+
+python3 ../../term_harvester.py -b
+
+# Add FoodOn food ontology (OWL) — large download; requires: pip install owlready2
+
+python3 ../../term_harvester.py -a https://raw.githubusercontent.com/FoodOntology/foodon/master/foodon.owl
+
+# After the above -a commands, edit config.yaml to add minus/include entries under the
+# foodon source, then re-run -c foodon.  Choose one of the two approaches below.
+#
+# OWL minus.concepts matches rdfs:label (English) or OWL local name (underscore form,
+# e.g. BFO_0000020).  minus excludes a class and its entire subtree; include restores a
+# class and its subtree even when an ancestor was excluded.  Blocking a parent only
+# prevents its subtree from being visited via that specific parent path — multi-parent
+# classes can still enter through any unblocked parent path that reaches them first, so
+# they must be listed explicitly in minus even if an ancestor is already excluded.
+
+
+# --- Option A: Exclude approach ---
+# Exclude the non-food branches shown in blue in foodon_classes.jpg.
+# Simpler, but does not block additional top-level imports that may enter foodon
+# from imported ontologies (e.g. BFO_0000001 entity, BFO_0000017 realizable entity,
+# time:TemporalEntity, NCIT_C94729).
+
+sources:
+  foodon:
+    minus:
+      concepts:
+        - anatomical entity          # UBERON:0001062 (also causes loss of seed & plant ovule via axioms)
+        - plant ovule                # PO:0020003  (multi-parent: also reachable via material entity)
+        - seed                       # PO:0009010  (multi-parent: also reachable via material entity)
+        - anatomical structure       # UBERON:0000061  (multi-parent: also reachable via material entity)
+        - UBERON_0006314             # bodily fluid or substance (subclasses covered by animal substance)
+        - UBERON_0000456             # secretion of exocrine gland (subclasses covered by animal substance)
+        - BFO_0000020                # characteristic (BFO)
+        - COB_0000502                # characteristic (COB) — unnecessary duplication of BFO term
+        - information content entity # IAO:0000030
+        - plant anatomical entity    # PO:0025131 (covers plant structure)
+        - TemporalEntity             # time:TemporalEntity — W3C OWL-Time import
+        - agency food product type   # FOODON:03400361 (coverage under animal/plant food product)
+        - organism piece             # FOODON:00004328 (subclasses already under animal/plant material)
+
+# Re-process foodon with Option A filters applied
+python3 ../../term_harvester.py -c foodon
+
+
+# --- Option B: Include/whitelist approach (alternate) ---
+# Specify only what to keep; everything else is excluded automatically.
+# More future-proof: any new top-level ontology imports are blocked by default
+# without needing explicit minus entries for each one.
+#
+# When include.concepts is present, the traversal starts all top-level classes
+# as excluded and restores only the listed subtrees.  minus.concepts then
+# fine-tunes by blocking specific nodes within those restored subtrees.
+
+sources:
+  foodon:
+    # Order of include and minus does not matter — both are resolved before traversal.
+    include:
+      concepts:
+        - material entity            # BFO:0000040 — only this subtree is kept
+    minus:
+      concepts:
+        # Items within material entity that should be excluded
+        - agency food product type   # FOODON:03400361 (coverage under animal/plant food product)
+        - organism piece             # FOODON:00004328 (subclasses already under animal/plant material)
+        - anatomical structure       # UBERON:0000061  (multi-parent via material anatomical entity)
+        - plant ovule                # PO:0020003  (multi-parent via material anatomical entity)
+        - seed                       # PO:0009010  (multi-parent via material anatomical entity)
+        - UBERON_0006314             # bodily fluid or substance (subclasses covered by animal substance)
+        - UBERON_0000456             # secretion of exocrine gland (subclasses covered by animal substance)
+
+# Re-process foodon with Option B filters applied
+python3 ../../term_harvester.py -c foodon
+
+
+
+# Build schema.yaml from all sources
+python3 ../../term_harvester.py -b
