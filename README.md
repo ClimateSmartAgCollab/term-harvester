@@ -101,7 +101,7 @@ Term Harvester processes authoritative vocabulary sources into a single merged, 
 
 3. **Merging of sources**: The `--build` parameter causes all sources or a given source to be merged into a single output LinkML `schema.yaml` file where extra include/exclude term filtering occurs, and where mappings via SSSOM tables can be included.
 
-Stage 3 yields a normalized format of reference vocabularies which can then be transformed into the format (and locale) required by an agency or project's network and database infrastructure. A demonstration of this post-processing is given in the Term Harvester [examples/agrifoodca_postharvest.py](https://github.com/ClimateSmartAgCollab/term-harvester/blob/main/examples/agrifoodca_postharvest.py) script (see [readme](https://github.com/ClimateSmartAgCollab/term-harvester/blob/main/examples/README_agrifoodca.md)).
+Stage 3 yields a normalized format of reference vocabularies which can then be transformed into the format (and locale) required by an agency or project's network and database infrastructure. A demonstration of this post-processing is given in the Term Harvester [examples/agrifoodca/postharvest.py](https://github.com/ClimateSmartAgCollab/term-harvester/blob/main/examples/agrifoodca/postharvest.py) script (see [readme](https://github.com/ClimateSmartAgCollab/term-harvester/blob/main/examples/README_agrifoodca.md)).
 
 ---
 
@@ -139,7 +139,7 @@ python term_harvester.py -a https://raw.githubusercontent.com/GenomicsStandardsC
 
 ```bash
 python term_harvester.py -i path/to/myconfig.yaml -f all -c -b
-python term_harvester.py --input examples/agrifoodca_config.yaml -r
+python term_harvester.py --input examples/agrifoodca/config.yaml -r
 ```
 
 Overrides the default configuration file name (`harvester_config.yaml`).  All
@@ -161,16 +161,35 @@ Auto-detects the source type, downloads the file, adds an entry to
 python term_harvester.py -a https://example.org/some-valueset.json
 ```
 
-Combine with `--free_text` to extract a picklist from prose rather than a
-structured file (see [`--free_text`](#extract-from-free-text---free_text) below).
+**Any `-a` URL that resolves to an HTML page, PDF, or plain-text document
+automatically invokes the FreeText (Claude) extraction engine** — the document
+is fetched and sent to Claude with no extra flags needed:
+
+```bash
+python term_harvester.py -a 'https://example.org/article'
+```
+
+Add an anchor fragment to scope the extraction window to a specific passage or
+page (strongly recommended for long documents — see [Anchoring the extraction
+window](#anchoring-the-extraction-window)):
+
+```bash
+python term_harvester.py -a 'https://example.org/article#text=lodging scale'
+```
+
+To supply the extraction text yourself instead of having it fetched from the
+URL, use `--free_text` (see below).  The URL then becomes a citation only.
 
 ---
 
 #### Extract from free text: `--free_text`
 
-Used with `-a` to extract enumerations from a textual document rather than a structured
-source file.  See the dedicated [FreeText source type](#freetext-source-type)
-section for full usage, file-input support, and API key setup.
+Used with `-a` as the explicit alternative to URL-based fetching: provide the
+text (inline string, `.txt`, or `.pdf`) that Claude should extract
+enumerations from.  The URL is stored as the citation; its document is **not**
+used as Claude's extraction input.  See the dedicated [FreeText source
+type](#freetext-source-type) section for full usage, file-input support, and
+API key setup.
 
 ---
 
@@ -313,7 +332,7 @@ Check source section for details on command line configuration.
 | **General** | |
 | [`CRediT`](#credit-contributor-roles-taxonomy)<br>14 roles | 14-role contributor roles taxonomy for scholarly output attribution, published on Zenodo as a PDF.<br>(URL from `zenodo.org/records/{id}` — bare record URL containing "credit", or a `/files/` path containing "credit" and ".pdf") |
 | [`FreeText`](#freetext-source-type)<br>varies | Claude API extraction of picklist enumerations from any human-readable source: URL, inline text, plain-text file, or PDF; useful when no structured vocabulary file exists.<br>(Any HTTP/HTTPS URL passed with `--free_text`, or a local file path / inline string supplied as `--free_text` without a URL) |
-| [`ISO_COUNTRY`](#iso-3166-2-country-subdivisions-iso_country)<br>~14 terms per country (5,400+ all countries) | ISO 3166-2 first-level country subdivisions (provinces, states, territories) fetched via Wikidata SPARQL.<br>(URL from `iso.org/obp/ui/#iso:code:3166:` followed by a 2-letter country code) |
+| [`ISO_COUNTRY`](#iso-3166-2-country-subdivisions-iso_country)<br>~14 terms per country (5,400+ all countries) | ISO 3166-2 first-level country subdivisions (provinces, states, territories) fetched via Wikidata SPARQL; subdivisions are grouped by type (provinces, territories, etc.) when two or more distinct types exist.<br>(Shorthand `ISO_COUNTRY_XX` or full OBP URL `iso.org/obp/ui/#iso:code:3166:XX`; pre-download) |
 | [`LinkML`](#linkml)<br>varies by source | LinkML YAML schema containing one or more named enumerations with permissible values.<br>(`.yaml`/`.yml` file that is a dict containing `enums` or `id`) |
 | [`LOC_CLASSIFICATION`](#library-of-congress-classification-loc_classification)<br>~6,600 terms | Library of Congress subject heading hierarchy spanning all academic disciplines, useful for general topic or domain picklists.<br>(Exact URL `https://www.loc.gov/catdir/cpso/lcco/`) |
 | [OBO terms](#obo-ontology-terms-envo-go-uberon-) → `OntologyAPI`<br>varies by ontology (1,000–40,000+) | Open Biological and Biomedical Ontologies covering environments, gene functions, anatomical structures, and more.<br>(Bare CURIE `ENVO:00010483`, OBO shorthand `ENVO_00010483`, or OBO IRI `http://purl.obolibrary.org/obo/ENVO_00010483`; pre-download, routed to configured API or OLS4) |
@@ -456,41 +475,56 @@ fetched automatically; French names appear in the locale extension.
 ### ISO 3166-2 country subdivisions (ISO_COUNTRY)
 
 Provinces, states, territories, and other first-level subdivisions for any
-country listed in ISO 3166-2.  Use the ISO Online Browsing Platform URL as the
-source identifier.
+country listed in ISO 3166-2.  Use the source-key shorthand as the `-a`
+identifier — no URL lookup needed:
 
 ```bash
 # Canada — provinces and territories (English + French)
-python term_harvester.py -a "https://www.iso.org/obp/ui/#iso:code:3166:CA"
+python term_harvester.py -a ISO_COUNTRY_CA
 python term_harvester.py -c ISO_COUNTRY_CA
 python term_harvester.py -b
+
+# United States
+python term_harvester.py -a ISO_COUNTRY_US
+
+# All countries in one enum-per-country source
+python term_harvester.py -a ISO_COUNTRY
+```
+
+The full ISO OBP URL is also accepted:
+
+```bash
+python term_harvester.py -a "https://www.iso.org/obp/ui/#iso:code:3166:CA"
 ```
 
 Because the ISO OBP page is a JavaScript application, data is sourced from the
 [Wikidata Query Service](https://query.wikidata.org/) via SPARQL.  The alpha-2
-code extracted from the ISO OBP URL (e.g. `CA`) drives two queries:
+code drives three queries at `-a`/`-f` time:
 
-1. **P297** (ISO 3166-1 alpha-2) — resolves the country's English name, used
-   as the enum key (e.g. `Canada`).
+1. **P297** (ISO 3166-1 alpha-2) — resolves the country's English name and
+   Wikidata QID, used as the enum key (e.g. `Canada`) and `enum_uri`.
 2. **P300** (ISO 3166-2 code) filtered by the alpha-2 prefix — fetches all
    subdivisions with `rdfs:label` for every project locale listed in
    `harvester_config.yaml`.
+3. **P31** (instance of) — fetches the Wikidata type of each subdivision
+   (e.g. "province of Canada", "territory of Canada") to enable grouping.
 
-The enum itself receives a `description:` drawn from Wikidata's `schema:description`
-for the country entity (e.g. *"country in North America"* for Canada).
+The enum description combines Wikidata's `schema:description` with a
+type-count sentence, e.g. *"country in North America. Includes 10 provinces
+of Canada and 3 territories of Canada."*
 
-Each permissible value carries:
-- `meaning: wd:Q…` — the Wikidata QID (e.g. `wd:Q1951` for Alberta), a stable
-  semantic anchor that links to the full Wikidata entity.
-- `exact_mappings: [iso:CA-AB]` — the canonical ISO 3166-2 code as a CURIE.
+When two or more distinct subdivision types are found a synthetic group-header
+permissible value is inserted for each type (most-common type first), and each
+subdivision PV receives an `is_a:` pointing to its header.  Countries with only
+one subdivision type (Japan — 47 prefectures; Germany — 16 federal states) produce
+a flat list with only the type-count sentence added to the description.
 
-Both `wd:` and `iso:` prefixes are written to the source YAML and to the config
-entry's `prefixes:` block so that `-b` can sync them into `schema.yaml`.
-Results are cached in `sources/{key}.json`; the ISO OBP URL is retained in
-`source_ontology` as the canonical citation.
-
-The suffix of each 3166-2 code (e.g. `AB` from `CA-AB`) becomes the
-permissible value key.
+Each subdivision permissible value carries `meaning: wd:Q…` — the Wikidata QID
+(e.g. `wd:Q1951` for Alberta), a stable semantic anchor.  The `wd:` prefix is
+written to the source YAML and to the config entry's `prefixes:` block so that
+`-b` can sync it into `schema.yaml`.  Results are cached in
+`sources/{key}.zip`; the canonical ISO OBP URL is retained in
+`source_ontology` for reference.
 
 **Config entry produced:**
 
@@ -499,12 +533,12 @@ ISO_COUNTRY_CA:
   title: Canada
   name: ISO_COUNTRY_CA
   content_type: ISO_COUNTRY
-  file_format: json
+  file_format: zip
   reachable_from:
     source_ontology: https://www.iso.org/obp/ui/#iso:code:3166:CA
   download_date: '2026-06-09'
   prefixes:
-    iso: https://www.iso.org/iso-3166-country-codes/
+    iso: https://www.iso.org/iso-3166-country-codes.html
     wd: http://www.wikidata.org/entity/
 ```
 
@@ -512,56 +546,59 @@ ISO_COUNTRY_CA:
 
 ```yaml
 prefixes:
-  iso: https://www.iso.org/iso-3166-country-codes/
+  iso: https://www.iso.org/iso-3166-country-codes.html
   wd: http://www.wikidata.org/entity/
 enums:
   Canada:
     name: Canada
     title: Canada
-    description: country in North America
+    description: country in North America. Includes 10 provinces of Canada and 3 territories of Canada.
     permissible_values:
-      AB:
+      Province of Canada:          # group header
+        title: Provinces of Canada
+        meaning: wd:Q11828
+      Territory of Canada:         # group header
+        title: Territories of Canada
+        meaning: wd:Q1202063
+      CA-AB:
         title: Alberta
         meaning: wd:Q1951
-        exact_mappings:
-        - iso:CA-AB
-      BC:
+        is_a: Province of Canada
+      CA-BC:
         title: British Columbia
         meaning: wd:Q1974
-        exact_mappings:
-        - iso:CA-BC
-      MB:
-        title: Manitoba
-        meaning: wd:Q1948
-        exact_mappings:
-        - iso:CA-MB
-      # … remaining provinces and territories …
+        is_a: Province of Canada
+      # … 8 more provinces …
+      CA-NT:
+        title: Northwest Territories
+        meaning: wd:Q2007
+        is_a: Territory of Canada
+      CA-NU:
+        title: Nunavut
+        meaning: wd:Q204792
+        is_a: Territory of Canada
+      CA-YT:
+        title: Yukon
+        meaning: wd:Q2009
+        is_a: Territory of Canada
 extensions:
-  fr:
-    enums:
-      Canada:
-        permissible_values:
-          AB: {title: Alberta}
-          BC: {title: Colombie-Britannique}
-          MB: {title: Manitoba}
-          NB: {title: Nouveau-Brunswick}
-          NL: {title: Terre-Neuve-et-Labrador}
-          NS: {title: Nouvelle-Écosse}
-          NT: {title: Territoires du Nord-Ouest}
-          NU: {title: Nunavut}
-          ON: {title: Ontario}
-          PE: {title: Île-du-Prince-Édouard}
-          QC: {title: Québec}
-          SK: {title: Saskatchewan}
-          YT: {title: Yukon}
+  locales:
+    value:
+      fr:
+        enums:
+          Canada:
+            permissible_values:
+              CA-AB: {title: Alberta}
+              CA-BC: {title: Colombie-Britannique}
+              # … remaining French labels …
 ```
 
 To refresh the data when Wikidata updates:
 
 ```bash
-python term_harvester.py -f ISO_COUNTRY_CA   # re-queries Wikidata SPARQL, updates sources/ISO_COUNTRY_CA.json
+python term_harvester.py -f ISO_COUNTRY_CA   # re-queries Wikidata SPARQL, updates sources/ISO_COUNTRY_CA.zip
 python term_harvester.py -c ISO_COUNTRY_CA   # regenerates sources/ISO_COUNTRY_CA.yaml
-python term_harvester.py -b                  # rebuilds schema.yaml, syncs wd: and iso: prefixes
+python term_harvester.py -b                  # rebuilds schema.yaml
 ```
 
 ---
@@ -1041,7 +1078,7 @@ python term_harvester.py -f SoilAerationStatus
 python term_harvester.py -c SoilAerationStatus
 
 # Web page source with a section anchor — anchor stored in config and enum see_also
-python3 ../term_harvester.py --input agrifoodca_config.yaml \
+python3 ../term_harvester.py --input config.yaml \
   -a "https://www.undrr.org/understanding-disaster-risk/terminology/hips/en0303" \
   --free_text "Soil sodicity class (SAR/ESP)"
 ```
@@ -1085,11 +1122,19 @@ grower's manual.
 
 ### Input forms
 
+There are two ways to invoke FreeText extraction:
+
+| Trigger | How it works |
+|---|---|
+| **`-a URL`** pointing to HTML, PDF, or plain text | Document is fetched automatically and sent to Claude.  Add an anchor fragment (`#text=phrase`, `#page=N`, bare HTML id) to scope the extraction window to a specific passage.  No `--free_text` flag needed. |
+| **`-a URL --free_text TEXT\|FILE`** | You supply the extraction text directly (inline string, `.txt`, or `.pdf`).  The URL is stored as a citation; its document is not used as Claude's extraction input. |
+
 #### URL-only (no `--free_text`)
 
 When the `-a` URL points to an HTML page or a PDF, the file type is detected
 from the HTTP `Content-Type` response header — no `.html` or `.pdf` extension
-is required in the URL.  The document is fetched automatically and sent to Claude:
+is required in the URL.  The document is fetched automatically and sent to Claude.  **For long documents, add an anchor fragment to scope the extraction
+window to the relevant passage:**
 
 ```bash
 # HTML article — Content-Type: text/html detected from server response
@@ -1116,10 +1161,19 @@ Supply extraction context directly as an inline string or local file:
 | Plain-text file | `--free_text methods.txt` |
 | PDF file | `--free_text /path/to/appendix.pdf` |
 
-When `--free_text` is an inline string or local file path, the source URL is
-stored as a citation only — the document at that URL is **not** fetched.  A
-short topic string produces a plausible enum from Claude's training knowledge;
-a longer excerpt or file produces a grounded extraction.
+When `--free_text` is an inline string or local file path, **Claude's
+extraction input is the `--free_text` content, not the URL document**.  The
+URL is stored as the citation and, for HTTP/HTTPS URLs, the source document is
+also downloaded and saved as `content.{ext}` inside `sources/{key}.zip` as
+backing storage — but the initial extraction always uses the `--free_text`
+text.  A short topic string produces a plausible enum from Claude's training
+knowledge; a longer excerpt or file produces a grounded extraction.
+
+The `description` field written to `harvester_config.yaml` is a short
+Claude-generated summary derived from the extracted enum descriptions — it is
+**not** a copy of the `--free_text` string.  The inline text itself is
+preserved as `extracted_text.txt` inside the zip so `-c` reuses the same
+extraction window on subsequent runs.
 
 #### Anchoring the extraction window
 
@@ -1175,13 +1229,15 @@ valid identifier (letters, digits, underscores; start with a letter).  Entering
 a key that already exists in the config is rejected and you are re-prompted.
 This prevents `-a` from ever overwriting an existing source.
 
-> **Note:** When `--free_text` is an inline string, Claude receives only that
-> string — the URL is stored as a citation but the document at that URL is not
-> fetched.  A short topic string (e.g. `"soil aeration status"`) produces a
-> plausible enum from Claude's training knowledge rather than from the document.
-> For grounded extraction: either use URL-only mode (omit `--free_text` and let
-> content-type detection fetch the page), or run `-f [key]` then `-c [key]`
-> after the initial `-a`.
+> **Note:** When `--free_text` is an inline string, Claude's extraction input
+> is that string — the URL is stored as the citation and, for HTTP/HTTPS URLs,
+> the source document is also downloaded as backing storage, but Claude does
+> **not** see the URL content during the initial `-a` run.  A short topic
+> string (e.g. `"soil aeration status"`) therefore produces a plausible enum
+> from Claude's training knowledge rather than from the document.
+> For extraction grounded in the actual document: either use URL-only mode
+> (omit `--free_text` and let content-type detection fetch the page), or run
+> `-f [key]` then `-c [key]` after the initial `-a`.
 
 ```bash
 # URL-only: page fetched automatically, enum grounded in actual article text
@@ -1208,7 +1264,7 @@ Claude always receives at most 10 000 characters regardless of the original docu
 | `-a URL` (no `--free_text`) — PDF or HTML | `sources/{key}.zip` | `content.{ext}` — **full original document**; `extracted_text.txt` — the ≤10 000-char window sent to Claude (cached so repeated `-c` runs use the same text) |
 | `-a URL` (no `--free_text`) — other format | `sources/{key}.{ext}` | Full original document |
 | `-a URL --free_text FILE` | `sources/{key}.{ext}` | Full original source file copied as-is; Claude receives ≤10 000 chars extracted from it |
-| `-a URL --free_text TEXT` (inline string) | `sources/{key}.zip` | `extracted_text.txt` — the inline string only; no original document is downloaded |
+| `-a URL --free_text TEXT` (inline string) | `sources/{key}.zip` | `extracted_text.txt` — the inline string (what Claude receives); `content.{ext}` — full URL document, if URL is HTTP/HTTPS and reachable |
 | `-f key` | `sources/{key}.zip` or `sources/{key}.{ext}` | Full original document re-downloaded; no cached extraction window — the next `-c` re-extracts with a fresh ≤10 000-char cap |
 
 Running `-f` discards any cached extraction window and forces a fresh re-extraction on the next `-c`.
@@ -1359,7 +1415,7 @@ Markdown renderer (GitHub, VS Code preview, Obsidian, etc.).
 
 ```bash
 python term_harvester.py \
-  --input examples/agrifoodca_config.yaml \
+  --input examples/agrifoodca/config.yaml \
   --format markdown \
   --ai \
   --search 'soil acidity' > soil_acidity.md
@@ -1429,6 +1485,30 @@ MySource:
   content_type: LinkML
   include:
     concepts: [BiomeEnum, HabitatEnum]            # only these two enums are imported
+```
+
+#### OWL sources — `include` always implies whitelist at the class level
+
+For `OWL` sources processed by `-c`, `include.concepts` triggers whitelist
+mode regardless of whether `minus` is also present.  All top-level OWL classes
+start excluded; only the subtrees named in `include` are restored.  `minus`
+then fine-tunes by blocking specific classes *within* those restored subtrees.
+
+This differs from non-OWL sources because OWL class-hierarchy traversal cannot
+distinguish "unrelated top-level imports" (e.g. `time:TemporalEntity` imported
+into FoodOn) from intentional content without the whitelist default.
+
+```yaml
+# OWL whitelist: keep only the material entity subtree;
+# minus trims specific nodes within it
+foodon:
+  content_type: OWL
+  include:
+    concepts: [material entity]                   # only this OWL subtree is traversed
+  minus:
+    concepts:
+      - agency food product type                  # exclude within material entity
+      - organism piece                            # exclude within material entity
 ```
 
 ### `rank` — auto-detected permissible value ordering
@@ -1760,7 +1840,7 @@ echo $ANTHROPIC_API_KEY
 | `source_nsdb.py` | National Soil DataBase HTML parsing | [index](https://sis.agr.gc.ca/cansis/nsdb/index.html) |
 | `source_statscan.py` | Statistics Canada classification page scraping | |
 | `source_statscan_table.py` | `content_type: STATSCANTable` — Statistics Canada Census Dictionary table pages; auto-fetches French translations from the corresponding `index-fra.cfm` page | |
-| `source_iso_country.py` | `content_type: ISO_COUNTRY` — ISO 3166-2 country subdivision codes via Wikidata SPARQL (P297 for country name, P300 prefix filter for subdivisions); each PV carries its Wikidata QID as `meaning`; ISO OBP is a Vaadin SPA, not directly fetchable | [ISO OBP](https://www.iso.org/obp/ui/) |
+| `source_iso_country.py` | `content_type: ISO_COUNTRY` — ISO 3166-2 country subdivision codes via Wikidata SPARQL (P297 for country name/QID; P300 for subdivision codes and labels; P31 for subdivision types used to generate group headers and a type-count description sentence); each PV carries its Wikidata QID as `meaning`; ISO OBP is a Vaadin SPA, not directly fetchable; accepts shorthand `ISO_COUNTRY_XX` or `ISO_COUNTRY` for all countries | [ISO OBP](https://www.iso.org/obp/ui/) |
 | `source_napcscanada.py` | NAPCS Canada CSV parsing | [CSV file](https://www.statcan.gc.ca/en/media/5274) |
 | `source_agrifoodca.py` | AgriFoodCA picklist CSV parsing and GitHub directory import | [CSV files](https://github.com/agrifooddatacanada/picklists_for_schemas/tree/main/picklists) |
 | `source_zenodo.py` | Shared Zenodo REST API utilities: `is_zenodo_record_url`, `to_zenodo_api_url`, `fetch_zenodo_file` — used by `source_credit.py` | |
