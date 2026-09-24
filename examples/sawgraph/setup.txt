@@ -14,23 +14,31 @@ python3 ../../term_harvester.py -a ISO_COUNTRY_US
 python3 ../../term_harvester.py -a AGROVOC_c_2808  
 
 # Example apis block, uncomment whichever APIS you want to use.
-#   apis:
-#     ols:
-#       type:
-#         rest:
-#           uri: http://www.ebi.ac.uk/ols4/api/ontologies/{ontology}/terms/{double_encoded}/graph
-#       ontologies: [ENVO, GO, UBERON]
-#     bioportal:
-#       type:
-#         rest:
-#           uri: https://data.bioontology.org
-#           apikey: YOUR_BIOPORTAL_KEY
-#       ontologies: [MESH, NCIT, SNOMEDCT]
-#     agrovoc:
-#       type:
-#         sparql:
-#           uri: https://agrovoc.fao.org/sparql/
-#       ontologies: [agrovoc]
+apis:
+  ols:
+    type:
+      rest:
+        uri: http://www.ebi.ac.uk/ols4/api/ontologies/{ontology}/terms/{double_encoded}/graph
+    ontologies:
+      - ENVO
+      - GO
+      - UBERON
+  bioportal:
+    type:
+      rest:
+        uri: https://data.bioontology.org
+        apikey: YOUR_BIOPORTAL_KEY
+    ontologies:
+      - MESH
+      - NCIT
+      - SNOMEDCT
+  agrovoc:
+    type:
+      sparql:
+        uri: https://agrovoc.fao.org/sparql/
+    ontologies:
+      - agrovoc
+
 
 # Add ENVO Landform and its descendents
 
