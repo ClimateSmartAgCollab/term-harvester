@@ -9,9 +9,6 @@
 python3 ../../term_harvester.py -a ISO_COUNTRY_US
 
 
-# Add AGROVOC farmland hierarchy (_2808)
-
-python3 ../../term_harvester.py -a AGROVOC_c_2808  
 
 # Example apis block, uncomment whichever APIS you want to use.
 apis:
@@ -39,6 +36,10 @@ apis:
     ontologies:
       - agrovoc
 
+# Add AGROVOC farmland hierarchy (_2808)
+
+python3 ../../term_harvester.py -a AGROVOC_c_2808  
+
 
 # Add ENVO Landform and its descendents
 
@@ -62,9 +63,11 @@ python3 ../../term_harvester.py -a 'https://link.springer.com/article/10.1186/s1
 
 python3 ../../term_harvester.py -c CerealGrainLodging
 
-python3 ../../term_harvester.py --sssom
+# Add sssom to config:
+sssom:
+  - sawgraph_sssom.tsv
 
-python3 ../../term_harvester.py -b
+python3 ../../term_harvester.py -b --sssom
 
 # Add FoodOn food ontology (OWL) — large download; requires: pip install owlready2
 
