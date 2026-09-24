@@ -273,7 +273,7 @@ def match_agrovoc(url, config_file=MENU_CONFIG):
         if full_graph:
             _save_agrovoc_graph_zip(key, full_graph, config_file)
     else:
-        print(f"  No SPARQL endpoint configured — run '-f {key}' after adding apis.agrovoc",
+        print(f"  No SPARQL endpoint configured — run '-f {key}' after adding apis.agrovoc configuration in config.yaml",
               file=sys.stderr)
     print(f"  Run: term_harvester.py -c {key}  to generate sources/{key}.yaml, "
           f"then -b to rebuild schema.yaml")

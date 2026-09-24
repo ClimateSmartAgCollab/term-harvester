@@ -7,18 +7,30 @@ Two modes:
    Fetches Wikidata for that alpha-2 code only; stored as
    sources/ISO_COUNTRY_CA.zip  →  sources/ISO_COUNTRY_CA.yaml (one enum).
 
+   For single-country sources, a second SPARQL query fetches the Wikidata
+   P31 (instance of) type for each subdivision (e.g. "province of Canada",
+   "territory of Canada").  When two or more distinct types are found the
+   generated YAML groups the permissible values: one synthetic header entry
+   per type (most-common type first) followed by the subdivisions in that
+   group with ``is_a`` pointing to the header.  The enum description also
+   gains a sentence summarising the type counts, e.g.
+   "Includes 10 provinces of Canada and 3 territories of Canada."
+
 2. All countries — triggered by:
        https://www.iso.org/iso-3166-country-codes.html
    Fetches all ISO 3166-1 alpha-2 country names and all ISO 3166-2 subdivision
    codes in two broad SPARQL queries; stored as
    sources/ISO_COUNTRY.zip  →  sources/ISO_COUNTRY.yaml (one enum per country).
+   Type grouping is not applied in all-countries mode (too expensive).
 
 The ISO OBP page is a Vaadin SPA; the downloaded tmp_path content is discarded
 and Wikidata is queried instead.  Each subdivision's Wikidata QID is stored as
 the permissible value's ``meaning`` (e.g. wd:Q1951 for Alberta).
 
 Public API used by term_harvester.py:
-    match_iso_country(url, tmp_path, config_file)
+    match_iso_country_code(url, config_file)       # pre-download: ISO_COUNTRY_XX / ISO_COUNTRY
+    match_iso_country(url, tmp_path, config_file)  # post-download: full OBP URL
+    match_iso_country_all(url, config_file)        # pre-download: all-countries landing page
     fetch_iso_country_source(key, source, config_file)
     process_iso_country_source(key, source, config_file, locales)
 """
@@ -33,6 +45,7 @@ import urllib.parse
 import urllib.request
 import yaml
 import zipfile
+from collections import Counter, defaultdict
 
 from source_utils import (
     BROWSER_HEADERS,
@@ -88,6 +101,77 @@ def _qid_from_uri(uri):
     if uri.startswith(_WD_ENTITY_BASE):
         return uri[len(_WD_ENTITY_BASE):]
     return uri.rsplit("/", 1)[-1]
+
+
+def _pluralize_type_label(label):
+    """Pluralize the main noun in a Wikidata type label.
+
+    Pluralizes the last word before the first preposition ("of", "in", etc.),
+    which handles both simple labels ('province') and compound labels
+    ('special municipality', 'constituent country').
+
+    Examples:
+      'province of Canada'                              → 'provinces of Canada'
+      'territory of Canada'                             → 'territories of Canada'
+      'special municipality of the Netherlands'         → 'special municipalities of the Netherlands'
+      'constituent country of the Kingdom ...'          → 'constituent countries of the Kingdom ...'
+      'municipality'                                    → 'municipalities'
+    """
+    if not label:
+        return label
+    words = label.split()
+    # Default: pluralize the last word (handles "federal district", "U.S. state", etc.)
+    # When a preposition ("of", "in", …) is found, pluralize the word before it
+    # ("province of Canada" → pluralize "province", not "Canada").
+    _PREPOSITIONS = {"of", "in", "from", "at", "for", "with", "by"}
+    noun_idx = len(words) - 1
+    for i, w in enumerate(words):
+        if w.lower() in _PREPOSITIONS:
+            noun_idx = max(0, i - 1)
+            break
+    w = words[noun_idx]
+    if w.endswith("y") and len(w) > 1 and w[-2].lower() not in "aeiou":
+        w = w[:-1] + "ies"
+    elif w.endswith(("s", "sh", "ch", "x", "z")):
+        w = w + "es"
+    else:
+        w = w + "s"
+    words[noun_idx] = w
+    return " ".join(words)
+
+
+def _group_code(type_label):
+    """Convert a Wikidata type label to a PV key for the group header entry."""
+    return type_label[0].upper() + type_label[1:] if type_label else ""
+
+
+def _fetch_subdivision_types(alpha2):
+    """Query Wikidata for P31 (instance of) types for all ISO 3166-2 subdivisions of *alpha2*.
+
+    Returns dict: iso_code → list of (type_qid, type_label_en) sorted by label.
+    An empty dict is returned when the query fails or returns no results.
+    """
+    sparql = f"""
+SELECT ?item ?iso_code ?type ?typeLabel WHERE {{
+  ?item wdt:P300 ?iso_code .
+  FILTER(STRSTARTS(?iso_code, "{alpha2}-"))
+  ?item wdt:P31 ?type .
+  ?type rdfs:label ?typeLabel .
+  FILTER(LANG(?typeLabel) = "en")
+}}
+ORDER BY ?iso_code ?typeLabel
+"""
+    result = {}
+    try:
+        for row in _sparql_query(sparql, timeout=30):
+            code      = row.get("iso_code",   {}).get("value", "")
+            type_uri  = row.get("type",        {}).get("value", "")
+            type_lbl  = row.get("typeLabel",   {}).get("value", "")
+            if code and type_uri and type_lbl:
+                result.setdefault(code, []).append((_qid_from_uri(type_uri), type_lbl))
+    except Exception as e:
+        print(f"  Warning: could not fetch subdivision types for {alpha2}: {e}", file=sys.stderr)
+    return result
 
 
 def _sparql_query(sparql, timeout=90):
@@ -185,6 +269,25 @@ ORDER BY ?iso_code
             subdivisions.append({"code": code, "suffix": suffix, "qid": qid, "labels": labels})
     except Exception as e:
         print(f"  Error querying subdivisions for {alpha2}: {e}", file=sys.stderr)
+
+    # Fetch P31 (instance of) types so the YAML builder can group by subdivision kind
+    if subdivisions:
+        print(f"  Fetching subdivision types for {alpha2} ...")
+        type_data = _fetch_subdivision_types(alpha2)
+        if type_data:
+            # Count how often each (qid, label) pair appears across ALL subdivisions
+            all_type_freq: Counter = Counter()
+            for types_list in type_data.values():
+                for t in types_list:
+                    all_type_freq[t] += 1
+            # Assign each subdivision its most-frequent type (tie-break: alphabetical label)
+            for sub in subdivisions:
+                code  = sub.get("code", "")
+                types = type_data.get(code, [])
+                if types:
+                    best = sorted(types, key=lambda t: (-all_type_freq[t], t[1]))[0]
+                    sub["type_qid"]   = best[0]
+                    sub["type_label"] = best[1]
 
     return country_name, country_desc, country_qid, subdivisions
 
@@ -347,29 +450,101 @@ def _build_single_yaml(key, source, data, locales=None):
         print(f"  Warning: no subdivision data in {_zip_path(key)}/{_json_name(key)}", file=sys.stderr)
         return
 
-    enum_key = _country_name_to_key(country_name) if country_name else key
-    pv_en = {}
-    pv_fr = {}
-
+    # --- Group subdivisions by Wikidata P31 type ---
+    type_counter: Counter = Counter()
     for sub in subdivisions:
+        tl = sub.get("type_label", "")
+        if tl:
+            type_counter[tl] += 1
+
+    # Ordered groups: most-common type first, alphabetical tie-break
+    ordered_groups = sorted(type_counter.items(), key=lambda x: (-x[1], x[0]))
+
+    # Map type_label → sorted list of subdivisions
+    grouped: defaultdict = defaultdict(list)
+    ungrouped = []
+    for sub in subdivisions:
+        tl = sub.get("type_label", "")
+        if tl:
+            grouped[tl].append(sub)
+        else:
+            ungrouped.append(sub)
+    for tl in grouped:
+        grouped[tl].sort(key=lambda s: s.get("code", ""))
+
+    # Drop types with fewer than 2 members — their codes join the ungrouped tail
+    # so that singleton types (e.g. one federal district) don't get a header of
+    # their own while the rest of the country is neatly grouped.
+    _MIN_GROUP = 2
+    small_labels = {lbl for lbl, cnt in ordered_groups if cnt < _MIN_GROUP}
+    if small_labels:
+        for tl in small_labels:
+            ungrouped.extend(grouped.pop(tl, []))
+        ordered_groups = [(lbl, cnt) for lbl, cnt in ordered_groups if cnt >= _MIN_GROUP]
+    ungrouped.sort(key=lambda s: s.get("code", ""))
+
+    has_groups = len(ordered_groups) >= 2
+
+    # Build type-summary sentence for enum description
+    type_desc = ""
+    if ordered_groups:
+        parts = [f"{cnt} {_pluralize_type_label(lbl)}" for lbl, cnt in ordered_groups]
+        if len(parts) == 1:
+            type_desc = f"Includes {parts[0]}."
+        else:
+            type_desc = "Includes " + ", ".join(parts[:-1]) + " and " + parts[-1] + "."
+
+    enum_key = _country_name_to_key(country_name) if country_name else key
+    pv_en: dict = {}
+    pv_fr: dict = {}
+
+    # Subdivision PVs helper
+    def _add_sub(sub, is_a=None):
         code = sub.get("code", "")
         if not code:
-            continue
+            return
         labels  = sub.get("labels", {})
         qid     = sub.get("qid", "")
         title   = labels.get(primary_lang) or labels.get("en") or code
         meaning = (_WD_ENTITY_BASE + qid) if qid else None
         add_permissible_value(pv_en, code, title=title, meaning=meaning,
-                              prefixes=_WD_PREFIXES)
+                              prefixes=_WD_PREFIXES, is_a=is_a)
         if request_fr:
             title_fr = labels.get("fr", "")
             if title_fr:
                 add_permissible_value(pv_fr, code, title=title_fr)
 
+    # Emit each group header immediately followed by its members so that
+    # is_a children always appear directly after their parent in the YAML.
+    for type_label, _cnt in ordered_groups:
+        gc = _group_code(type_label) if has_groups else None
+        if gc:
+            type_qid = next(
+                (s.get("type_qid", "") for s in grouped[type_label] if s.get("type_qid")),
+                "",
+            )
+            _plural = _pluralize_type_label(type_label)
+            header: dict = {"title": (_plural[0].upper() + _plural[1:]) if _plural else ""}
+            if type_qid:
+                header["meaning"] = f"wd:{type_qid}"
+            pv_en[gc] = header
+        for sub in grouped[type_label]:
+            _add_sub(sub, is_a=gc)
+    for sub in ungrouped:
+        _add_sub(sub)
+
     source_url = (source.get("reachable_from") or {}).get("source_ontology", "")
+
+    # Combine Wikidata country description with type-summary sentence
+    full_desc = normalize_text(country_desc) if country_desc else ""
+    if type_desc:
+        if full_desc and not full_desc.endswith("."):
+            full_desc += "."
+        full_desc = (full_desc + " " + type_desc).strip() if full_desc else type_desc
+
     enum_entry = {"name": enum_key, "title": normalize_text(country_name), "permissible_values": pv_en}
-    if country_desc:
-        enum_entry["description"] = normalize_text(country_desc)
+    if full_desc:
+        enum_entry["description"] = full_desc
     if country_qid:
         enum_entry["enum_uri"] = f"wd:{country_qid}"
 
@@ -510,14 +685,15 @@ def process_iso_country_source(key, source, config_file=MENU_CONFIG, locales=Non
         _build_single_yaml(key, source, data, locales=locales)
 
 
-def match_iso_country(url, tmp_path, config_file=MENU_CONFIG):
-    """Return True if *url* is a single-country ISO OBP page and was handled."""
-    # Single-country OBP page
-    alpha2 = _alpha2_from_url(url)
-    if not alpha2:
-        return False
+def _add_single_country(alpha2, url, config_file, tmp_path=None):
+    """Core logic for registering a single ISO 3166-2 country source.
 
-    os.unlink(tmp_path)   # discard Vaadin bootstrap HTML
+    *url* is the canonical ISO OBP URL stored in the config entry.
+    *tmp_path* is removed when provided (the Vaadin bootstrap file from -a downloads).
+    Returns True (always, once the URL matched).
+    """
+    if tmp_path:
+        os.unlink(tmp_path)
 
     key = f"ISO_COUNTRY_{alpha2}"
     try:
@@ -527,7 +703,7 @@ def match_iso_country(url, tmp_path, config_file=MENU_CONFIG):
         config = {}
 
     if key in config.get("sources", {}):
-        print(f"  Skipping {url}: source key '{key}' already exists in {config_file}",
+        print(f"  Skipping: source key '{key}' already exists in {config_file}",
               file=sys.stderr)
         return True
 
@@ -549,6 +725,43 @@ def match_iso_country(url, tmp_path, config_file=MENU_CONFIG):
 
     process_iso_country_source(key, config["sources"][key], config_file, locales=locales)
     return True
+
+
+def match_iso_country(url, tmp_path, config_file=MENU_CONFIG):
+    """Return True if *url* is a single-country ISO OBP page and was handled."""
+    alpha2 = _alpha2_from_url(url)
+    if not alpha2:
+        return False
+    return _add_single_country(alpha2, url, config_file, tmp_path=tmp_path)
+
+
+# Matches ISO_COUNTRY_XX (single country) or bare ISO_COUNTRY (all countries)
+_SHORTHAND_RE = re.compile(r'^ISO_COUNTRY(?:_([A-Za-z]{2}))?$', re.IGNORECASE)
+
+
+def match_iso_country_code(url, config_file=MENU_CONFIG):
+    """Pre-download handler for ISO_COUNTRY_XX / ISO_COUNTRY shorthands.
+
+    Accepts:
+      ISO_COUNTRY_CA   →  sources/ISO_COUNTRY_CA.zip/.yaml  (single country)
+      ISO_COUNTRY_US   →  sources/ISO_COUNTRY_US.zip/.yaml
+      ISO_COUNTRY      →  sources/ISO_COUNTRY.zip/.yaml     (all countries)
+
+    The shorthand mirrors the source key produced by the tool, so users
+    never need to look up the ISO OBP URL.  The canonical OBP URL is still
+    stored in harvester_config.yaml for reference.
+    Returns True if the shorthand matched (regardless of outcome).
+    """
+    m = _SHORTHAND_RE.match(url.strip())
+    if not m:
+        return False
+    alpha2 = m.group(1)
+    if alpha2:
+        alpha2 = alpha2.upper()
+        canon_url = f"https://www.iso.org/obp/ui/#iso:code:3166:{alpha2}"
+        return _add_single_country(alpha2, canon_url, config_file)
+    # No alpha-2 suffix → all-countries
+    return match_iso_country_all(_ISO_BASE, config_file)
 
 
 def match_iso_country_all(url, config_file=MENU_CONFIG):

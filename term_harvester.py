@@ -159,7 +159,7 @@
 #     python term_harvester.py -c ISO_COUNTRY_CA
 #
 #   OWL ontologies (content_type: OWL) require owlready2 (pip install owlready2).
-#   The source file is saved as sources/{key}.text regardless of original suffix.
+#   The source file is stored as sources/{key}.zip (file_format: zip).
 #   Auto-detected from URL extension (.owl, .ofn, .rdf, .ttl) or file content:
 #
 #     python term_harvester.py -a https://purl.obolibrary.org/obo/envo.owl
@@ -171,7 +171,7 @@
 #
 #     Envo:
 #       content_type: OWL
-#       file_format: text
+#       file_format: zip
 #       reachable_from:
 #         source_ontology: https://purl.obolibrary.org/obo/envo.owl
 #       minus:
@@ -216,6 +216,7 @@ from source_linkml import (
 )
 from source_owl import (
     _extract_owl_metadata,
+    fetch_owl_source,
     process_owl_source,
     match_owl,
 )
@@ -253,6 +254,7 @@ from source_iso_country import (
     fetch_iso_country_source,
     match_iso_country,
     match_iso_country_all,
+    match_iso_country_code,
 )
 from source_loinc import (
     to_camel_case,
@@ -363,6 +365,39 @@ SSSOM_PREDICATE_MAP = {
     "skos:relatedMatch": "related_mappings",
 }
 
+_DEFAULT_SCHEMA_FILE = "schema.yaml"
+CONFIG_FILE = "config.yaml"          # filename expected inside the config folder
+
+
+def _resolve_schema_file(output_arg, config_file):
+    """Return the output schema file path, persisting the resolved value to config.
+
+    Priority:
+      1. -o/--output command-line argument  (saved to config)
+      2. 'output' key in config.yaml
+      3. "schema.yaml" default              (saved to config so it is visible)
+
+    The path (relative or absolute) is interpreted relative to the config folder
+    (the directory containing config.yaml). Absolute paths are used as-is.
+
+    The 'output' key is written as the first key in the config file (above 'locales').
+    """
+    config_dir = os.path.dirname(config_file) or "."
+    try:
+        with open(config_file) as _f:
+            _cfg = yaml.safe_load(_f) or {}
+    except (FileNotFoundError, OSError):
+        stored = output_arg or _DEFAULT_SCHEMA_FILE
+        return os.path.normpath(os.path.join(config_dir, stored))
+
+    stored = output_arg or _cfg.get("output") or _DEFAULT_SCHEMA_FILE
+    if _cfg.get("output") != stored:
+        # Place 'output' first in the written file (above 'locales' and other keys)
+        _cfg = {"output": stored, **{k: v for k, v in _cfg.items() if k != "output"}}
+        write_config(_cfg, config_file)
+    return os.path.normpath(os.path.join(config_dir, stored))
+
+
 DEFAULT_CONFIG_COMMENTS = [
     'See docs on "reachable_from": https://linkml.io/linkml-model/latest/docs/reachable_from/',
     "Config below doesn't support LinkML dynamic enumeration \"inherits\", and is limited custom version of LinkML dynamic enumerations, not quite in context of LinkML schema.",
@@ -440,9 +475,18 @@ def _load_sssom(path_or_uri):
         with open(path_or_uri, "r", encoding="utf-8") as f:
             content = f.read()
 
-    # Strip leading '#' metadata/comment lines; the first non-comment line is
-    # the TSV header.
-    data_lines = [ln for ln in content.splitlines() if not ln.startswith("#")]
+    # Two supported preamble formats:
+    #   Standard SSSOM: YAML frontmatter terminated by a "---" separator line,
+    #     followed by the TSV header and data rows.
+    #   Embedded comments: all metadata lines are '#'-prefixed; the first
+    #     non-comment line is the TSV header.
+    if "\n---\n" in content:
+        tsv_part = content.split("\n---\n", 1)[1]
+    else:
+        tsv_part = "\n".join(
+            ln for ln in content.splitlines() if not ln.startswith("#")
+        )
+    data_lines = [ln for ln in tsv_part.splitlines() if ln.strip()]
     if not data_lines:
         return {}
 
@@ -456,19 +500,36 @@ def _load_sssom(path_or_uri):
 
 
 def apply_sssom_mappings(predicates=None, schema_file="schema.yaml", config_file=MENU_CONFIG):
-    """Apply SSSOM ontology mappings to permissible_values in schema.yaml.
+    """Apply SSSOM ontology mappings to schema.yaml at two levels.
 
     Reads SSSOM files listed in the top-level 'sssom' array of harvester_config.yaml
-    (each entry may be a local relative path or an http/https URL), then for
-    every permissible_value in schema.yaml whose 'meaning' field matches a
+    (each entry may be a local relative path or an http/https URL).
+
+    PV-level rows: for every permissible_value whose 'meaning' field matches a
     subject_id in the SSSOM data, writes the matching object_id values into the
     appropriate mapping attribute on the permissible_value.
+
+    Schema-object-level rows target a named enum, slot, or class definition
+    rather than individual permissible values.  The subject_id prefix selects
+    the schema section and the canonical URI field:
+
+      subject_id prefix  | schema section | skos:exactMatch target
+      -------------------|----------------|------------------------
+      enums:{EnumKey}    | schema.enums   | enum_uri
+      slots:{SlotKey}    | schema.slots   | slot_uri
+      classes:{ClassName}| schema.classes | class_uri
+
+    For schema-object rows, skos:exactMatch writes object_id to the
+    corresponding *_uri field (first match only, as the canonical URI).
+    All other predicates write to the standard mapping list on the definition.
+    Only permissible_value uses 'meaning'; enums, slots, and classes use their
+    respective *_uri fields instead.
 
     SSSOM predicate_id → LinkML permissible_value attribute:
       skos:closeMatch   → close_mappings
       skos:broadMatch   → broad_mappings
       skos:narrowMatch  → narrow_mappings
-      skos:exactMatch   → exact_mappings
+      skos:exactMatch   → exact_mappings  (also → *_uri for schema-object rows)
       skos:relatedMatch → related_mappings
 
     predicates: list of predicate_id strings to apply (e.g. ['skos:closeMatch']).
@@ -523,6 +584,7 @@ def apply_sssom_mappings(predicates=None, schema_file="schema.yaml", config_file
 
     mapping_counts = {attr: 0 for attr in active.values()}
     pv_updated = 0
+    enum_updated = 0
 
     for enum_def in (schema.get("enums") or {}).values():
         if not isinstance(enum_def, dict):
@@ -552,10 +614,44 @@ def apply_sssom_mappings(predicates=None, schema_file="schema.yaml", config_file
                 pvs[pv_code] = pv
                 pv_updated += 1
 
+    # Schema-object-level pass: subject_id prefix selects the section and the
+    # canonical URI field.  skos:exactMatch → *_uri; others → mapping list.
+    _SCHEMA_OBJ_SECTIONS = [
+        ("enums",   "enums",   "enum_uri"),
+        ("slots",   "slots",   "slot_uri"),
+        ("classes", "classes", "class_uri"),
+    ]
+    for prefix, section, uri_field in _SCHEMA_OBJ_SECTIONS:
+        for obj_key, obj_def in (schema.get(section) or {}).items():
+            if not isinstance(obj_def, dict):
+                continue
+            rows = sssom_index.get(f"{prefix}:{obj_key}", [])
+            if not rows:
+                continue
+            changed = False
+            for predicate, attr in active.items():
+                object_ids = [
+                    r["object_id"].strip()
+                    for r in rows
+                    if r.get("predicate_id", "").strip() == predicate
+                    and r.get("object_id", "").strip()
+                ]
+                if not object_ids:
+                    continue
+                if predicate == "skos:exactMatch":
+                    obj_def[uri_field] = object_ids[0]
+                else:
+                    obj_def[attr] = object_ids
+                mapping_counts[attr] += len(object_ids)
+                changed = True
+            if changed:
+                enum_updated += 1
+
     with open(schema_file, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
 
-    print(f"Updated {schema_file}: {pv_updated} permissible_value(s) received mappings")
+    print(f"Updated {schema_file}: {pv_updated} permissible_value(s) and"
+          f" {enum_updated} schema object(s) received mappings")
     for attr, count in mapping_counts.items():
         if count:
             print(f"  {attr}: {count} mapping(s)")
@@ -754,7 +850,10 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
         action = "Created"
 
     # Sync enums and prefixes from harvester_config.yaml sources
-    prefix_conflicts = []  # collected at end for stdout summary
+    prefix_conflicts = []      # collected at end for stdout summary
+    # Track which source registered each prefix key so conflicts can name both parties.
+    # Pre-populate with "schema.yaml" for prefixes already present in the loaded file.
+    schema_prefix_source = {k: "schema.yaml" for k in (schema.get("prefixes") or {})}
     if not os.path.exists(config_file):
         print(f"Warning: {config_file} not found — no sources to import. "
               f"Run -a to add sources or ensure you are in the correct project directory.")
@@ -796,25 +895,31 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
                         new_uri = source_prefix_map[pfx]
                         if pfx in schema["prefixes"]:
                             if schema["prefixes"][pfx] != new_uri:
+                                _prior = schema_prefix_source.get(pfx, "schema.yaml")
                                 prefix_conflicts.append(
-                                    f"  prefix conflict: '{pfx}' already mapped to "
-                                    f"'{schema['prefixes'][pfx]}' but '{key}' requires "
-                                    f"'{new_uri}' — skipping"
+                                    f"  prefix conflict: '{pfx}'\n"
+                                    f"    mapped:   {schema['prefixes'][pfx]} (source: {_prior})\n"
+                                    f"    requires: {new_uri} (source: {key}) — skipping"
                                 )
                         else:
                             schema["prefixes"][pfx] = new_uri
+                            schema_prefix_source[pfx] = key
 
             source_enums = source_data.get("enums") or {}
             enum_added = enum_updated = enum_reported = enum_excluded = enum_deleted = enum_conflicts = 0
             enum_concepts_included = enum_pvs_included = 0
 
             minus = source.get("minus") or {}
-            minus_concepts = keys_from_minus(minus.get("concepts"))
+            # OWL minus/include.concepts are OWL class-label filters applied at -c time
+            # by owlready2; they have no meaning at -b time (enum keys are source keys,
+            # not class labels), so clear them here to avoid spurious filtering/warnings.
+            _is_owl = source.get("content_type") == "OWL"
+            minus_concepts = set() if _is_owl else keys_from_minus(minus.get("concepts"))
             minus_pvs = keys_from_minus(minus.get("permissible_values"))
             minus_status = keys_from_minus(minus.get("status"))
 
             include = source.get("include") or {}
-            include_concepts = keys_from_minus(include.get("concepts"))
+            include_concepts = set() if _is_owl else keys_from_minus(include.get("concepts"))
             include_pvs = keys_from_minus(include.get("permissible_values"))
 
             # include without minus → implicit "exclude all, restore only listed"
@@ -1137,17 +1242,6 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
 
             print(f"Prefixes: {prefix_added} added, {prefix_updated} updated")
 
-            # Report prefix keys that are identical except for case
-            case_groups = defaultdict(list)
-            for prefix in schema["prefixes"]:
-                case_groups[prefix.lower()].append(prefix)
-            collisions = [keys for keys in case_groups.values() if len(keys) > 1]
-            for keys in sorted(collisions):
-                detail = ", ".join(
-                    f"{k} ({', '.join(prefix_sources[k])})" for k in keys
-                )
-                print(f"  Warning: case-variant prefix keys: {detail}", file=sys.stderr)
-
     # Report enums in schema.yaml not attributed to any current harvester_config.yaml source
     if os.path.exists(config_file):
         known_sources = set(all_sources.keys())
@@ -1177,16 +1271,122 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
     if os.path.exists(trans_sssom_path):
         _apply_translate_sssom(schema, trans_sssom_path, config_stem)
 
+    # Normalize case-variant prefix keys (e.g. CHEBI/chebi) after all sources are merged.
+    prefix_normalizations = _normalize_prefix_case(schema, schema_prefix_source)
+
     with open(schema_file, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
 
-    print(f"{action} {schema_file}")
-
-    if prefix_conflicts:
-        print(f"\nPrefix conflicts ({len(prefix_conflicts)}):")
-        for msg in prefix_conflicts:
+    if prefix_normalizations:
+        print(f"\nPrefix normalizations ({len(prefix_normalizations)} — uppercase → lowercase):")
+        for msg in prefix_normalizations:
             print(msg)
 
+    if prefix_conflicts:
+        seen = set()
+        unique_conflicts = [m for m in prefix_conflicts if not (m in seen or seen.add(m))]
+        print(f"\nPrefix conflicts ({len(prefix_conflicts)}, {len(unique_conflicts)} unique):")
+        for msg in unique_conflicts:
+            print(msg)
+
+    print(f"\n{action} {schema_file}")
+
+
+
+def _normalize_prefix_case(schema, prefix_source=None):
+    """Normalize case-variant prefix keys that map to the same URI to lowercase.
+
+    Runs after all sources (including -l) are merged into schema.  Only acts when
+    the same URI appears under two keys that differ only by case (e.g. CHEBI and
+    chebi).  Updates schema['prefixes'] in-place and rewrites any PV meanings that
+    used the uppercase form.  Returns a list of human-readable normalization messages.
+
+    prefix_source: optional dict mapping prefix key -> source name, used to annotate
+    warnings and normalization messages with origin information.
+    """
+    prefixes = schema.get("prefixes") or {}
+    src = prefix_source or {}
+    groups = defaultdict(list)
+    for k in list(prefixes):
+        groups[k.lower()].append(k)
+
+    # Determine which uppercase keys to fold into their lowercase equivalents.
+    # to_rename maps old_key -> new_key (always lowercase).
+    # uri_lower tracks keys whose URI also needs lowercasing (key → lower URI).
+    to_rename = {}
+    uri_lower = {}   # new_key -> lowercased URI, for groups where URIs differed only by case
+    messages = []
+    for lower, keys in groups.items():
+        if len(keys) < 2:
+            continue
+        uris = {prefixes[k] for k in keys}
+        if len(uris) == 1:
+            # All variants point to the same URI — normalize keys to lowercase.
+            for k in keys:
+                if k != lower:
+                    to_rename[k] = lower
+                    _origin = src.get(k)
+                    messages.append(
+                        f"  prefix normalized: '{k}' → '{lower}'"
+                        + (f" (source: {_origin})" if _origin else "")
+                    )
+        elif len({u.lower() for u in uris}) == 1:
+            # URIs differ only by case — normalize both keys and URI to lowercase.
+            lower_uri = next(iter(uris)).lower()
+            for k in keys:
+                if k != lower:
+                    to_rename[k] = lower
+                old_uri = prefixes[k]
+                _origin = src.get(k)
+                _origin_str = f" (source: {_origin})" if _origin else ""
+                _after_origin = src.get(lower)
+                _after_str = f" (already in {_after_origin})" if _after_origin else ""
+                if old_uri != lower_uri:
+                    messages.append(
+                        f"  prefix normalized: '{k}' → '{lower}'\n"
+                        f"    before: {old_uri}{_origin_str}\n"
+                        f"    after:  {lower_uri}{_after_str}"
+                    )
+                elif k != lower:
+                    messages.append(
+                        f"  prefix normalized: '{k}' → '{lower}'{_origin_str}"
+                    )
+            uri_lower[lower] = lower_uri
+        else:
+            # URIs differ in substance — cannot auto-normalize.
+            # Report so the user can decide which to keep.
+            def _pfx_line(k):
+                origin = src.get(k)
+                return f"'{k}': {prefixes[k]}" + (f" (source: {origin})" if origin else "")
+            detail = "\n    ".join(_pfx_line(k) for k in sorted(keys))
+            print(f"  Warning: case-variant prefix keys with different URIs — manual review needed:\n    {detail}",
+                  file=sys.stderr)
+
+    if not to_rename and not uri_lower:
+        return messages
+
+    # Update schema["prefixes"]: for each normalized group, remove all variant keys
+    # and write the lowercase key with the correct (possibly lowercased) URI.
+    for lower, keys in groups.items():
+        if len(keys) < 2:
+            continue
+        if not any(k in to_rename for k in keys) and lower not in uri_lower:
+            continue
+        canonical_uri = uri_lower.get(lower) or prefixes.get(lower) or prefixes.get(keys[0])
+        for k in keys:
+            prefixes.pop(k, None)
+        prefixes[lower] = canonical_uri
+
+    # Rewrite PV meanings that used an uppercase prefix.
+    for enum_def in (schema.get("enums") or {}).values():
+        for pv in ((enum_def or {}).get("permissible_values") or {}).values():
+            meaning = (pv or {}).get("meaning") or ""
+            if ":" in meaning:
+                pfx = meaning.split(":")[0]
+                if pfx in to_rename:
+                    pv["meaning"] = to_rename[pfx] + meaning[len(pfx):]
+
+    return messages
 
 
 def _fetch_to_file(url, dest_path, timeout=60):
@@ -1342,6 +1542,8 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
         if match_cansis_glossary(url, config_file):
             continue
         if match_statscan_catalog(url, config_file):
+            continue
+        if match_iso_country_code(url, config_file):
             continue
         if match_iso_country_all(url, config_file):
             continue
@@ -1572,7 +1774,7 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
             _non_freetext_ran = True
 
         if content_type == "OWL":
-            if not _require_source_file(key, source.get("file_format", "owl")): continue
+            if not _require_source_file(key, "zip", fallback_ext=source.get("file_format", "owl")): continue
             process_owl_source(key, source, config_file)
             continue
 
@@ -1706,17 +1908,19 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
         process_linkml_source(key, source, config_file)
 
     # Skip index rebuild only when every explicitly-run source was FreeText and none wrote a YAML
-    if _freetext_ran and _freetext_wrote == 0 and not _non_freetext_ran:
-        pass
-    else:
-        _rebuild_fts_index(config_file)
+    _index_total = None
+    if not (_freetext_ran and _freetext_wrote == 0 and not _non_freetext_ran):
+        _index_total = _rebuild_fts_index(config_file)
 
     _report_missing_yamls(config_file)
+    if _index_total is not None:
+        print(f"  Search index: {_index_total} terms indexed in {_SEARCH_INDEX_DB}")
 
 
-# Content types whose yaml is generated via -c (API fetch), not -f (file download).
-# OntologyAPI now uses -f + -c like all other sources (graph cached in sources/{key}.zip).
-_REGEN_C_TYPES = set()
+# Content types whose yaml is generated via -c (process), not -f (file download).
+# OWL: -f downloads sources/{key}.zip; -c runs owlready2 to generate sources/{key}.yaml.
+# OntologyAPI: -f fetches the API graph to sources/{key}.zip; -c processes to yaml.
+_REGEN_C_TYPES = {"OWL", "OntologyAPI"}
 
 
 def _report_missing_yamls(config_file):
@@ -1733,13 +1937,13 @@ def _report_missing_yamls(config_file):
     ]
     if not missing:
         return
-    print("\nMissing sources yaml — run to regenerate:")
+    print("\n  Missing sources yaml — run to regenerate:")
     for key, flag in missing:
-        print(f"  {flag} {key}")
+        print(f"    {flag} {key}")
 
 
 def expand_reachable_from(yaml_path, enum_filter=None, apis=None, locales=None,
-                          source_configs=None):
+                          source_configs=None, schema_output_file=_DEFAULT_SCHEMA_FILE):
     """For each enum with reachable_from.source_nodes, fetch graph data via the
     appropriate API and populate permissible_values with CURIE keys, titles,
     and is_a hierarchy.
@@ -1918,19 +2122,18 @@ def expand_reachable_from(yaml_path, enum_filter=None, apis=None, locales=None,
             yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
         print(f"Updated {yaml_path} with expanded reachable_from values")
 
-    # If oboInOwl prefix was added and we were working on a source file, also update schema.yaml
-    if prefix_added and os.path.abspath(yaml_path) != os.path.abspath("schema.yaml"):
-        schema_file = "schema.yaml"
-        if os.path.exists(schema_file):
-            with open(schema_file, "r") as f:
+    # If oboInOwl prefix was added and we were working on a source file, also update the output schema
+    if prefix_added and os.path.abspath(yaml_path) != os.path.abspath(schema_output_file):
+        if os.path.exists(schema_output_file):
+            with open(schema_output_file, "r") as f:
                 schema_data = yaml.safe_load(f) or {}
             existing_prefixes = schema_data.get("prefixes") or {}
             if OBOINOWL_KEY not in existing_prefixes:
                 existing_prefixes[OBOINOWL_KEY] = OBOINOWL_URI
                 schema_data["prefixes"] = existing_prefixes
-                with open(schema_file, "w") as f:
+                with open(schema_output_file, "w") as f:
                     yaml.dump(schema_data, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
-                print(f"Added '{OBOINOWL_KEY}' prefix to schema.yaml")
+                print(f"Added '{OBOINOWL_KEY}' prefix to {schema_output_file}")
 
     return expanded
 
@@ -2194,7 +2397,7 @@ def _rebuild_fts_index(config_file=MENU_CONFIG):
 
     conn.commit()
     conn.close()
-    print(f"  Search index: {total} terms indexed in {_SEARCH_INDEX_DB}")
+    return total
 
 
 def _upsert_source_in_index(key):
@@ -3350,7 +3553,7 @@ def generate_enum_report(yaml_file, tsv=False, output=sys.stdout, header=None):
 # --translate: machine-translate a source's enum/PV labels to target locales
 # ---------------------------------------------------------------------------
 
-def translate_source(key, config_file):
+def translate_source(key, config_file, schema_file=_DEFAULT_SCHEMA_FILE):
     """Translate enum titles, descriptions, and PV titles for a source.
 
     Reads sources/{key}.yaml, translates all EN strings to the non-English
@@ -3510,10 +3713,10 @@ def translate_source(key, config_file):
                 if pv_tr:
                     new_rows.append((f"{config_stem}:{key}:{enum_key}:choice:{pv_key}", lang, pv_tr))
 
-    # Load schema.yaml for SSSOM metadata
+    # Load output schema for SSSOM metadata
     schema_id = schema_name = ""
-    if os.path.exists("schema.yaml"):
-        with open("schema.yaml", encoding="utf-8") as f:
+    if os.path.exists(schema_file):
+        with open(schema_file, encoding="utf-8") as f:
             _sd = yaml.safe_load(f) or {}
         schema_id   = _sd.get("id") or ""
         schema_name = _sd.get("name") or ""
@@ -3542,7 +3745,8 @@ def main():
             f"({', '.join(SSSOM_PREDICATE_MAP)}); omit to apply all."
         ))
     parser.add_argument("-t", "--tabformat", action="store_true", help="Output report as tab-delimited TSV (default is space-padded columns)")
-    parser.add_argument("-i", "--input", metavar="CONFIG_FILE", default=None, help="Path to the configuration file (default: harvester_config.yaml)")
+    parser.add_argument("-i", "--input", metavar="CONFIG_FOLDER", default=None, help=f"Folder that contains {CONFIG_FILE} (default: sources/); created on first -a if absent")
+    parser.add_argument("-o", "--output", metavar="SCHEMA_FILE", default=None, help="Output schema file to read/write with -b (default: schema.yaml); saved to harvester_config.yaml as 'output'")
     parser.add_argument("--free_text", metavar="TEXT", default=None, help="Free text describing a picklist to extract via Claude API (used with -a; requires ANTHROPIC_API_KEY)")
     parser.add_argument("--search", metavar="TEXT", default=None,
         help=(
@@ -3567,14 +3771,28 @@ def main():
         ))
     args = parser.parse_args()
 
-    config_file = args.input if args.input else MENU_CONFIG
+    _config_folder = os.path.abspath(args.input if args.input else ".")
+    config_file = os.path.join(_config_folder, CONFIG_FILE)
+    # Resolve output schema file early; written to config so subsequent runs see it.
+    # Both config_file and schema_file are now absolute paths.
+    schema_file = _resolve_schema_file(args.output, config_file)
 
-    if args.input and not os.path.isfile(config_file):
-        parser.error(f"config file not found: {config_file!r}\n"
-                     f"  Check the path passed to -i/--input, or omit it to use the default '{MENU_CONFIG}'.")
-    elif not args.input and not args.add and not os.path.isfile(config_file):
-        parser.error(f"'{MENU_CONFIG}' not found in the current directory.\n"
-                     f"  Use -i <path> to specify a config file, or use -a <URL> to create one.")
+    if not os.path.isfile(config_file) and not args.add:
+        if args.input:
+            parser.error(
+                f"config file not found: {config_file!r}\n"
+                f"  Check the folder passed to -i/--input, or omit it to use the current directory."
+            )
+        else:
+            parser.error(
+                f"'{config_file}' not found.\n"
+                f"  Use -i <folder> to specify a config folder, or use -a <source> to create one."
+            )
+
+    # Change into the config folder so all relative "sources/" paths in source modules
+    # resolve to {config_folder}/sources/ regardless of where the user invoked the script.
+    os.makedirs(_config_folder, exist_ok=True)
+    os.chdir(_config_folder)
 
     if args.add:
         _expanded_add = [p.strip() for arg in args.add for p in arg.split(",") if p.strip()]
@@ -3603,11 +3821,10 @@ def main():
         if config_keys:
             write_config(config, config_file)
 
-        # Delete matching enums from schema.yaml:
+        # Delete matching enums from the output schema file:
         # - enum key directly matches a given key, OR
         # - enum's imported_from annotation matches a given key (source deletion)
         delete_set = set(args.delete)
-        schema_file = "schema.yaml"
         removed = []
         if os.path.exists(schema_file):
             with open(schema_file, "r") as f:
@@ -3737,6 +3954,9 @@ def main():
             if content_type == "CANSIS_GLOSSARY":
                 fetch_cansis_glossary_source(key, source, config_file)
                 continue
+            if content_type == "OWL":
+                fetch_owl_source(key, source, config_file)
+                continue
             if content_type == "OntologyAPI":
                 fetch_ontologyapi_source(key, source, config_file, locales=locales_cfg)
                 continue
@@ -3785,15 +4005,14 @@ def main():
     if args.config is not None:
         process_sources(args.config, config_file, debug=getattr(args, "debug", False))
     if args.build is not None:
-        build_schema(keys=[args.build] if isinstance(args.build, str) else None, config_file=config_file)
+        build_schema(schema_file=schema_file, keys=[args.build] if isinstance(args.build, str) else None, config_file=config_file)
     # -s must run after -b: SSSOM mappings are applied to the schema.yaml that
     # -b produces, so this order must be preserved.
     if args.sssom is not None:
-        apply_sssom_mappings(predicates=args.sssom or None, config_file=config_file)
+        apply_sssom_mappings(predicates=args.sssom or None, schema_file=schema_file, config_file=config_file)
     if args.lookup is not None:
-        schema_file = "schema.yaml"
         if not os.path.exists(schema_file):
-            print(f"schema.yaml not found — run -b first", file=sys.stderr)
+            print(f"{schema_file} not found — run -b first", file=sys.stderr)
         else:
             lookup_results = {}   # enum_key -> pv count
 
@@ -3804,10 +4023,11 @@ def main():
             _locales = _lconfig.get("locales") or ["en"]
 
             if not args.lookup:
-                # -l with no args: expand every enum in schema.yaml that has reachable_from.source_nodes
+                # -l with no args: expand every enum in the output schema that has reachable_from.source_nodes
                 lookup_results.update(expand_reachable_from(
                     schema_file, apis=_apis, locales=_locales,
-                    source_configs=_lconfig.get("sources", {})))
+                    source_configs=_lconfig.get("sources", {}),
+                    schema_output_file=schema_file))
             else:
                 all_sources = _lconfig.get("sources", {})
                 with open(schema_file, "r") as f:
@@ -3847,13 +4067,26 @@ def main():
                 if enum_filter:
                     lookup_results.update(expand_reachable_from(
                         schema_file, enum_filter=enum_filter, apis=_apis, locales=_locales,
-                        source_configs=_lconfig.get("sources", {})))
+                        source_configs=_lconfig.get("sources", {}),
+                        schema_output_file=schema_file))
 
             if lookup_results:
                 print("\nLookup report:")
                 for enum_key, count in sorted(lookup_results.items()):
                     print(f"  {enum_key}: {count} permissible_values")
                 print(f"  Total: {sum(lookup_results.values())} permissible_values across {len(lookup_results)} enum(s)")
+
+                # Normalize case-variant prefix keys introduced by the lookup.
+                with open(schema_file, "r") as _f:
+                    _schema = yaml.safe_load(_f) or {}
+                _norms = _normalize_prefix_case(_schema)
+                if _norms:
+                    with open(schema_file, "w") as _f:
+                        yaml.dump(_schema, _f, Dumper=IndentedDumper,
+                                  default_flow_style=False, sort_keys=False)
+                    print(f"\nPrefix normalizations ({len(_norms)} — uppercase → lowercase):")
+                    for _msg in _norms:
+                        print(_msg)
             else:
                 print("Lookup: no reachable_from.source_nodes enums found to expand")
     if args.report:
@@ -3922,7 +4155,7 @@ def main():
             fmt = "tsv"
         print(_format_search_report(results, fmt=fmt))
     if args.translate:
-        translate_source(args.translate, config_file)
+        translate_source(args.translate, config_file, schema_file=schema_file)
     if not any([args.add, args.build is not None, args.delete, args.fetch is not None,
                 args.config is not None, args.sssom is not None, args.report, args.search,
                 args.translate]):

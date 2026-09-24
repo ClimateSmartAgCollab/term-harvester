@@ -511,6 +511,22 @@ def process_skos_source(key, source, config_file=MENU_CONFIG, locales=None):
               file=sys.stderr)
         return
 
+    # If the title was never resolved at -a time (still equals key), derive it
+    # from the root source_node's label in the fetched graph and persist it.
+    _source_title = source.get("title") or key
+    if _source_title == key:
+        for _node_ref in source_nodes:
+            if ":" not in _node_ref:
+                continue
+            _ont, _tid = _node_ref.split(":", 1)
+            _pfx_uri = prefixes.get(_ont, "")
+            _root_iri = f"{_pfx_uri}{_tid}" if _pfx_uri else ""
+            if _root_iri and _root_iri in all_nodes and all_nodes[_root_iri]["label"]:
+                _source_title = normalize_text(all_nodes[_root_iri]["label"])
+                update_source_config(key, {"title": _source_title, "name": _source_title},
+                                     config_file)
+                break
+
     is_a_map = {e["child_curie"]: e["parent_curie"] for e in all_edges}
 
     # Preserve any user-set ranks from an existing sources/{key}.yaml so that
@@ -557,7 +573,7 @@ def process_skos_source(key, source, config_file=MENU_CONFIG, locales=None):
     schema = make_config_schema(
         id=pfx_id or key,
         name=key,
-        title=source.get("title") or key,
+        title=_source_title,
         description=source.get("description") or "",
         version=source.get("version") or "",
         prefixes=prefixes,
@@ -565,7 +581,7 @@ def process_skos_source(key, source, config_file=MENU_CONFIG, locales=None):
     schema["enums"] = {
         key: {
             "name":               key,
-            "title":              source.get("title") or key,
+            "title":              _source_title,
             "reachable_from":     reachable_from,
             "permissible_values": permissible_values,
         }

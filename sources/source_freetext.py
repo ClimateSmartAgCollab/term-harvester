@@ -92,15 +92,16 @@ Rules:
   (1, 2, 3 … 9). For categorical scales, use the natural semantic order (e.g.
   absent → trace → low → medium → high). Ordinal intent must be preserved.
 - CODES: Use codes exactly as they appear in the source (numbers, letters,
-  abbreviations). When the source provides no explicit codes, form a unique
-  2–3 letter uppercase abbreviation from each label's significant words
-  (e.g. "Poorly aerated" → "PA", "Moderately aerated" → "MA",
-  "Well aerated" → "WA", "None" → "NO", "Trace" → "TR"). All abbreviations
-  within one enum must be distinct — add a third letter to resolve clashes.
-  Only use sequential integers (1, 2, 3 …) when the source document itself
-  uses an explicit numeric rating scale. If a numeric range is described
-  (e.g. 1–9) with per-value labels in the source, use the integers as codes
-  and supply a title for each.
+  abbreviations). When a source designates values by number — whether in a table
+  or in prose (e.g. "9 means 'no lodging'", "score of 5", "a scale of 1–9 where
+  1 = X") — use those numbers as integer codes. Never substitute letter
+  abbreviations for a numeric scale: if the source says "9 = X, 7 = Y, 5 = Z"
+  the codes are 9, 7, 5, regardless of whether every integer step is described.
+  When the source provides no explicit codes, form a unique 2–3 letter uppercase
+  abbreviation from each label's significant words (e.g. "Poorly aerated" → "PA",
+  "Moderately aerated" → "MA", "Well aerated" → "WA", "None" → "NO",
+  "Trace" → "TR"). All abbreviations within one enum must be distinct — add a
+  third letter to resolve clashes.
 - SECTIONS: When a table or list has named sub-sections (e.g. "Brittleness",
   "Fluidity", "Smeariness"), extract each sub-section as its own enum with
   the section name as the enum key and title. Include "has_sections": true at
@@ -121,14 +122,22 @@ Rules:
   "Ver. 4 November 2024", "v1.0", "Edition 3", "Release 2.1". Extract just the
   core version identifier (e.g. "4", "2.1", "Ver. 4"). Return null if nothing
   plausible is found — do not guess.
-- INTERMEDIATES: When a numeric scale has only a few explicitly stated anchor
-  points (e.g. "1 = Erect, 9 = Prostrate") but implies all integer steps exist,
-  you MUST include ALL integer steps between the first and last anchor. Mark each
-  unstated step with "is_intermediate": true and set its "title" to "" — do NOT
-  invent titles for intermediate steps; a second pass generates "between X and Y"
-  labels automatically. Explicitly stated values must have "is_intermediate": false.
-  Only generate intermediates for continuous numeric scales; never for categorical
-  or text-ordered lists.
+- INTERMEDIATES: When a numeric scale implies all integer steps exist, include
+  ALL integer steps between the first and last code. A value is "stated" when
+  the source text describes it — INCLUDING mid-range values, not just endpoints.
+  Mark only values with NO source description as "is_intermediate": true with
+  title "" — do NOT invent titles for intermediate steps; a second pass generates
+  "between X and Y" labels automatically. Explicitly stated values must have
+  "is_intermediate": false with their title from the source text, not from general
+  knowledge about the scale type. Only generate intermediates for continuous
+  numeric scales; never for categorical or text-ordered lists.
+  Example A (2 stated anchors): "1 = Erect, 9 = Prostrate" → codes 2–8 are
+    intermediate (is_intermediate: true, title: "").
+  Example B (5 stated anchors): "9 = no lodging, 7 = slightly lodged, 5 = medium
+    degree, 3 = significantly lodged, 1 = severe. Other values denote intermediate
+    states." → 1, 3, 5, 7, 9 are all stated (is_intermediate: false) with titles
+    from the source; only 2, 4, 6, 8 are intermediate. "Other values" means the
+    undescribed steps, not all mid-range values.
 - Return only the JSON object, no surrounding text."""
 
 
@@ -384,7 +393,8 @@ def _label_intermediates(enums):
     """Generate 'between X and Y' titles for is_intermediate PVs via a Haiku call.
 
     For each enum containing PVs marked is_intermediate, sends the stated anchor
-    points and intermediate codes to Claude Haiku and fills in the returned labels.
+    points and intermediate codes to Claude Haiku and fills in the returned labels,
+    using synonymy_scale.yaml dimension matching to prefer canonical scale terms.
     Modifies enums in place.  Returns True if any labels were generated.
     """
     client = _get_anthropic_client()

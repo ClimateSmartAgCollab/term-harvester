@@ -9,12 +9,17 @@ Public API used by term_harvester.py:
     match_owl(url, tmp_path, config_file=None, process_fn=None)
 """
 
+import datetime
 import os
 import re
 import sys
+import tempfile
+import urllib.request
 import yaml
+import zipfile
 from source_utils import (
     MENU_CONFIG,
+    BROWSER_HEADERS,
     IndentedDumper,
     sort_prefixes,
     log_extraction,
@@ -22,6 +27,7 @@ from source_utils import (
     add_permissible_value,
     make_source_entry,
     normalize_text,
+    update_source_config,
     write_config,
     keys_from_minus,
 )
@@ -199,10 +205,11 @@ def _find_owl_classes_by_label(onto, label_text):
 def process_owl_source(key, source, config_file=MENU_CONFIG):
     """Build a LinkML enum YAML from a fetched OWL ontology source.
 
-    Loads sources/{key}.text with owlready2 in an isolated World, traverses
-    the class hierarchy from top-level nodes (classes with no class-type
-    is_a parent other than owl:Thing), and writes a LinkML YAML with a single
-    enum named *key* containing one permissible_value entry per OWL class.
+    Loads sources/{key}.zip (or legacy sources/{key}.{ext}) with owlready2 in
+    an isolated World, traverses the class hierarchy from top-level nodes
+    (classes with no class-type is_a parent other than owl:Thing), and writes
+    a LinkML YAML with a single enum named *key* containing one
+    permissible_value entry per OWL class.
 
     Filtering via the source's minus/include.concepts lists:
       minus.concepts:   English rdfs:label strings (case-insensitive) of
@@ -220,14 +227,45 @@ def process_owl_source(key, source, config_file=MENU_CONFIG):
               file=sys.stderr)
         return
 
-    concise    = bool(source.get("concise"))
-    text_path  = f"sources/{key}.{source.get('file_format', 'owl')}"
-    yaml_path  = f"sources/{key}.yaml"
-    source_url = (source.get("reachable_from") or {}).get("source_ontology", "")
+    concise     = bool(source.get("concise"))
+    yaml_path   = f"sources/{key}.yaml"
+    source_url  = (source.get("reachable_from") or {}).get("source_ontology", "")
+    file_format = source.get("file_format", "owl")
+    zip_path    = f"sources/{key}.zip"
 
-    print(f"Loading OWL ontology from {text_path} ...")
-    world = World()
-    onto  = world.get_ontology(f"file://{os.path.abspath(text_path)}").load()
+    if file_format == "zip" and os.path.isfile(zip_path):
+        _owl_ext = source.get("owl_ext", "owl")
+        print(f"Loading OWL ontology from {zip_path} ...")
+        with zipfile.ZipFile(zip_path) as _zf:
+            _names = _zf.namelist()
+            _owl_name = next(
+                (n for n in _names if n.lower().endswith(f".{_owl_ext}")),
+                _names[0] if _names else None,
+            )
+            if not _owl_name:
+                print(f"  Error: {zip_path} is empty — run: term_harvester.py -f {key}",
+                      file=sys.stderr)
+                return
+            _tmp_fd, _tmp_owl_path = tempfile.mkstemp(suffix=f".{_owl_ext}")
+            os.close(_tmp_fd)
+            with _zf.open(_owl_name) as _src, open(_tmp_owl_path, "wb") as _dst:
+                _dst.write(_src.read())
+        world = World()
+        onto  = world.get_ontology(f"file://{os.path.abspath(_tmp_owl_path)}").load()
+        try:
+            os.unlink(_tmp_owl_path)
+        except OSError:
+            pass
+    else:
+        _raw_path = f"sources/{key}.{file_format}"
+        if not os.path.isfile(_raw_path):
+            print(f"  Error: {_raw_path} not found — run: term_harvester.py -f {key}",
+                  file=sys.stderr)
+            return
+        print(f"Loading OWL ontology from {_raw_path} ...")
+        world = World()
+        onto  = world.get_ontology(f"file://{os.path.abspath(_raw_path)}").load()
+
     total = len(list(onto.classes()))
     print(f"  Base IRI: {onto.base_iri}  ({total} classes)")
 
@@ -250,6 +288,12 @@ def process_owl_source(key, source, config_file=MENU_CONFIG):
             print(f"  Warning: include label '{lbl}' not found in ontology", file=sys.stderr)
         for cls in found:
             include_iris.add(cls.iri)
+
+    # Whitelist mode: when include_labels are given, all top-level classes start
+    # excluded (in_minus_subtree=True) and only the include_iris subtrees are
+    # restored.  minus_labels then fine-tune by blocking specific nodes within
+    # those restored subtrees.  Without include, every class is visited normally.
+    whitelist_mode = bool(include_labels)
 
     # Auto-discover OBO Foundry per-ontology prefixes from class IRIs,
     # then overlay with any user-specified config additions (config wins on conflicts).
@@ -294,11 +338,17 @@ def process_owl_source(key, source, config_file=MENU_CONFIG):
         for sub in cls.subclasses():
             _collect(sub, next_parent, in_minus_subtree)
 
-    # Top-level classes: those with no class-type is_a parent other than Thing
+    # Top-level classes: those with no class-type is_a parent other than Thing.
+    # owl:Thing itself is explicitly skipped — it is the OWL root metaclass and
+    # should never appear as a permissible value.
+    # In whitelist mode (include_labels given) every top-level class starts excluded;
+    # only include_iris subtrees are restored during traversal.
     for cls in onto.classes():
+        if cls is Thing:
+            continue
         class_parents = [p for p in cls.is_a if isinstance(p, type) and p is not Thing]
         if not class_parents:
-            _collect(cls, None)
+            _collect(cls, None, in_minus_subtree=whitelist_mode)
 
     n = len(permissible_values)
     excluded_n = total - len(visited)
@@ -320,12 +370,63 @@ def process_owl_source(key, source, config_file=MENU_CONFIG):
     log_extraction(key, count=n)
 
 
+def fetch_owl_source(key, source, config_file=MENU_CONFIG):
+    """Download (or re-download) the OWL file for *key* and save it to sources/{key}.zip.
+
+    Reads the source URL from source["reachable_from"]["source_ontology"], downloads
+    the OWL file, and stores it in sources/{key}.zip.  Updates download_date,
+    file_format, and owl_ext in config_file.
+    """
+    url = (source.get("reachable_from") or {}).get("source_ontology")
+    if not url:
+        print(f"  Error: no source_ontology URL for '{key}'", file=sys.stderr)
+        return
+
+    _filename = url.split("#")[0].split("?")[0].rstrip("/").split("/")[-1]
+    if "." in _filename:
+        _stem_noext, _ext = _filename.rsplit(".", 1)
+    else:
+        _stem_noext, _ext = _filename, "owl"
+
+    zip_path = f"sources/{key}.zip"
+    print(f"Fetching {url} ...")
+    tmp_fd, tmp_path = tempfile.mkstemp(dir="sources")
+    os.close(tmp_fd)
+    try:
+        req = urllib.request.Request(url, headers=BROWSER_HEADERS)
+        with urllib.request.urlopen(req) as response:
+            with open(tmp_path, "wb") as tmp_f:
+                tmp_f.write(response.read())
+    except Exception as e:
+        _keep = f" — keeping existing {zip_path}" if os.path.exists(zip_path) else ""
+        print(f"  Error fetching {url}: {e}{_keep}", file=sys.stderr)
+        os.unlink(tmp_path)
+        return
+
+    new_size = os.path.getsize(tmp_path)
+    if new_size == 0:
+        _keep = f" — keeping existing {zip_path}" if os.path.exists(zip_path) else ""
+        print(f"  Error: downloaded file is empty{_keep}", file=sys.stderr)
+        os.unlink(tmp_path)
+        return
+
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as _zf:
+        _zf.write(tmp_path, _filename)
+    os.unlink(tmp_path)
+    print(f"Saved to {zip_path}")
+    update_source_config(key, {
+        "download_date": datetime.date.today().isoformat(),
+        "file_format": "zip",
+        "owl_ext": _ext,
+    }, config_file)
+
+
 def match_owl(url, tmp_path, config_file=MENU_CONFIG, process_fn=None):
     """Return True if *tmp_path* looks like an OWL ontology file and was handled.
 
     Detection is by URL extension (.owl, .ofn, .rdf, .ttl, .n3) first, then
     by RDF/OWL content markers in the first 4 KB of the file.  When matched:
-      - renames tmp_path to sources/{filename}
+      - stores the OWL file in sources/{key}.zip (file_format: zip)
       - extracts metadata from the file (title, description, version, license, prefixes)
       - adds a source entry to config_file
       - calls process_fn([key], config_file) if provided
@@ -366,17 +467,23 @@ def match_owl(url, tmp_path, config_file=MENU_CONFIG, process_fn=None):
         os.unlink(tmp_path)
         return True
 
-    output_path = f"sources/{_filename}"
-    os.rename(tmp_path, output_path)
-    print(f"Saved to {output_path}")
+    # Extract metadata from the raw OWL file before zipping
+    _meta = _extract_owl_metadata(tmp_path)
 
-    _meta = _extract_owl_metadata(output_path)
+    # Store OWL file inside sources/{key}.zip
+    zip_path = f"sources/{key}.zip"
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as _zf:
+        _zf.write(tmp_path, _filename)
+    os.unlink(tmp_path)
+    print(f"Saved to {zip_path}")
+
     entry = make_source_entry(
-        key, url, "OWL", _ext,
+        key, url, "OWL", "zip",
         title       = _meta["title"]       or _stem_noext,
         description = _meta["description"],
         version     = _meta["version"],
     )
+    entry["owl_ext"] = _ext  # original OWL extension for owlready2 format detection
     if _meta["license"]:
         entry["license"] = _meta["license"]
     if _meta["prefixes"]:

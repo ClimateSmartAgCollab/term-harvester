@@ -36,7 +36,7 @@ import urllib.request
 import yaml
 
 
-MENU_CONFIG = "harvester_config.yaml"
+MENU_CONFIG = "config.yaml"
 
 
 # Browser-like headers used for all HTTP fetches.  Some servers (e.g. those
