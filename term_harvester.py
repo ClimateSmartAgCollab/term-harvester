@@ -256,6 +256,16 @@ from source_iso_country import (
     match_iso_country_all,
     match_iso_country_code,
 )
+from source_geonames import (
+    match_geonames_code,
+    fetch_geonames_source,
+    process_geonames_source,
+)
+from source_geowiki import (
+    match_geowiki_code,
+    fetch_geowiki_source,
+    process_geowiki_source,
+)
 from source_loinc import (
     to_camel_case,
     collect_loinc_concepts,
@@ -453,16 +463,22 @@ def _load_sssom(path_or_uri):
     in a tabular format.  See https://github.com/mapping-commons/sssom/ for the
     full specification.
 
-    The file may begin with '#'-prefixed metadata lines (including an embedded
-    YAML curie_map block) followed by a tab-separated header row and data rows.
+    Two supported preamble formats:
+      Standard SSSOM: YAML frontmatter terminated by a "---" separator line,
+        followed by the TSV header and data rows.
+      Embedded comments: all metadata lines are '#'-prefixed; the first
+        non-comment line is the TSV header.
+
     Required columns: subject_id, predicate_id, object_id.
     Other columns (subject_label, object_label, match_type, Comments, …) are
     allowed by the standard and are preserved in each row dict but not used here.
 
     path_or_uri: local file path or http/https URL.
 
-    Returns a dict {subject_id: [row_dict, …]} indexed by subject_id for fast
-    lookup.  Rows whose subject_id is empty are silently skipped.
+    Returns (index, curie_map) where:
+      index     — {subject_id: [row_dict, …]} for fast lookup
+      curie_map — {prefix: uri} from the SSSOM curie_map block, or {}
+    Rows whose subject_id is empty are silently skipped.
     """
     import csv, io
 
@@ -475,20 +491,34 @@ def _load_sssom(path_or_uri):
         with open(path_or_uri, "r", encoding="utf-8") as f:
             content = f.read()
 
-    # Two supported preamble formats:
-    #   Standard SSSOM: YAML frontmatter terminated by a "---" separator line,
-    #     followed by the TSV header and data rows.
-    #   Embedded comments: all metadata lines are '#'-prefixed; the first
-    #     non-comment line is the TSV header.
+    # Split preamble from TSV body and parse curie_map.
+    curie_map = {}
     if "\n---\n" in content:
-        tsv_part = content.split("\n---\n", 1)[1]
+        preamble, tsv_part = content.split("\n---\n", 1)
+        # Preamble is plain YAML; extract curie_map from it.
+        try:
+            meta = yaml.safe_load(preamble) or {}
+            curie_map = dict(meta.get("curie_map") or {})
+        except Exception:
+            pass
     else:
+        # '#'-prefixed metadata: strip '#' from comment lines and parse as YAML.
+        preamble_lines = [
+            ln[1:].lstrip() if ln.startswith("#") else None
+            for ln in content.splitlines()
+        ]
+        preamble_yaml = "\n".join(l for l in preamble_lines if l is not None)
+        try:
+            meta = yaml.safe_load(preamble_yaml) or {}
+            curie_map = dict(meta.get("curie_map") or {})
+        except Exception:
+            pass
         tsv_part = "\n".join(
             ln for ln in content.splitlines() if not ln.startswith("#")
         )
     data_lines = [ln for ln in tsv_part.splitlines() if ln.strip()]
     if not data_lines:
-        return {}
+        return {}, curie_map
 
     index = {}
     reader = csv.DictReader(io.StringIO("\n".join(data_lines)), delimiter="\t")
@@ -496,7 +526,7 @@ def _load_sssom(path_or_uri):
         subject_id = (row.get("subject_id") or "").strip()
         if subject_id:
             index.setdefault(subject_id, []).append(row)
-    return index
+    return index, curie_map
 
 
 def apply_sssom_mappings(predicates=None, schema_file="schema.yaml", config_file=MENU_CONFIG):
@@ -540,7 +570,8 @@ def apply_sssom_mappings(predicates=None, schema_file="schema.yaml", config_file
 
     sssom_files = config.get("sssom") or []
     if not sssom_files:
-        print("No 'sssom' files listed in harvester_config.yaml — nothing to apply", file=sys.stderr)
+        config_name = os.path.basename(config_file)
+        print(f"No 'sssom' files listed in {config_name} — nothing to apply", file=sys.stderr)
         return
 
     # Resolve which predicates to apply
@@ -560,13 +591,15 @@ def apply_sssom_mappings(predicates=None, schema_file="schema.yaml", config_file
         print("No valid predicates to apply — aborting", file=sys.stderr)
         return
 
-    # Load and merge all SSSOM files into one index
+    # Load and merge all SSSOM files into one index; accumulate curie_maps.
     sssom_index = {}
+    combined_curie_map = {}
     for sssom_path in sssom_files:
         try:
-            partial = _load_sssom(sssom_path)
+            partial, curie_map = _load_sssom(sssom_path)
             for subj, rows in partial.items():
                 sssom_index.setdefault(subj, []).extend(rows)
+            combined_curie_map.update(curie_map)
             print(f"Loaded SSSOM: {len(partial)} subject IDs from {sssom_path}")
         except Exception as _e:
             print(f"Warning: could not load SSSOM file '{sssom_path}': {_e}", file=sys.stderr)
@@ -647,6 +680,22 @@ def apply_sssom_mappings(predicates=None, schema_file="schema.yaml", config_file
             if changed:
                 enum_updated += 1
 
+    # Auto-inject prefixes from SSSOM curie_map for any CURIE object_ids that
+    # were written to the schema but whose prefix is not yet in schema.yaml.
+    # -b never removes existing prefixes, so these persist across rebuilds.
+    prefix_added = []
+    schema_prefixes = schema.setdefault("prefixes", {})
+    for subj_rows in sssom_index.values():
+        for row in subj_rows:
+            oid = (row.get("object_id") or "").strip()
+            if ":" not in oid:
+                continue
+            pfx = oid.split(":")[0]
+            if pfx in schema_prefixes or pfx not in combined_curie_map:
+                continue
+            schema_prefixes[pfx] = combined_curie_map[pfx]
+            prefix_added.append(pfx)
+
     with open(schema_file, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
 
@@ -655,6 +704,8 @@ def apply_sssom_mappings(predicates=None, schema_file="schema.yaml", config_file
     for attr, count in mapping_counts.items():
         if count:
             print(f"  {attr}: {count} mapping(s)")
+    if prefix_added:
+        print(f"  prefixes added from SSSOM curie_map: {', '.join(sorted(set(prefix_added)))}")
 
 
 def _normalize_enum_def(enum_def):
@@ -981,7 +1032,12 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
                         if k not in minus_pvs
                         and (not exclude_all_pvs or k in include_pvs)
                     }
-                if (minus_status and source.get("content_type") == "OWL"
+                _status_filter_types = {
+                    "OWL", "OntologyAPI",
+                    "GeoNamesSettlement", "GeoWikiSettlement",
+                }
+                if (minus_status
+                        and source.get("content_type") in _status_filter_types
                         and enum_def.get("permissible_values")):
                     enum_def["permissible_values"] = {
                         k: v for k, v in enum_def["permissible_values"].items()
@@ -1547,6 +1603,10 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
             continue
         if match_iso_country_all(url, config_file):
             continue
+        if match_geonames_code(url, config_file):
+            continue
+        if match_geowiki_code(url, config_file):
+            continue
 
         # Check if base URL already matches an existing source; skip download if so.
         _base_add_url = url.split("#")[0]
@@ -1796,6 +1856,16 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
                       file=sys.stderr)
                 continue
             process_iso_country_source(key, source, config_file, locales=locales)
+            continue
+
+        if content_type in ("GeoNamesCountries", "GeoNamesADM1", "GeoNamesADM2",
+                            "GeoNamesADM34", "GeoNamesSettlement"):
+            process_geonames_source(key, source, config_file, locales=locales)
+            continue
+
+        if content_type in ("GeoWikiCountries", "GeoWikiADM1", "GeoWikiADM2",
+                            "GeoWikiSettlement"):
+            process_geowiki_source(key, source, config_file, locales=locales)
             continue
 
         if content_type == "NAPCSCanada":
@@ -3925,6 +3995,18 @@ def main():
             if content_type == "ISO_COUNTRY":
                 fetch_iso_country_source(key, source, config_file)
                 process_iso_country_source(key, source, config_file, locales=locales_cfg)
+                continue
+            # GeoNames flat-file sources
+            if content_type in ("GeoNamesCountries", "GeoNamesADM1", "GeoNamesADM2",
+                                "GeoNamesADM34", "GeoNamesSettlement"):
+                fetch_geonames_source(key, source, config_file)
+                process_geonames_source(key, source, config_file, locales=locales_cfg)
+                continue
+            # GeoWiki (Wikidata) sources
+            if content_type in ("GeoWikiCountries", "GeoWikiADM1", "GeoWikiADM2",
+                                "GeoWikiSettlement"):
+                fetch_geowiki_source(key, source, config_file)
+                process_geowiki_source(key, source, config_file, locales=locales_cfg)
                 continue
             # NSDB sources: multi-page crawl — build sources/{key}.zip, not a single HTML.
             if content_type in ("NSDBSNT", "NSDBSLT", "NSDBSLC"):

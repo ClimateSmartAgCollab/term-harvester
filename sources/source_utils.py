@@ -190,7 +190,8 @@ def fetch_html(url):
 
 def add_permissible_value(permissible_values, code, *, title=None, description=None,
                           is_a=None, status=None, comments=None,
-                          meaning=None, prefixes=None, exact_mappings=None):
+                          meaning=None, prefixes=None, exact_mappings=None,
+                          broad_mappings=None):
     """Add one permissible value entry to *permissible_values* in-place.
 
     All keyword arguments are optional; a field is only written to the entry
@@ -199,15 +200,16 @@ def add_permissible_value(permissible_values, code, *, title=None, description=N
     the text value.  Returns the entry.
 
     permissible_values: dict to mutate.
-    code:           The permissible value code (used as the dict key).
-    title:          Human-readable label.
-    description:    Free-text definition.
-    is_a:           Parent code for hierarchy.
-    status:         Status string (e.g. 'ACTIVE').
-    comments:       Additional commentary (LOINC-specific).
-    meaning:        IRI for the concept; compressed to a CURIE when prefixes is provided.
-    prefixes:       Dict of prefix→URI used to compress meaning to a CURIE.
-    exact_mappings: List of CURIEs/IRIs that are exact matches for this concept.
+    code:            The permissible value code (used as the dict key).
+    title:           Human-readable label.
+    description:     Free-text definition.
+    is_a:            Parent code for hierarchy.
+    status:          Status string (e.g. 'ACTIVE').
+    comments:        Additional commentary (LOINC-specific).
+    meaning:         IRI for the concept; compressed to a CURIE when prefixes is provided.
+    prefixes:        Dict of prefix→URI used to compress meaning to a CURIE.
+    exact_mappings:  List of CURIEs/IRIs that are exact matches for this concept.
+    broad_mappings:  List of CURIEs/IRIs for broader concepts (e.g. type/class codes).
     """
     entry = {}
     if title:
@@ -227,6 +229,8 @@ def add_permissible_value(permissible_values, code, *, title=None, description=N
         entry["meaning"] = meaning
     if exact_mappings:
         entry["exact_mappings"] = list(exact_mappings)
+    if broad_mappings:
+        entry["broad_mappings"] = list(broad_mappings)
     permissible_values[code] = entry
     return entry
 

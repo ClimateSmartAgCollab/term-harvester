@@ -26,7 +26,7 @@ The term_harvester.py script fetches vocabulary sources, processes them into Lin
 - [Overview](#overview)
 - [Quick-start workflow](#quick-start-workflow)
 - [Command reference](#command-reference)
-  - [Specify configuration file: `-i`](#specify-configuration-file--i)
+  - [Specify configuration folder: `-i`](#specify-configuration-folder--i)
   - Retrieve Sources:
     - [Add a source from a URL: `-a`](#add-a-source-from-a-url--a)
     - [Extract from free text: `--free_text`](#extract-from-free-text---free_text)
@@ -52,6 +52,7 @@ The term_harvester.py script fetches vocabulary sources, processes them into Lin
   - [Statistics Canada](#statistics-canada)
   - [Statistics Canada Census Dictionary tables](#statistics-canada-census-dictionary-tables-statscan_table)
   - [ISO 3166-2 country subdivisions](#iso-3166-2-country-subdivisions-iso_country)
+  - [GeoNames and GeoWiki geopolitical vocabularies](#geonames-and-geowiki-geopolitical-vocabularies)
   - [NASIS (USDA NRCS National Soil Information System)](#nasis-usda-nrcs-national-soil-information-system)
   - [NRCS Field Book (field description enumerations)](#nrcs-field-book-field-description-enumerations)
   - [NAPCS Canada](#napcs-canada)
@@ -111,7 +112,7 @@ Stage 3 yields a normalized format of reference vocabularies which can then be t
 
 Install dependencies before first use — see [Python code notes](#python-code-notes).
 
-**The default configuration file is `harvester_config.yaml` in the current directory.  Use `-i`/`--input` to specify a different path.**
+**term_harvester.py looks for `config.yaml` in the current directory by default.  Use `-i`/`--input` to specify a different configuration folder.**
 
 ```bash
 # 1. Add sources (auto-detects type, downloads, adds to harvester_config.yaml)
@@ -135,18 +136,19 @@ python term_harvester.py -a https://raw.githubusercontent.com/GenomicsStandardsC
 
 ## Command reference
 
-### Specify configuration file: `-i`
+### Specify configuration folder: `-i`
 
 ```bash
-python term_harvester.py -i path/to/myconfig.yaml -f all -c -b
-python term_harvester.py --input examples/agrifoodca/config.yaml -r
+python term_harvester.py -i path/to/myproject/ -f all -c -b
+python term_harvester.py --input examples/agrifoodca/ -r
 ```
 
-Overrides the default configuration file name (`harvester_config.yaml`).  All
-commands (`-a`, `-f`, `-c`, `-b`, `-d`, `-l`, `-r`, `-s`) read from and write to
-the specified file.  Useful when managing multiple independent schemas from the
-same working directory, or when using a pre-built config from the `examples/`
-folder as a starting point.
+Points term_harvester.py at a different configuration folder instead of the
+current directory.  The folder must contain (or will have created on first
+`-a`) a `config.yaml` file.  All commands (`-a`, `-f`, `-c`, `-b`, `-d`,
+`-l`, `-r`, `-s`) read from and write to that folder.  Useful when working on
+multiple independent schemas, or when running term_harvester.py from outside
+the project folder.
 
 ---
 
@@ -599,6 +601,74 @@ To refresh the data when Wikidata updates:
 python term_harvester.py -f ISO_COUNTRY_CA   # re-queries Wikidata SPARQL, updates sources/ISO_COUNTRY_CA.zip
 python term_harvester.py -c ISO_COUNTRY_CA   # regenerates sources/ISO_COUNTRY_CA.yaml
 python term_harvester.py -b                  # rebuilds schema.yaml
+```
+
+---
+
+### GeoNames and GeoWiki geopolitical vocabularies
+
+Two parallel source modules produce geopolitical controlled vocabularies from
+[GeoNames](https://www.geonames.org/) (CC-BY 4.0) and
+[Wikidata](https://www.wikidata.org/) (CC0):
+
+| Module | Content types | PV code |
+|---|---|---|
+| `source_geonames.py` | `GeoNamesCountries`, `GeoNamesADM1`, `GeoNamesADM2`, `GeoNamesADM34`, `GeoNamesSettlement` | GeoNames numeric ID |
+| `source_geowiki.py` | `GeoWikiCountries`, `GeoWikiADM1`, `GeoWikiADM2`, `GeoWikiSettlement` | Wikidata QID |
+
+Both modules cross-link via Wikidata P1566 (GeoNames ID), so GeoNames entries
+carry `exact_mappings: [wd:Q…]` and GeoWiki entries carry `exact_mappings: [gnf:…]`.
+
+**Available shorthands:**
+
+```bash
+# Countries, continents, oceans
+python term_harvester.py -a GeoWiki_countries    # Wikidata sovereign states + territories + continents + oceans
+python term_harvester.py -a GeoNames_countries   # GeoNames countries + continents (no oceans — see note below)
+
+# First-order divisions (provinces, states)
+python term_harvester.py -a GeoWiki_CA_ADM1
+python term_harvester.py -a GeoNames_CA_ADM1
+
+# Second-order divisions (counties, districts)
+python term_harvester.py -a GeoWiki_CA_ADM2
+python term_harvester.py -a GeoNames_CA_ADM2
+
+# Third-order divisions (municipalities — from per-country zip)
+python term_harvester.py -a GeoNames_CA_ADM3
+
+# Populated places
+python term_harvester.py -a GeoWiki_CA_PPL
+python term_harvester.py -a GeoNames_CA_PPL
+```
+
+Replace `CA` with any ISO 3166-1 alpha-2 code.
+
+**GeoWikiCountry vs GeoWikiCountryExtended:**
+`GeoWiki_countries` produces two country enums.  `GeoWikiCountry` contains only
+sovereign states (P31 = Q3624078 or Q15634554).  `GeoWikiCountryExtended`
+contains dependent territories and overseas regions that have their own ISO
+alpha-2 code (e.g. HK, BL, GF) but are not sovereign; each territory carries
+`is_a` pointing to its parent sovereign state QID.  To produce a combined
+country + territory list use `inherits` in `harvester_config.yaml`:
+
+```yaml
+AllCountries:
+  inherits: [GeoWikiCountry, GeoWikiCountryExtended]
+```
+
+**Oceans — use GeoWikiOcean, not GeoNames:**
+GeoNames does not publish a dedicated ocean flat file.  Ocean entries exist in
+the GeoNames full `allCountries.zip` dump (feature class H, code `OCN`), but
+that file is ~400 MB uncompressed and is not fetched by `source_geonames.py`.
+`GeoWiki_countries` already includes a `GeoWikiOcean` enum (five major oceans
+queried from Wikidata via P31 = Q9430) with GeoNames numeric IDs in
+`exact_mappings` via P1566 — this is the preferred source for ocean names with
+GeoNames cross-references:
+
+```bash
+python term_harvester.py -a GeoWiki_countries
+# Produces GeoWikiCountry, GeoWikiCountryExtended, GeoWikiContinent, GeoWikiOcean
 ```
 
 ---
@@ -1748,6 +1818,22 @@ prefix set to `http://purl.bioontology.org/ontology/SNOMEDCT/` in the source
 entry — but the resulting CURIEs will not resolve to the international SNOMED
 namespace.
 
+### Multi-locale support
+
+Only AGROVOC supports multi-locale fetching.  OLS4 and BioPortal are
+single-locale; a `locales` list in `harvester_config.yaml` has no effect on
+their fetches.
+
+AGROVOC collects all locales listed under `locales` in a single SPARQL query
+(`VALUES ?locale { 'en' 'fr' … }`).  English labels are written to the main
+`title` field; non-English labels are stored in
+`schema.extensions.locales.value[lang].enums[key].permissible_values[code].title`.
+
+Because `-c` processes only already-downloaded data, locales are baked in at
+fetch time (`-f` or `-a`).  If you add a locale to `harvester_config.yaml`
+after the initial fetch, re-run `-f {key}` followed by `-c {key}` and `-b` to
+pick up the new language.
+
 ---
 
 ## SSSOM ontology mappings
@@ -1841,6 +1927,8 @@ echo $ANTHROPIC_API_KEY
 | `source_statscan.py` | Statistics Canada classification page scraping | |
 | `source_statscan_table.py` | `content_type: STATSCANTable` — Statistics Canada Census Dictionary table pages; auto-fetches French translations from the corresponding `index-fra.cfm` page | |
 | `source_iso_country.py` | `content_type: ISO_COUNTRY` — ISO 3166-2 country subdivision codes via Wikidata SPARQL (P297 for country name/QID; P300 for subdivision codes and labels; P31 for subdivision types used to generate group headers and a type-count description sentence); each PV carries its Wikidata QID as `meaning`; ISO OBP is a Vaadin SPA, not directly fetchable; accepts shorthand `ISO_COUNTRY_XX` or `ISO_COUNTRY` for all countries | [ISO OBP](https://www.iso.org/obp/ui/) |
+| `source_geonames.py` | `content_type: GeoNamesCountries / GeoNamesADM1 / GeoNamesADM2 / GeoNamesADM34 / GeoNamesSettlement` — GeoNames flat-file geopolitical vocabulary (countries, provinces, counties, municipalities, populated places); PV code = GeoNames numeric ID; Wikidata P1566 reverse-lookup for QID cross-references; shorthands `GeoNames_countries`, `GeoNames_{CC}_ADM1/ADM2/ADM3/PPL`; oceans not included (use `GeoWikiOcean`) | [GeoNames downloads](https://download.geonames.org/export/dump/) |
+| `source_geowiki.py` | `content_type: GeoWikiCountries / GeoWikiADM1 / GeoWikiADM2 / GeoWikiSettlement` — Wikidata geopolitical vocabulary; PV code = QID; GeoNames P1566 cross-references in `exact_mappings`; `GeoWiki_countries` produces `GeoWikiCountry` (sovereign states), `GeoWikiCountryExtended` (territories with `is_a` parent), `GeoWikiContinent`, and `GeoWikiOcean` (five major oceans with GeoNames IDs — preferred ocean source); shorthands `GeoWiki_countries`, `GeoWiki_{CC}_ADM1/ADM2/PPL` | [Wikidata](https://www.wikidata.org/) |
 | `source_napcscanada.py` | NAPCS Canada CSV parsing | [CSV file](https://www.statcan.gc.ca/en/media/5274) |
 | `source_agrifoodca.py` | AgriFoodCA picklist CSV parsing and GitHub directory import | [CSV files](https://github.com/agrifooddatacanada/picklists_for_schemas/tree/main/picklists) |
 | `source_zenodo.py` | Shared Zenodo REST API utilities: `is_zenodo_record_url`, `to_zenodo_api_url`, `fetch_zenodo_file` — used by `source_credit.py` | |

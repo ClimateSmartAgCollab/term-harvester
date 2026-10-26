@@ -1,0 +1,366 @@
+# See docs on "reachable_from": https://linkml.io/linkml-model/latest/docs/reachable_from/
+# Config below doesn't support LinkML dynamic enumeration "inherits", and is limited custom version of LinkML dynamic enumerations, not quite in context of LinkML schema.
+# Note that "minus" list is implemented before "includes" list, which restores subordinate items that would otherwise have been eliminated by minus list items and their underlying items.
+# See https://linkml.io/linkml-model/latest/docs/EnumExpression/
+# Here 'reachable_from' is acted on via 'term_harvester.py -c' configuration to generate the LinkML .yaml schema file for the given source.  Over in schema.yaml, 'reachable_from' is acted on via 'term_harvester.py -l' for lookup function to populate schema.yaml enums.
+# The optional top-level 'apis' object configures API endpoints for the -l lookup function.
+# Each key is a service name (e.g. 'ols', 'bioportal', 'agrovoc') with a 'type' sub-object
+# containing protocol-keyed configs (e.g. 'rest', 'sparql'), each with 'uri' and optional 'apikey',
+# plus an 'ontologies' list.  The -l lookup routes each CURIE prefix to the first api whose
+# 'ontologies' list contains it; falls back to OLS4.
+# Example apis block:
+#   apis:
+#     ols:
+#       type:
+#         rest:
+#           uri: http://www.ebi.ac.uk/ols4/api/ontologies/{ontology}/terms/{double_encoded}/graph
+#       ontologies: [ENVO, GO, UBERON]
+#     bioportal:
+#       type:
+#         rest:
+#           uri: https://data.bioontology.org
+#           apikey: YOUR_BIOPORTAL_KEY
+#       ontologies: [MESH, NCIT, SNOMEDCT]
+#     agrovoc:
+#       type:
+#         sparql:
+#           uri: https://agrovoc.fao.org/sparql/
+#       ontologies: [agrovoc]
+
+output: schema.yaml
+locales:
+  - en
+  - fr
+sources:
+  CODEX_2025:
+    title: GENERAL STANDARD FOR FOOD ADDITIVES - FOOD CATEGORIES
+    name: CODEX_2025
+    version: 192-1995 (Rev. 2025)
+    content_type: CODEX
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.fao.org/gsfaonline/docs/CXS_192e.pdf
+    download_date: '2026-07-22'
+    description: 'The Codex General Standard for Food Additives (CXS 192-1995, formerly
+      CODEX STAN 192-1995) is the internationally agreed standard that establishes
+      conditions under which food additives may be safely used in foods and specifies
+      maximum use levels across a hierarchical food category system. Maintained by
+      the Codex Alimentarius Commission (FAO/WHO) and revised periodically by the
+      Codex Committee on Food Additives (CCFA), the standard is organised into three
+      parts: Part I defines the food category system - a hierarchical classification
+      of food and food ingredients that determines the scope of additive permissions;
+      Part II provides prose descriptors for each food category; and Part III lists
+      permitted food additives (colours, sweeteners, and others) with their authorised
+      maximum use levels by food category, including carry-over provisions and additive-specific
+      tables.'
+  CSSCv3_SoilOrder:
+    title: CSSC Soil Classification
+    name: CSSCv3_SoilOrder
+    version: '3'
+    content_type: CSSC
+    file_format: zip
+    reachable_from:
+      source_ontology: https://sis.agr.gc.ca/cansis/taxa/cssc3/index.html
+    download_date: '2026-10-23'
+    description: The hierarchical taxonomy of the Canadian System of Soil Classification
+      (CSSC, Third Edition), covering all three categorical levels in a single enumeration.
+      Soil Order codes identify the 10 highest-level taxa (e.g., BR for Brunisolic);
+      Great Group codes append the group abbreviation after a period (e.g., BR.MB
+      for Melanic Brunisol); Subgroup codes place the subgroup prefix before the period
+      (e.g., O.MB for Orthic Melanic Brunisol, is_a BR.MB). The is_a hierarchy enables
+      reachable_from filtering to retrieve any branch of the taxonomy from a single
+      source node.
+    see_also: https://sis.agr.gc.ca/cansis/taxa/cssc3/index.html
+  E_NUMBER:
+    title: E Numbers (Wikidata P628)
+    name: E_NUMBER
+    version: null
+    content_type: E_NUMBER
+    file_format: json
+    reachable_from:
+      source_ontology: https://www.wikidata.org/wiki/Q171318
+    download_date: '2026-10-23'
+    description: Food additive E numbers as recorded in Wikidata via property P628.
+      Covers EU/UK approved additives and related international INS codes.
+    prefix_dict:
+      wd: http://www.wikidata.org/entity/
+  GeoNames_CA_ADM1:
+    title: GeoNames ADM1 for CA
+    name: GeoNames_CA_ADM1
+    version: '2026-10-23'
+    content_type: GeoNamesADM1
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/admin1CodesASCII.txt
+    download_date: '2026-10-23'
+    country: CA
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+  GeoNames_CA_ADM2:
+    title: GeoNames ADM2 for CA
+    name: GeoNames_CA_ADM2
+    version: '2026-10-23'
+    content_type: GeoNamesADM2
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/admin2Codes.txt
+    download_date: '2026-10-23'
+    country: CA
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+  GeoNames_CA_ADM3ADM4:
+    title: GeoNames ADM3/ADM4 for CA
+    name: GeoNames_CA_ADM3ADM4
+    version: '2026-10-24'
+    content_type: GeoNamesADM34
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/CA.zip
+    download_date: '2026-10-23'
+    description: ADM3/ADM4 administrative divisions for CA from GeoNames CA.zip.
+    country: CA
+    levels:
+      - ADM3
+      - ADM4
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+  GeoNames_countries:
+    title: GeoNames Countries, Continents, and Oceans
+    name: GeoNames_countries
+    version: '2026-10-23'
+    content_type: GeoNamesCountries
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/countryInfo.txt
+    download_date: '2026-10-23'
+    description: Sovereign states, territories, continents, and major oceans from
+      GeoNames with Wikidata P1566 cross-references.
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+    license: CC-BY 4.0
+  GeoNames_NL_ADM1:
+    title: GeoNames ADM1 for NL
+    name: GeoNames_NL_ADM1
+    version: '2026-10-23'
+    content_type: GeoNamesADM1
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/admin1CodesASCII.txt
+    download_date: '2026-10-23'
+    country: NL
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+  GeoNames_NL_ADM2:
+    title: GeoNames ADM2 for NL
+    name: GeoNames_NL_ADM2
+    version: '2026-10-23'
+    content_type: GeoNamesADM2
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/admin2Codes.txt
+    download_date: '2026-10-23'
+    country: NL
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+  GeoNames_NL_ADM3:
+    title: GeoNames ADM3 for NL
+    name: GeoNames_NL_ADM3
+    version: '2026-10-23'
+    content_type: GeoNamesADM34
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/NL.zip
+    download_date: '2026-10-23'
+    description: ADM3 administrative divisions for NL from GeoNames NL.zip.
+    country: NL
+    levels:
+      - ADM3
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+  GeoNames_NL_PPL:
+    title: GeoNames Settlements for NL
+    name: GeoNames_NL_PPL
+    version: '2026-10-23'
+    content_type: GeoNamesSettlement
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/NL.zip
+    download_date: '2026-10-23'
+    description: 'Populated places for NL from GeoNames NL.zip. Historical entries
+      marked status: deprecated.'
+    country: NL
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+  GeoNames_US_ADM1:
+    title: GeoNames ADM1 for US
+    name: GeoNames_US_ADM1
+    version: '2026-10-24'
+    content_type: GeoNamesADM1
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/admin1CodesASCII.txt
+    download_date: '2026-10-23'
+    country: US
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+  GeoNames_US_ADM2:
+    title: GeoNames ADM2 for US
+    name: GeoNames_US_ADM2
+    version: '2026-10-24'
+    content_type: GeoNamesADM2
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/admin2Codes.txt
+    download_date: '2026-10-23'
+    country: US
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+  GeoNames_US_ADM3ADM4:
+    title: GeoNames ADM3/ADM4 for US
+    name: GeoNames_US_ADM3ADM4
+    version: '2026-10-24'
+    content_type: GeoNamesADM34
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/US.zip
+    download_date: '2026-10-23'
+    description: ADM3/ADM4 administrative divisions for US from GeoNames US.zip.
+    country: US
+    levels:
+      - ADM3
+      - ADM4
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+  GeoWiki_CA_ADM1:
+    title: Wikidata ADM1 for CA
+    name: GeoWiki_CA_ADM1
+    version: null
+    content_type: GeoWikiADM1
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/wiki/QQ16
+    download_date: '2026-10-23'
+    description: First-order administrative divisions of CA from Wikidata.
+    country: CA
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+  GeoWiki_countries:
+    title: Wikidata Countries, Continents, and Oceans
+    name: GeoWiki_countries
+    version: null
+    content_type: GeoWikiCountries
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/wiki/Wikidata:Main_Page
+    download_date: '2026-10-23'
+    description: Current sovereign states (P297), continents (P31=Q5107), and oceans
+      (P31=Q9430) from Wikidata with GeoNames P1566 cross-references.
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+    license: CC0 1.0
+  GeoWiki_LU_ADM1:
+    title: Wikidata ADM1 for LU
+    name: GeoWiki_LU_ADM1
+    version: null
+    content_type: GeoWikiADM1
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/wiki/QQ32
+    download_date: '2026-10-23'
+    description: First-order administrative divisions of LU from Wikidata.
+    country: LU
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+  GeoWiki_LU_PPL:
+    title: Wikidata Settlements for LU
+    name: GeoWiki_LU_PPL
+    version: null
+    content_type: GeoWikiSettlement
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/
+    download_date: '2026-10-23'
+    description: 'Populated places for LU from Wikidata. Dissolved entries marked
+      status: deprecated.'
+    country: LU
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+  GeoWiki_US_ADM1:
+    title: Wikidata ADM1 for US
+    name: GeoWiki_US_ADM1
+    version: null
+    content_type: GeoWikiADM1
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/wiki/QQ30
+    download_date: '2026-10-23'
+    description: First-order administrative divisions of US from Wikidata.
+    country: US
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+  GeoWiki_US_ADM2:
+    title: Wikidata ADM2 for US
+    name: GeoWiki_US_ADM2
+    version: null
+    content_type: GeoWikiADM2
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/wiki/QQ30
+    download_date: '2026-10-23'
+    description: Second-order administrative divisions of US from Wikidata.
+    country: US
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
