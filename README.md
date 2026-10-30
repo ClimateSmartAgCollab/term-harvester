@@ -613,11 +613,13 @@ Two parallel source modules produce geopolitical controlled vocabularies from
 
 | Module | Content types | PV code |
 |---|---|---|
-| `source_geonames.py` | `GeoNamesCountries`, `GeoNamesADM1`, `GeoNamesADM2`, `GeoNamesADM34`, `GeoNamesSettlement` | GeoNames numeric ID |
-| `source_geowiki.py` | `GeoWikiCountries`, `GeoWikiADM1`, `GeoWikiADM2`, `GeoWikiSettlement` | Wikidata QID |
+| `source_geonames.py` | `GeoNamesCountries`, `GeoNamesADM1`, `GeoNamesADM2`, `GeoNamesADM34`, `GeoNamesSettlement` | GeoNames numeric ID (`gnf:` URI) |
+| `source_geowiki.py` | `GeoWikiCountries`, `GeoWikiADM1`, `GeoWikiADM2`, `GeoWikiSettlement` | Wikidata QID (`wd:` URI) |
 
-Both modules cross-link via Wikidata P1566 (GeoNames ID), so GeoNames entries
-carry `exact_mappings: [wd:Q…]` and GeoWiki entries carry `exact_mappings: [gnf:…]`.
+Both modules cross-link via Wikidata P1566 (GeoNames ID).  Cross-references and
+feature-type annotations are stored in companion SSSOM files (`sources/GeoNames.sssom.tsv`
+and `sources/GeoWiki.sssom.tsv`) rather than inside the YAML permissible values,
+keeping the schema lean while preserving full interoperability metadata.
 
 **Available shorthands:**
 
@@ -644,13 +646,30 @@ python term_harvester.py -a GeoNames_CA_PPL
 
 Replace `CA` with any ISO 3166-1 alpha-2 code.
 
+**Administrative hierarchy and the `inherits` function:**
+Each administrative level is stored as a separate source (e.g. `GeoNames_CA_ADM1`,
+`GeoNames_CA_ADM2`).  Lower-level lists reference parent codes via `is_a` links,
+yielding a smooth hierarchy within each enum.  When a data template needs a
+combined multi-level picklist — for example, provinces + counties together — use
+the `inherits` key in `harvester_config.yaml` to pull parent-level terms into the
+child enum automatically:
+
+```yaml
+Canada_ADM1_ADM2:
+  inherits: [GeoNamesADM1_CA, GeoNamesADM2_CA]
+```
+
+This pattern works at any depth: a municipality list can inherit its county list,
+which in turn inherits the province list, so users see a full, navigable hierarchy
+in a single picklist.
+
 **GeoWikiCountry vs GeoWikiCountryExtended:**
 `GeoWiki_countries` produces two country enums.  `GeoWikiCountry` contains only
 sovereign states (P31 = Q3624078 or Q15634554).  `GeoWikiCountryExtended`
 contains dependent territories and overseas regions that have their own ISO
 alpha-2 code (e.g. HK, BL, GF) but are not sovereign; each territory carries
 `is_a` pointing to its parent sovereign state QID.  To produce a combined
-country + territory list use `inherits` in `harvester_config.yaml`:
+country + territory list:
 
 ```yaml
 AllCountries:
@@ -662,14 +681,58 @@ GeoNames does not publish a dedicated ocean flat file.  Ocean entries exist in
 the GeoNames full `allCountries.zip` dump (feature class H, code `OCN`), but
 that file is ~400 MB uncompressed and is not fetched by `source_geonames.py`.
 `GeoWiki_countries` already includes a `GeoWikiOcean` enum (five major oceans
-queried from Wikidata via P31 = Q9430) with GeoNames numeric IDs in
-`exact_mappings` via P1566 — this is the preferred source for ocean names with
-GeoNames cross-references:
+queried from Wikidata via P31 = Q9430):
 
 ```bash
 python term_harvester.py -a GeoWiki_countries
 # Produces GeoWikiCountry, GeoWikiCountryExtended, GeoWikiContinent, GeoWikiOcean
 ```
+
+**Historical settlements:**
+`GeoWikiSettlement` and `GeoNamesSettlement` distinguish two settlement states:
+
+| Status | Trigger | Meaning |
+|---|---|---|
+| *(none)* | Active settlement type, no dissolution date | Current populated place |
+| `historical` | Archaic Wikidata P31 type (ghost town, former settlement, destroyed city, abandoned village, deserted medieval village, former town, archaeological site) **or** Wikidata P576 (dissolved/abolished date) set **or** GeoNames historical feature code (PPLH, PPLCH, PPLW) | Place that no longer exists as an active settlement |
+
+`deprecated` is intentionally not used here because it means "this vocabulary term
+is being withdrawn", not "this real-world place is no longer active".  Both archaic
+types and formally dissolved places are historical facts — the vocabulary term is
+still valid and accurate.
+
+The default config entry created by `-a GeoWiki_{CC}_PPL` and `-a GeoNames_{CC}_PPL`
+includes `minus: {status: [historical]}`, so historical settlements are excluded from
+picklists by default.  To include them, remove that line:
+
+```yaml
+GeoWiki_CA_PPL:
+  content_type: GeoWikiSettlement
+  # minus removed — historical settlements included
+```
+
+**SSSOM mappings written by each module:**
+
+`sources/GeoNames.sssom.tsv` accumulates rows from every GeoNames source processed:
+
+| Predicate | Subject | Object | When emitted |
+|---|---|---|---|
+| `skos:exactMatch` | `gnf:{gnid}` | `wd:{qid}` | GeoNames entity has a Wikidata P1566 crosswalk |
+| `skos:broadMatch` | `gnf:{gnid}` | `gno:A.ADM1` / `gno:A.ADM2` / `gno:A.{feat_code}` / `gno:P.{feat_code}` | Every entry — records the GeoNames feature-type class (cross-scheme) |
+
+`sources/GeoWiki.sssom.tsv` accumulates rows from every GeoWiki source processed:
+
+| Predicate | Subject | Object | When emitted |
+|---|---|---|---|
+| `skos:exactMatch` | `wd:{qid}` | `gnf:{gnid}` | GeoWiki entity has a GeoNames P1566 crosswalk |
+| `skos:exactMatch` | `wd:{qid}` | `iso:{alpha2}` | Country or ADM1 has an ISO 3166 code |
+| `skos:broadMatch` | `wd:{qid}` | `gno:A.PCLI` / `gno:A.ADM1` / `gno:A.ADM2` / `gno:A.CONT` / `gno:H.OCN` | Every entry — records the GeoNames feature-type class (cross-vocabulary) |
+| `skos:broadMatch` | `gnf:{gnid}` | same `gno:` codes | When a GeoNames crosswalk ID is also available (cross-scheme within GeoNames) |
+| `skos:broader` | `wd:{qid}` | `wd:Q532` (village) / `wd:Q5084` (hamlet) / `wd:Q129676371` (rural settlement) | Settlement entries whose Wikidata type is one of these three (within Wikidata) |
+
+Both SSSOM files use a YAML metadata header declaring the `curie_map`, `mapping_set_id`,
+and `license`, and are deduplicated on `(subject_id, predicate_id, object_id)` across
+incremental runs.
 
 ---
 
@@ -1844,11 +1907,22 @@ matching a permissible value's `meaning` field to LinkML mapping attributes:
 
 | SSSOM predicate | LinkML attribute |
 |---|---|
+| `skos:exactMatch` | `exact_mappings` |
 | `skos:closeMatch` | `close_mappings` |
 | `skos:broadMatch` | `broad_mappings` |
+| `skos:broader` | `broad_mappings` |
 | `skos:narrowMatch` | `narrow_mappings` |
-| `skos:exactMatch` | `exact_mappings` |
 | `skos:relatedMatch` | `related_mappings` |
+
+`GeoNames.sssom.tsv` and `GeoWiki.sssom.tsv` are generated automatically during
+`-c` processing and accumulate rows incrementally across all GeoNames/GeoWiki sources
+in the project.  They record `skos:exactMatch` cross-references between GeoNames IDs
+and Wikidata QIDs, and `skos:broadMatch` type annotations linking each geographic entity
+to its GeoNames feature-type concept (e.g. `gno:A.ADM1`, `gno:P.PPL`) — `skos:broadMatch`
+is used (rather than `skos:broader`) because the subject and object belong to different
+concept schemes (GeoNames entity URIs vs GeoNames ontology, or Wikidata vs GeoNames).
+The one exception is the `wd: → wd:Q532/Q5084/Q129676371` settlement-type rows, which
+use `skos:broader` because both subject and object are within Wikidata.
 
 See https://github.com/mapping-commons/sssom/ and
 https://www.w3.org/TR/skos-reference/#mapping for the SSSOM and SKOS mapping
@@ -1927,8 +2001,8 @@ echo $ANTHROPIC_API_KEY
 | `source_statscan.py` | Statistics Canada classification page scraping | |
 | `source_statscan_table.py` | `content_type: STATSCANTable` — Statistics Canada Census Dictionary table pages; auto-fetches French translations from the corresponding `index-fra.cfm` page | |
 | `source_iso_country.py` | `content_type: ISO_COUNTRY` — ISO 3166-2 country subdivision codes via Wikidata SPARQL (P297 for country name/QID; P300 for subdivision codes and labels; P31 for subdivision types used to generate group headers and a type-count description sentence); each PV carries its Wikidata QID as `meaning`; ISO OBP is a Vaadin SPA, not directly fetchable; accepts shorthand `ISO_COUNTRY_XX` or `ISO_COUNTRY` for all countries | [ISO OBP](https://www.iso.org/obp/ui/) |
-| `source_geonames.py` | `content_type: GeoNamesCountries / GeoNamesADM1 / GeoNamesADM2 / GeoNamesADM34 / GeoNamesSettlement` — GeoNames flat-file geopolitical vocabulary (countries, provinces, counties, municipalities, populated places); PV code = GeoNames numeric ID; Wikidata P1566 reverse-lookup for QID cross-references; shorthands `GeoNames_countries`, `GeoNames_{CC}_ADM1/ADM2/ADM3/PPL`; oceans not included (use `GeoWikiOcean`) | [GeoNames downloads](https://download.geonames.org/export/dump/) |
-| `source_geowiki.py` | `content_type: GeoWikiCountries / GeoWikiADM1 / GeoWikiADM2 / GeoWikiSettlement` — Wikidata geopolitical vocabulary; PV code = QID; GeoNames P1566 cross-references in `exact_mappings`; `GeoWiki_countries` produces `GeoWikiCountry` (sovereign states), `GeoWikiCountryExtended` (territories with `is_a` parent), `GeoWikiContinent`, and `GeoWikiOcean` (five major oceans with GeoNames IDs — preferred ocean source); shorthands `GeoWiki_countries`, `GeoWiki_{CC}_ADM1/ADM2/PPL` | [Wikidata](https://www.wikidata.org/) |
+| `source_geonames.py` | `content_type: GeoNamesCountries / GeoNamesADM1 / GeoNamesADM2 / GeoNamesADM34 / GeoNamesSettlement` — GeoNames flat-file geopolitical vocabulary (countries, provinces, counties, municipalities, populated places); PV code = GeoNames numeric ID (`gnf:` URI); Wikidata P1566 crosswalk and GeoNames feature-type annotations written to `sources/GeoNames.sssom.tsv`; historical settlements (PPLH, PPLCH, PPLW feature codes) marked `status: historical`; shorthands `GeoNames_countries`, `GeoNames_{CC}_ADM1/ADM2/ADM3/PPL`; oceans not included (use `GeoWikiOcean`) | [GeoNames downloads](https://download.geonames.org/export/dump/) |
+| `source_geowiki.py` | `content_type: GeoWikiCountries / GeoWikiADM1 / GeoWikiADM2 / GeoWikiSettlement` — Wikidata geopolitical vocabulary; PV code = Wikidata QID (`wd:` URI); GeoNames P1566 crosswalk, ISO code crosswalk, and feature-type annotations written to `sources/GeoWiki.sssom.tsv`; `GeoWiki_countries` produces `GeoWikiCountry` (sovereign states), `GeoWikiCountryExtended` (territories with `is_a` parent), `GeoWikiContinent`, and `GeoWikiOcean` (preferred ocean source); all non-current settlements (archaic P31 types and P576-dissolved) marked `status: historical` — excluded by default via `minus: {status: [historical]}`; shorthands `GeoWiki_countries`, `GeoWiki_{CC}_ADM1/ADM2/PPL` | [Wikidata](https://www.wikidata.org/) |
 | `source_napcscanada.py` | NAPCS Canada CSV parsing | [CSV file](https://www.statcan.gc.ca/en/media/5274) |
 | `source_agrifoodca.py` | AgriFoodCA picklist CSV parsing and GitHub directory import | [CSV files](https://github.com/agrifooddatacanada/picklists_for_schemas/tree/main/picklists) |
 | `source_zenodo.py` | Shared Zenodo REST API utilities: `is_zenodo_record_url`, `to_zenodo_api_url`, `fetch_zenodo_file` — used by `source_credit.py` | |

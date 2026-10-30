@@ -184,6 +184,7 @@ import argparse
 import concurrent.futures
 import csv
 import datetime
+import fnmatch
 import html
 import json
 import os
@@ -1814,7 +1815,19 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
 
     locales = config.get("locales") or ["en"]
     all_sources = config.get("sources", {})
-    keys_to_process = list(all_sources.keys()) if not source_keys else source_keys
+    if not source_keys:
+        keys_to_process = list(all_sources.keys())
+    else:
+        all_keys = list(all_sources.keys())
+        keys_to_process = []
+        for token in source_keys:
+            if any(c in token for c in ("*", "?", "[")):
+                matched = [k for k in all_keys if fnmatch.fnmatch(k, token)]
+                if not matched:
+                    print(f"  Warning: pattern '{token}' matched no source keys.", file=sys.stderr)
+                keys_to_process.extend(matched)
+            else:
+                keys_to_process.append(token)
 
     invalid = [k for k in keys_to_process if k not in all_sources]
     if invalid:
@@ -3935,7 +3948,16 @@ def main():
         if "all" in args.fetch:
             keys_to_download = list(all_sources.keys())
         elif args.fetch:
-            keys_to_download = args.fetch
+            keys_to_download = []
+            all_keys = list(all_sources.keys())
+            for token in args.fetch:
+                if any(c in token for c in ("*", "?", "[")):
+                    matched = [k for k in all_keys if fnmatch.fnmatch(k, token)]
+                    if not matched:
+                        print(f"  Warning: pattern '{token}' matched no source keys.", file=sys.stderr)
+                    keys_to_download.extend(matched)
+                else:
+                    keys_to_download.append(token)
         elif args.config:
             keys_to_download = args.config
         else:

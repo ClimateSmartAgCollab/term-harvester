@@ -213,8 +213,46 @@ def _pdf_to_pages(pdf_path):
     return [(i, page.extract_text() or "") for i, page in enumerate(reader.pages, 1)]
 
 
+_CURL_BROWSER_HEADERS = [
+    "-H", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "-H", "Accept: application/pdf,*/*;q=0.9",
+    "-H", "Accept-Language: en-US,en;q=0.9",
+    "-H", "Referer: https://www.fao.org/",
+]
+
+# Fallback URL list: primary is the no-year URL that tracks the current edition;
+# the dated URL is tried next in case the primary is blocked.
+_CODEX_URLS = [CODEX_GSFA_URL, CODEX_GSFA_URL_ALT]
+
+
+def _try_curl_pdf(url, out_path):
+    """Run curl with browser headers; return True if downloaded file is a PDF."""
+    result = subprocess.run(
+        [
+            "curl", "-L",
+            "--connect-timeout", "30",
+            "--max-time", "300",
+            "--silent", "--show-error",
+            *_CURL_BROWSER_HEADERS,
+            "-o", out_path,
+            url,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print(f"  curl error ({url}): {result.stderr.strip()}", file=sys.stderr)
+        return False
+    with open(out_path, "rb") as fh:
+        return fh.read(5) == b"%PDF-"
+
+
 def _download_and_zip(url, zip_path):
     """Download PDF from *url*, extract all page text, write into *zip_path*.
+
+    Tries *url* first with browser-like headers.  If the server returns a
+    non-PDF response (e.g. a Cloudflare challenge page), automatically retries
+    with the other known FAO Codex URL before giving up.
 
     The zip contains a single file 'extracted_text.txt'.  Each PDF page is
     preceded by an '===PAGE N===' marker line.
@@ -222,35 +260,43 @@ def _download_and_zip(url, zip_path):
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp_path = tmp.name
 
-    print(f"  Downloading {url} ...")
-    result = subprocess.run(
-        [
-            "curl", "-L",
-            "--connect-timeout", "30",
-            "--max-time", "300",
-            "--silent", "--show-error",
-            "-o", tmp_path,
-            url,
-        ],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        print(f"  curl error: {result.stderr.strip()}", file=sys.stderr)
-        os.unlink(tmp_path)
-        sys.exit(1)
+    # Build the ordered list: requested URL first, then whichever alternate is different
+    urls_to_try = [url] + [u for u in _CODEX_URLS if u != url]
 
-    with open(tmp_path, "rb") as fh:
-        magic = fh.read(5)
-    if magic != b"%PDF-":
-        preview = open(tmp_path, "rb").read(200)
+    downloaded_url = None
+    for attempt_url in urls_to_try:
+        print(f"  Downloading {attempt_url} ...")
+        if _try_curl_pdf(attempt_url, tmp_path):
+            downloaded_url = attempt_url
+            break
+        # Check whether server returned HTML (bot-detection redirect)
+        try:
+            with open(tmp_path, "rb") as fh:
+                preview = fh.read(100)
+            if b"<!DOCTYPE" in preview or b"<html" in preview.lower():
+                print(
+                    "  Server returned an HTML page — likely bot-detection.",
+                    file=sys.stderr,
+                )
+                if attempt_url != urls_to_try[-1]:
+                    print("  Retrying with alternate URL ...", file=sys.stderr)
+        except Exception:
+            pass
+
+    if downloaded_url is None:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
         print(
-            f"  Error: downloaded content is not a PDF.\n"
-            f"  First bytes: {preview.decode('utf-8', errors='replace')[:120]!r}\n"
-            f"  Check the URL is still valid: {url}",
+            "  Error: could not download a valid PDF from any known FAO Codex URL.\n"
+            "  The FAO website may be blocking automated downloads (Cloudflare).\n"
+            "  Manual workaround:\n"
+            f"    1. Open {CODEX_GSFA_URL} in your browser and download the PDF.\n"
+            f"    2. Copy it to:  sources/CXS_192e.pdf\n"
+            f"    3. Run:  python term_harvester.py -a sources/CXS_192e.pdf",
             file=sys.stderr,
         )
-        os.unlink(tmp_path)
         sys.exit(1)
 
     pages = _pdf_to_pages(tmp_path)

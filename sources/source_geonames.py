@@ -21,8 +21,9 @@ GeoNamesADM34
 GeoNamesSettlement
     Populated places (feature class P) from per-country {CC}.zip.  Includes both
     current settlements and historical/abandoned ones (PPLH, PPLCH, PPLQ, PPLW).
-    Historical entries are emitted with status: deprecated so they can be excluded
-    at build time with minus: {status: [deprecated]} in harvester_config.yaml.
+    Historical entries (feature codes ending in H) are emitted with status: historical
+    so they can be excluded at build time with minus: {status: [historical]} in
+    harvester_config.yaml.
 
 Shorthand -a patterns
 ---------------------
@@ -88,6 +89,7 @@ from source_utils import (
     normalize_text,
     update_source_config,
     write_config,
+    write_sssom_mappings,
 )
 
 # ---------------------------------------------------------------------------
@@ -133,6 +135,20 @@ _SOURCE_PREFIXES = {
     "gnf": _GN_URI_BASE,
     "gno": _GN_ONTOLOGY_BASE,
     "iso": _ISO_URI_BASE,
+}
+
+# SSSOM output file for GeoNames → Wikidata / ISO exact-match cross-references
+_GEONAMES_SSSOM      = os.path.join("sources", "GeoNames.sssom.tsv")
+_GEONAMES_SSSOM_ID   = "https://w3id.org/geonames/mappings"
+_GEONAMES_SSSOM_DESC = ("Exact-match cross-references between GeoNames entities "
+                        "(gnf: URIs) and Wikidata QIDs (wd:) / ISO 3166 codes (iso:).")
+_SSSOM_PREFIXES      = {
+    "gnf":   _GN_URI_BASE,
+    "gno":   _GN_ONTOLOGY_BASE,
+    "iso":   _ISO_URI_BASE,
+    "semapv": "https://w3id.org/semapv/vocab/",
+    "skos":  "http://www.w3.org/2004/02/skos/core#",
+    "wd":    _WD_ENTITY_BASE,
 }
 
 # GeoNames continent geonameIds (stable; feature code CONT)
@@ -610,7 +626,7 @@ def _fetch_geonames_ppl(cc):
 
     Collects both current (_GN_PPL_CODES) and historical (_GN_PPL_HIST_CODES) entries.
     Historical entries are flagged with is_historical=True so callers can mark them
-    status: deprecated in the output YAML.
+    status: historical in the output YAML.
     """
     cc             = cc.upper()
     all_ppl_codes  = _GN_PPL_CODES | _GN_PPL_HIST_CODES
@@ -767,11 +783,11 @@ def _build_countries_yaml(key, source, data, locales=None):
         cont_label = _lbl(cont_gnid, cont_entry["name"] if cont_entry else cont_gnid)
         cont_pv = {"title": normalize_text(cont_label), "meaning": f"gnf:{cont_gnid}"}
         cont_wd = wd_data.get(cont_gnid, {})
-        if cont_wd.get("qid"):
-            cont_pv["exact_mappings"] = [f"wd:{cont_wd['qid']}"]
         if cont_entry:
             cont_pv["aliases"] = [cont_entry["code"]]
         country_pvs[cont_gnid] = cont_pv
+
+    sssom_rows: list = []
 
     # 2. Sovereign states globally sorted A-Z
     for country in sorted(sovereign_countries, key=lambda c: _title_sort_key(_lbl(c["gnid"], c["name"]))):
@@ -781,23 +797,24 @@ def _build_countries_yaml(key, source, data, locales=None):
         cont_gnid = _CONTINENT_CODE_TO_GNID.get(country.get("continent_code", ""), "")
         wd        = wd_data.get(gnid, {})
         qid       = wd.get("qid", "")
-        label     = _lbl(gnid, name)
+        label     = normalize_text(_lbl(gnid, name))
         desc      = normalize_text(wd.get("desc", "")) or None
-
-        exact_maps = []
-        if qid:
-            exact_maps.append(f"wd:{qid}")
-        exact_maps.append(f"iso:{iso2}")
 
         entry = add_permissible_value(
             country_pvs, gnid,
-            title=normalize_text(label),
+            title=label,
             meaning=f"gnf:{gnid}",
-            exact_mappings=exact_maps,
             description=desc,
             is_a=cont_gnid or None,
         )
         entry["aliases"] = [iso2]
+        if qid:
+            sssom_rows.append({"subject_id": f"gnf:{gnid}", "predicate_id": "skos:exactMatch",
+                               "object_id": f"wd:{qid}", "mapping_justification": "semapv:ManualMappingCuration",
+                               "subject_label": label, "object_label": label})
+        sssom_rows.append({"subject_id": f"gnf:{gnid}", "predicate_id": "skos:exactMatch",
+                           "object_id": f"iso:{iso2}", "mapping_justification": "semapv:ManualMappingCuration",
+                           "subject_label": label, "object_label": iso2})
 
     # --- GeoNamesCountryExtended enum: territories only, inherits GeoNamesCountry ---
     extended_pvs = {}
@@ -808,7 +825,7 @@ def _build_countries_yaml(key, source, data, locales=None):
         cont_gnid = _CONTINENT_CODE_TO_GNID.get(country.get("continent_code", ""), "")
         wd        = wd_data.get(gnid, {})
         qid       = wd.get("qid", "")
-        label     = _lbl(gnid, name)
+        label     = normalize_text(_lbl(gnid, name))
         desc      = normalize_text(wd.get("desc", "")) or None
 
         # Parent sovereign state gnid (for is_a link into inherited GeoNamesCountry).
@@ -817,20 +834,21 @@ def _build_countries_yaml(key, source, data, locales=None):
         parent_gnid = (qid_to_gnid.get(parent_qid, "")
                        if parent_qid and parent_qid != qid else "")
 
-        exact_maps = []
-        if qid:
-            exact_maps.append(f"wd:{qid}")
-        exact_maps.append(f"iso:{iso2}")
-
         entry = add_permissible_value(
             extended_pvs, gnid,
-            title=normalize_text(label),
+            title=label,
             meaning=f"gnf:{gnid}",
-            exact_mappings=exact_maps,
             description=desc,
             is_a=parent_gnid or cont_gnid or None,
         )
         entry["aliases"] = [iso2]
+        if qid:
+            sssom_rows.append({"subject_id": f"gnf:{gnid}", "predicate_id": "skos:exactMatch",
+                               "object_id": f"wd:{qid}", "mapping_justification": "semapv:ManualMappingCuration",
+                               "subject_label": label, "object_label": label})
+        sssom_rows.append({"subject_id": f"gnf:{gnid}", "predicate_id": "skos:exactMatch",
+                           "object_id": f"iso:{iso2}", "mapping_justification": "semapv:ManualMappingCuration",
+                           "subject_label": label, "object_label": iso2})
 
     # --- GeoNamesContinent enum (standalone, sorted alphabetically) ---
     continents_sorted = sorted(_CONTINENTS, key=lambda c: _title_sort_key(_lbl(c["gnid"], c["name"])))
@@ -839,15 +857,29 @@ def _build_countries_yaml(key, source, data, locales=None):
         gnid  = cont["gnid"]
         wd    = wd_data.get(gnid, {})
         qid   = wd.get("qid", "")
-        label = _lbl(gnid, cont["name"])
+        label = normalize_text(_lbl(gnid, cont["name"]))
 
         entry = add_permissible_value(
             continent_pvs, gnid,
-            title=normalize_text(label),
+            title=label,
             meaning=f"gnf:{gnid}",
-            exact_mappings=[f"wd:{qid}"] if qid else None,
         )
         entry["aliases"] = [cont["code"]]
+        if qid:
+            sssom_rows.append({"subject_id": f"gnf:{gnid}", "predicate_id": "skos:exactMatch",
+                               "object_id": f"wd:{qid}", "mapping_justification": "semapv:ManualMappingCuration",
+                               "subject_label": label, "object_label": label})
+
+    # Also collect continent cross-refs embedded in country_pvs (built above loop)
+    for cont_gnid2 in continents_in_use:
+        cont_wd2 = wd_data.get(cont_gnid2, {})
+        cont_qid2 = cont_wd2.get("qid", "")
+        if cont_qid2:
+            cont_lbl = normalize_text(next(
+                (c["name"] for c in _CONTINENTS if c["gnid"] == cont_gnid2), cont_gnid2))
+            sssom_rows.append({"subject_id": f"gnf:{cont_gnid2}", "predicate_id": "skos:exactMatch",
+                               "object_id": f"wd:{cont_qid2}", "mapping_justification": "semapv:ManualMappingCuration",
+                               "subject_label": cont_lbl, "object_label": cont_lbl})
 
     # Crosswalk + sovereignty stats
     n_sov     = len(sovereign_countries)
@@ -954,6 +986,11 @@ def _build_countries_yaml(key, source, data, locales=None):
         log_extraction("GeoNamesCountryExtended", count=len(extended_pvs))
     log_extraction("GeoNamesContinent", count=len(continent_pvs))
 
+    if sssom_rows:
+        write_sssom_mappings(_GEONAMES_SSSOM, sssom_rows, _SSSOM_PREFIXES,
+                             _GEONAMES_SSSOM_ID, _GEONAMES_SSSOM_DESC)
+        print(f"  SSSOM: {len(sssom_rows)} mappings written to {_GEONAMES_SSSOM}")
+
 
 def _build_adm1_section(entries, wd_data, country_name, locales=None):
     """Build type-grouped ADM1 permissible_values for a single country.
@@ -964,13 +1001,15 @@ def _build_adm1_section(entries, wd_data, country_name, locales=None):
     alphabetically immediately after their header.  Single-type countries get a
     flat sorted list.
 
-    Returns (pvs, enum_title).
+    Returns (pvs, enum_title, sssom_rows).
       pvs:        ordered dict — type headers (no 'meaning') and province entries
                   (PV code = geonameId, has 'meaning' and 'aliases').
       enum_title: country-specific title e.g. "Province or Territory of Canada"
+      sssom_rows: list of exactMatch dicts for the caller to write to SSSOM file.
     """
     locales      = locales or ["en"]
     primary_lang = "en" if "en" in locales else locales[0]
+    sssom_rows: list = []
 
     def _lbl(entry):
         wd = wd_data.get(entry["gnid"], {})
@@ -979,19 +1018,30 @@ def _build_adm1_section(entries, wd_data, country_name, locales=None):
                 or entry.get("name", ""))
 
     def _add_entry(pvs, entry, is_a=None):
-        gnid = entry["gnid"]
-        wd   = wd_data.get(gnid, {})
-        qid  = wd.get("qid", "")
-        pv   = add_permissible_value(
+        gnid  = entry["gnid"]
+        wd    = wd_data.get(gnid, {})
+        qid   = wd.get("qid", "")
+        label = normalize_text(_lbl(entry))
+        pv    = add_permissible_value(
             pvs, gnid,
-            title=normalize_text(_lbl(entry)),
+            title=label,
             meaning=f"gnf:{gnid}",
-            exact_mappings=[f"wd:{qid}"] if qid else None,
-            broad_mappings=["gno:A.ADM1"],
             description=normalize_text(wd.get("desc", "")) or None,
             is_a=is_a,
         )
         pv["aliases"] = [entry["compound_code"]]
+        sssom_rows.append({
+            "subject_id":            f"gnf:{gnid}",
+            "predicate_id":          "skos:broadMatch",
+            "object_id":             "gno:A.ADM1",
+            "mapping_justification": "semapv:ManualMappingCuration",
+            "subject_label":         label,
+            "object_label":          "",
+        })
+        if qid:
+            sssom_rows.append({"subject_id": f"gnf:{gnid}", "predicate_id": "skos:exactMatch",
+                               "object_id": f"wd:{qid}", "mapping_justification": "semapv:ManualMappingCuration",
+                               "subject_label": label, "object_label": label})
 
     # Bucket entries by type word from Wikidata description
     type_buckets = defaultdict(list)
@@ -1028,7 +1078,7 @@ def _build_adm1_section(entries, wd_data, country_name, locales=None):
         for entry in sorted(entries, key=lambda e: _title_sort_key(_lbl(e))):
             _add_entry(pvs, entry)
 
-    return pvs, enum_title
+    return pvs, enum_title, sssom_rows
 
 
 def _build_adm1_yaml(key, source, data, locales=None):
@@ -1052,7 +1102,7 @@ def _build_adm1_yaml(key, source, data, locales=None):
     country_name = data.get("country_name", scope if scope != "global" else "")
 
     if scope != "global":
-        pvs, enum_title = _build_adm1_section(entries, wd_data, country_name, locales)
+        pvs, enum_title, sssom_rows = _build_adm1_section(entries, wd_data, country_name, locales)
     else:
         # Global scope: flat, preserving download order
 
@@ -1064,19 +1114,31 @@ def _build_adm1_yaml(key, source, data, locales=None):
 
         enum_title = "Province or State"
         pvs        = {}
+        sssom_rows = []
         for entry in entries:
-            gnid = entry["gnid"]
-            wd   = wd_data.get(gnid, {})
-            qid  = wd.get("qid", "")
-            pv   = add_permissible_value(
+            gnid  = entry["gnid"]
+            wd    = wd_data.get(gnid, {})
+            qid   = wd.get("qid", "")
+            label = normalize_text(_lbl_g(entry))
+            pv    = add_permissible_value(
                 pvs, gnid,
-                title=normalize_text(_lbl_g(entry)),
+                title=label,
                 meaning=f"gnf:{gnid}",
-                exact_mappings=[f"wd:{qid}"] if qid else None,
-                broad_mappings=["gno:A.ADM1"],
                 description=normalize_text(wd.get("desc", "")) or None,
             )
             pv["aliases"] = [entry["compound_code"]]
+            sssom_rows.append({
+                "subject_id":            f"gnf:{gnid}",
+                "predicate_id":          "skos:broadMatch",
+                "object_id":             "gno:A.ADM1",
+                "mapping_justification": "semapv:ManualMappingCuration",
+                "subject_label":         label,
+                "object_label":          "",
+            })
+            if qid:
+                sssom_rows.append({"subject_id": f"gnf:{gnid}", "predicate_id": "skos:exactMatch",
+                                   "object_id": f"wd:{qid}", "mapping_justification": "semapv:ManualMappingCuration",
+                                   "subject_label": label, "object_label": label})
 
     n       = len(entries)
     n_match = sum(1 for e in entries if wd_data.get(e["gnid"], {}).get("qid"))
@@ -1105,6 +1167,11 @@ def _build_adm1_yaml(key, source, data, locales=None):
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
     log_extraction(enum_key, count=len(pvs))
+
+    if sssom_rows:
+        write_sssom_mappings(_GEONAMES_SSSOM, sssom_rows, _SSSOM_PREFIXES,
+                             _GEONAMES_SSSOM_ID, _GEONAMES_SSSOM_DESC)
+        print(f"  SSSOM: {len(sssom_rows)} mappings written to {_GEONAMES_SSSOM}")
 
 
 def _build_adm2_yaml(key, source, data, locales=None):
@@ -1139,7 +1206,7 @@ def _build_adm2_yaml(key, source, data, locales=None):
 
     # Build province/territory hierarchy (Province of Canada → Alberta → …)
     if adm1_entries:
-        adm1_pvs, _adm1_title = _build_adm1_section(
+        adm1_pvs, _adm1_title, _adm1_sssom = _build_adm1_section(
             adm1_entries, adm1_wd_data, adm1_country_name, locales
         )
     else:
@@ -1175,7 +1242,8 @@ def _build_adm2_yaml(key, source, data, locales=None):
     # combined schema — only ADM2 entries go in pvs; province entries come via inherits.
     # When ADM1 data is absent (old cached payload / no separate ADM1 source), embed
     # minimal province headers directly so the enum is still self-contained.
-    has_adm1 = bool(adm1_entries)
+    has_adm1   = bool(adm1_entries)
+    sssom_rows = []
 
     pvs = {}
     for code, pv_data in adm1_pvs.items():
@@ -1191,19 +1259,28 @@ def _build_adm2_yaml(key, source, data, locales=None):
                 name     = entry["name"]
                 wd       = wd_data.get(gnid, {})
                 qid      = wd.get("qid", "")
-                label    = (wd.get("labels", {}).get(primary_lang)
-                            or wd.get("labels", {}).get("en")
-                            or name)
+                label    = normalize_text(wd.get("labels", {}).get(primary_lang)
+                            or wd.get("labels", {}).get("en") or name)
                 pv = add_permissible_value(
                     pvs, gnid,
-                    title=normalize_text(label),
+                    title=label,
                     meaning=f"gnf:{gnid}",
-                    exact_mappings=[f"wd:{qid}"] if qid else None,
-                    broad_mappings=["gno:A.ADM2"],
                     description=normalize_text(wd.get("desc", "")) or None,
                     is_a=province_gnid,
                 )
                 pv["aliases"] = [compound]
+                sssom_rows.append({
+                    "subject_id":            f"gnf:{gnid}",
+                    "predicate_id":          "skos:broadMatch",
+                    "object_id":             "gno:A.ADM2",
+                    "mapping_justification": "semapv:ManualMappingCuration",
+                    "subject_label":         label,
+                    "object_label":          "",
+                })
+                if qid:
+                    sssom_rows.append({"subject_id": f"gnf:{gnid}", "predicate_id": "skos:exactMatch",
+                                       "object_id": f"wd:{qid}", "mapping_justification": "semapv:ManualMappingCuration",
+                                       "subject_label": label, "object_label": label})
 
     # Orphaned ADM2 entries (province gnid not in adm1_pvs): append sorted
     for entry in sorted(adm2_orphans, key=lambda e: _title_sort_key(_lbl_adm2(e))):
@@ -1212,18 +1289,27 @@ def _build_adm2_yaml(key, source, data, locales=None):
         name     = entry["name"]
         wd       = wd_data.get(gnid, {})
         qid      = wd.get("qid", "")
-        label    = (wd.get("labels", {}).get(primary_lang)
-                    or wd.get("labels", {}).get("en")
-                    or name)
+        label    = normalize_text(wd.get("labels", {}).get(primary_lang)
+                    or wd.get("labels", {}).get("en") or name)
         pv = add_permissible_value(
             pvs, gnid,
-            title=normalize_text(label),
+            title=label,
             meaning=f"gnf:{gnid}",
-            exact_mappings=[f"wd:{qid}"] if qid else None,
-            broad_mappings=["gno:A.ADM2"],
             description=normalize_text(wd.get("desc", "")) or None,
         )
         pv["aliases"] = [compound]
+        sssom_rows.append({
+            "subject_id":            f"gnf:{gnid}",
+            "predicate_id":          "skos:broadMatch",
+            "object_id":             "gno:A.ADM2",
+            "mapping_justification": "semapv:ManualMappingCuration",
+            "subject_label":         label,
+            "object_label":          "",
+        })
+        if qid:
+            sssom_rows.append({"subject_id": f"gnf:{gnid}", "predicate_id": "skos:exactMatch",
+                               "object_id": f"wd:{qid}", "mapping_justification": "semapv:ManualMappingCuration",
+                               "subject_label": label, "object_label": label})
 
     n       = len(entries)
     n_match = sum(1 for e in entries if wd_data.get(e["gnid"], {}).get("qid"))
@@ -1249,6 +1335,11 @@ def _build_adm2_yaml(key, source, data, locales=None):
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
     log_extraction(enum_key, count=len(pvs))
+
+    if sssom_rows:
+        write_sssom_mappings(_GEONAMES_SSSOM, sssom_rows, _SSSOM_PREFIXES,
+                             _GEONAMES_SSSOM_ID, _GEONAMES_SSSOM_DESC)
+        print(f"  SSSOM: {len(sssom_rows)} mappings written to {_GEONAMES_SSSOM}")
 
 
 def _build_adm3_yaml(key, source, data, locales=None):
@@ -1298,7 +1389,8 @@ def _build_adm3_yaml(key, source, data, locales=None):
     # When the ADM2 compound→gnid mapping is available, the enum can inherit
     # GeoNamesADM2_{scope} so is_a links resolve to parent ADM2 entries.  Without
     # ADM2 data, synthetic title-only parent headers are embedded directly.
-    has_adm2 = bool(adm2_compound_to_gnid)
+    has_adm2   = bool(adm2_compound_to_gnid)
+    sssom_rows = []
 
     def _build_pvs(entry_list, parent_key_fn):
         """Build pvs for a list of entries.
@@ -1333,22 +1425,32 @@ def _build_adm3_yaml(key, source, data, locales=None):
                 name     = entry["name"]
                 wd       = wd_data.get(gnid, {})
                 qid      = wd.get("qid", "")
-                label    = (wd.get("labels", {}).get(primary_lang)
-                            or wd.get("labels", {}).get("en")
-                            or name)
+                label    = normalize_text(wd.get("labels", {}).get(primary_lang)
+                            or wd.get("labels", {}).get("en") or name)
 
                 feat_code = entry.get("feat_code", "")
                 gno_code  = f"gno:A.{feat_code}" if feat_code else "gno:A.ADM3"
                 pv = add_permissible_value(
                     pvs, gnid,
-                    title=normalize_text(label),
+                    title=label,
                     meaning=f"gnf:{gnid}",
-                    exact_mappings=[f"wd:{qid}"] if qid else None,
-                    broad_mappings=[gno_code],
                     description=normalize_text(wd.get("desc", "")) or None,
                     is_a=resolved_pk,
                 )
                 pv["aliases"] = [compound]
+                if gno_code:
+                    sssom_rows.append({
+                        "subject_id":            f"gnf:{gnid}",
+                        "predicate_id":          "skos:broadMatch",
+                        "object_id":             gno_code,
+                        "mapping_justification": "semapv:ManualMappingCuration",
+                        "subject_label":         label,
+                        "object_label":          "",
+                    })
+                if qid:
+                    sssom_rows.append({"subject_id": f"gnf:{gnid}", "predicate_id": "skos:exactMatch",
+                                       "object_id": f"wd:{qid}", "mapping_justification": "semapv:ManualMappingCuration",
+                                       "subject_label": label, "object_label": label})
         return pvs
 
     enums = {}
@@ -1411,6 +1513,11 @@ def _build_adm3_yaml(key, source, data, locales=None):
     for ek, ev in enums.items():
         log_extraction(ek, count=len(ev["permissible_values"]))
 
+    if sssom_rows:
+        write_sssom_mappings(_GEONAMES_SSSOM, sssom_rows, _SSSOM_PREFIXES,
+                             _GEONAMES_SSSOM_ID, _GEONAMES_SSSOM_DESC)
+        print(f"  SSSOM: {len(sssom_rows)} mappings written to {_GEONAMES_SSSOM}")
+
 
 def _build_ppl_yaml(key, source, data, locales=None):
     """Write sources/{key}.yaml for GeoNamesSettlement scope (per-country only).
@@ -1422,8 +1529,8 @@ def _build_ppl_yaml(key, source, data, locales=None):
     Each settlement gets an aliases entry with the ADM location path
     ({CC}.{ADM1}.{ADM2} or {CC}.{ADM1}) to provide location context;
     note this is NOT the settlement's own code — geonameId is the unique ID.
-    Historical entries (PPLH, PPLCH, PPLQ, PPLW) are marked status: deprecated.
-    Users can suppress them with minus: {status: [deprecated]} in harvester_config.yaml.
+    Historical entries (PPLH, PPLCH, PPLQ, PPLW) are marked status: historical.
+    Users can suppress them with minus: {status: [historical]} in harvester_config.yaml.
     """
     locales      = locales or ["en"]
     primary_lang = "en" if "en" in locales else locales[0]
@@ -1455,6 +1562,7 @@ def _build_ppl_yaml(key, source, data, locales=None):
                 or wd.get("labels", {}).get("en")
                 or entry.get("name", ""))
 
+    sssom_rows = []
     pvs = {}
     for ac in sorted(adm1_compounds):
         raw_code = adm1_compounds[ac]
@@ -1465,7 +1573,7 @@ def _build_ppl_yaml(key, source, data, locales=None):
             gnid      = entry["gnid"]
             wd        = wd_data.get(gnid, {})
             qid       = wd.get("qid", "")
-            label     = _lbl(entry)
+            label     = normalize_text(_lbl(entry))
             adm1_code = entry.get("adm1_code", "")
             adm2_code = entry.get("adm2_code", "")
 
@@ -1482,39 +1590,53 @@ def _build_ppl_yaml(key, source, data, locales=None):
             gno_code  = f"gno:P.{feat_code}" if feat_code else None
             pv = add_permissible_value(
                 pvs, gnid,
-                title=normalize_text(label),
+                title=label,
                 meaning=f"gnf:{gnid}",
-                exact_mappings=[f"wd:{qid}"] if qid else None,
-                broad_mappings=[gno_code] if gno_code else None,
                 description=normalize_text(wd.get("desc", "")) or None,
                 is_a=ac,
             )
             if location_alias:
                 pv["aliases"] = [location_alias]
             if entry.get("is_historical"):
-                pv["status"] = "deprecated"
+                pv["status"] = "historical"
+            if gno_code:
+                sssom_rows.append({
+                    "subject_id":            f"gnf:{gnid}",
+                    "predicate_id":          "skos:broadMatch",
+                    "object_id":             gno_code,
+                    "mapping_justification": "semapv:ManualMappingCuration",
+                    "subject_label":         label,
+                    "object_label":          "",
+                })
+            if qid:
+                sssom_rows.append({"subject_id": f"gnf:{gnid}", "predicate_id": "skos:exactMatch",
+                                   "object_id": f"wd:{qid}", "mapping_justification": "semapv:ManualMappingCuration",
+                                   "subject_label": label, "object_label": label})
 
     # Entries with no ADM1 code: append sorted at the end
     for entry in sorted(no_adm1_entries, key=lambda e: _title_sort_key(_lbl(e))):
         gnid  = entry["gnid"]
         wd    = wd_data.get(gnid, {})
         qid   = wd.get("qid", "")
-        label = _lbl(entry)
+        label = normalize_text(_lbl(entry))
         pv = add_permissible_value(
             pvs, gnid,
-            title=normalize_text(label),
+            title=label,
             meaning=f"gnf:{gnid}",
-            exact_mappings=[f"wd:{qid}"] if qid else None,
             description=normalize_text(wd.get("desc", "")) or None,
         )
         if entry.get("is_historical"):
             pv["status"] = "deprecated"
+        if qid:
+            sssom_rows.append({"subject_id": f"gnf:{gnid}", "predicate_id": "skos:exactMatch",
+                               "object_id": f"wd:{qid}", "mapping_justification": "semapv:ManualMappingCuration",
+                               "subject_label": label, "object_label": label})
 
     n       = len(entries)
     n_hist  = sum(1 for e in entries if e.get("is_historical"))
     n_match = sum(1 for e in entries if wd_data.get(e["gnid"], {}).get("qid"))
     pct     = 100 * n_match // n if n else 0
-    print(f"  Settlement: {n - n_hist} current + {n_hist} historical (deprecated) entries")
+    print(f"  Settlement: {n - n_hist} current + {n_hist} historical entries")
     print(f"  Crosswalk: {n_match}/{n} entries ({pct}%) have Wikidata P1566 links")
 
     source_url = (source.get("reachable_from") or {}).get(
@@ -1526,7 +1648,7 @@ def _build_ppl_yaml(key, source, data, locales=None):
         title=source.get("title") or f"GeoNames Settlements for {scope}",
         description=(
             f"{n - n_hist} current + {n_hist} historical populated places for {scope} from GeoNames. "
-            "Historical entries are marked status: deprecated."
+            "Historical entries are marked status: historical."
         ),
         license="CC-BY 4.0",
         prefixes=_SOURCE_PREFIXES,
@@ -1542,6 +1664,11 @@ def _build_ppl_yaml(key, source, data, locales=None):
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
     log_extraction(enum_key, count=len(pvs))
+
+    if sssom_rows:
+        write_sssom_mappings(_GEONAMES_SSSOM, sssom_rows, _SSSOM_PREFIXES,
+                             _GEONAMES_SSSOM_ID, _GEONAMES_SSSOM_DESC)
+        print(f"  SSSOM: {len(sssom_rows)} mappings written to {_GEONAMES_SSSOM}")
 
 
 # ---------------------------------------------------------------------------
@@ -1917,12 +2044,13 @@ def _register_ppl(cc, config_file):
         title=f"GeoNames Settlements for {cc}",
         description=(
             f"Populated places for {cc} from GeoNames {cc}.zip. "
-            "Historical entries marked status: deprecated."
+            "Historical entries marked status: historical."
         ),
     )
     entry["country"]  = cc.upper()
     entry["prefixes"] = dict(_SOURCE_PREFIXES)
     entry["license"]  = "CC-BY 4.0"
+    entry["minus"]    = {"status": ["historical"]}
     if payload.get("source_modified"):
         entry["version"] = payload["source_modified"]
     config.setdefault("sources", {})[key] = entry

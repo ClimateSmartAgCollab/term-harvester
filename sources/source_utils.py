@@ -468,6 +468,73 @@ def write_config(config, config_file=MENU_CONFIG):
         yaml.dump(data, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
 
 
+def write_sssom_mappings(sssom_path, new_rows, prefixes, mapping_set_id,
+                         mapping_set_description=None,
+                         license_uri="https://creativecommons.org/publicdomain/zero/1.0/"):
+    """Write or merge SSSOM exactMatch rows into an SSSOM TSV file.
+
+    Reads any existing rows from sssom_path and merges them with new_rows.
+    Rows are deduplicated on (subject_id, predicate_id, object_id); new_rows
+    win on conflict.  The file is written sorted by subject_id then object_id.
+
+    Parameters
+    ----------
+    sssom_path : str
+        Path to the .sssom.tsv file (created if absent).
+    new_rows : list[dict]
+        Each dict must have ``subject_id``, ``predicate_id``, ``object_id``,
+        ``mapping_justification``.  ``subject_label`` and ``object_label``
+        are optional.
+    prefixes : dict[str, str]
+        CURIE prefix → URI expansion for the curie_map header block.
+    mapping_set_id : str
+        URI identifying this mapping set.
+    mapping_set_description : str, optional
+        Human-readable description written as a header comment.
+    license_uri : str
+        License URI; defaults to CC0 1.0.
+    """
+    _COLUMNS = ["subject_id", "predicate_id", "object_id",
+                "mapping_justification", "subject_label", "object_label"]
+
+    # Read existing rows (skip YAML header lines and the column-name line)
+    existing: dict = {}
+    if os.path.exists(sssom_path):
+        with open(sssom_path, encoding="utf-8") as f:
+            for line in f:
+                stripped = line.rstrip("\n")
+                if stripped.startswith("#") or stripped.startswith("subject_id"):
+                    continue
+                parts = stripped.split("\t")
+                if len(parts) >= 3 and parts[0] and parts[2]:
+                    key = (parts[0], parts[1], parts[2])
+                    # Pad to full column count
+                    existing[key] = (parts + [""] * len(_COLUMNS))[:len(_COLUMNS)]
+
+    # Merge new rows (new rows win on duplicate key)
+    for row in new_rows:
+        s = row.get("subject_id", "")
+        p = row.get("predicate_id", "skos:exactMatch")
+        o = row.get("object_id", "")
+        if not (s and o):
+            continue
+        existing[(s, p, o)] = [row.get(c, "") for c in _COLUMNS]
+
+    # Write YAML metadata header + TSV data
+    with open(sssom_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("# curie_map:\n")
+        for prefix, uri in sorted(prefixes.items()):
+            f.write(f"#   {prefix}: {uri}\n")
+        f.write(f"# mapping_set_id: {mapping_set_id}\n")
+        if mapping_set_description:
+            f.write(f"# mapping_set_description: \"{mapping_set_description}\"\n")
+        f.write(f"# license: {license_uri}\n")
+        f.write("\n")
+        f.write("\t".join(_COLUMNS) + "\n")
+        for row_vals in sorted(existing.values(), key=lambda r: (r[0], r[2])):
+            f.write("\t".join(row_vals) + "\n")
+
+
 def update_source_config(source_key, fields, config_file=MENU_CONFIG):
     """Update one or more fields on a source entry in harvester_config.yaml."""
     with open(config_file, "r") as f:
