@@ -28,12 +28,12 @@ GeoNamesSettlement
 Shorthand -a patterns
 ---------------------
 GeoNames_countries              → GeoNamesCountries (countries + continents)
-GeoNames_ADM1                   → GeoNamesADM1 (all ~4,000 globally)
-GeoNames_{CC}_ADM1              → GeoNamesADM1 single country (e.g. GeoNames_US_ADM1)
-GeoNames_{CC}_ADM2              → GeoNamesADM2 single country (e.g. GeoNames_CA_ADM2)
-GeoNames_{CC}_ADM3              → GeoNamesADM34 (ADM3 only) for one country
-GeoNames_{CC}_ADM3ADM4          → GeoNamesADM34 (ADM3+ADM4) for one country
-GeoNames_{CC}_PPL               → GeoNamesSettlement for one country (e.g. GeoNames_NL_PPL)
+GeoNames_ADM1                   → GeoNamesAdm1 (all ~4,000 globally)
+GeoNames_ADM1_{CC}              → GeoNamesAdm1 single country (e.g. GeoNames_ADM1_US)
+GeoNames_ADM2_{CC}              → GeoNamesAdm2 single country (e.g. GeoNames_ADM2_CA)
+GeoNames_ADM3_{CC}              → GeoNamesAdm3 (ADM3 only) for one country
+GeoNames_ADM3ADM4_{CC}          → GeoNamesAdm3 + Adm4 for one country
+GeoNames_Settlement_{CC}        → GeoNamesSettlement for one country (e.g. GeoNames_Settlement_NL)
 https://download.geonames.org/export/dump/countryInfo.txt → GeoNamesCountries
 
 Permissible value structure
@@ -56,6 +56,11 @@ License
 -------
 GeoNames data: Creative Commons Attribution 4.0 License (geonames.org)
 
+See also
+--------
+https://unstats.un.org/unsd/geoinfo/ungegn/docs/CHAPTER%2010.pdf
+    UNGEGN Chapter 10 — Administrative Divisions
+
 Public API used by term_harvester.py
 -------------------------------------
 match_geonames_code(url, config_file)
@@ -65,12 +70,14 @@ process_geonames_source(key, source, config_file, locales)
 
 import datetime
 import email.utils
+import io
 import json
 import os
 import re
 import sys
 import time
 import unicodedata
+import urllib.error
 import urllib.parse
 import urllib.request
 import yaml
@@ -171,7 +178,7 @@ _CONTINENTS = [
 _CONTINENT_CODE_TO_GNID = {c["code"]: c["gnid"] for c in _CONTINENTS}
 
 # Wikidata P1566 batch size for WDQS
-_WD_BATCH = 50
+_WD_BATCH = 500
 
 # Wikidata sovereign-state instance types (same as source_geowiki.py)
 _WD_SOVEREIGN_TYPES = (
@@ -179,9 +186,9 @@ _WD_SOVEREIGN_TYPES = (
     "Q15634554",  # member state of the United Nations
 )
 
-# Shorthand regex: GeoNames_countries, GeoNames_ADM1, GeoNames_US_ADM1, GeoNames_CA_ADM3, GeoNames_CA_ADM3ADM4, GeoNames_NL_PPL
+# Shorthand regex: GeoNames_countries, GeoNames_ADM1, GeoNames_ADM1_US, GeoNames_ADM3_CA, GeoNames_ADM3ADM4_CA, GeoNames_Settlement_NL
 _SHORTHAND_RE = re.compile(
-    r'^GeoNames_(?:(countries|ADM1)|([A-Za-z]{2})_(ADM3ADM4|ADM[1-4]|PPL))$',
+    r'^GeoNames_(?:(countries|ADM1)|(ADM3ADM4|ADM[1-4]|Settlement)_([A-Za-z]{2}))$',
     re.IGNORECASE,
 )
 
@@ -271,8 +278,16 @@ def _adm1_enum_title(type_words_by_freq, country_name):
 # SPARQL helper (Wikidata P1566 enrichment)
 # ---------------------------------------------------------------------------
 
+_SPARQL_RETRY_DELAYS = (15, 60, 120)   # seconds; transient HTTP codes only
+_SPARQL_TRANSIENT_CODES = {429, 502, 503, 504}
+
+
 def _sparql_query(sparql, timeout=60, endpoint=_WDQS_ENDPOINT, use_post=False):
-    """Execute a SPARQL query against an endpoint; return bindings list."""
+    """Execute a SPARQL query against an endpoint; return bindings list.
+
+    Retries up to 3 times with increasing delays on transient HTTP errors
+    (429 Too Many Requests, 502/503/504 gateway errors).
+    """
     headers = {
         **BROWSER_HEADERS,
         "Accept": "application/sparql-results+json",
@@ -287,9 +302,17 @@ def _sparql_query(sparql, timeout=60, endpoint=_WDQS_ENDPOINT, use_post=False):
     else:
         params = urllib.parse.urlencode({"query": sparql, "format": "json"})
         req = urllib.request.Request(f"{endpoint}?{params}", headers=headers)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-    return data["results"]["bindings"]
+    for attempt, delay in enumerate((*_SPARQL_RETRY_DELAYS, None)):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            return data["results"]["bindings"]
+        except urllib.error.HTTPError as exc:
+            if exc.code not in _SPARQL_TRANSIENT_CODES or delay is None:
+                raise
+            print(f"  SPARQL HTTP {exc.code} (attempt {attempt + 1}); "
+                  f"retrying in {delay}s ...", file=sys.stderr)
+            time.sleep(delay)
 
 
 def _wikidata_p1566_batch(gnids, locales=None, use_qlever=False):
@@ -299,7 +322,7 @@ def _wikidata_p1566_batch(gnids, locales=None, use_qlever=False):
     """
     locales  = locales or ["en"]
     endpoint = _QLEVER_ENDPOINT if use_qlever else _WDQS_ENDPOINT
-    use_post = use_qlever
+    use_post = True  # always POST — large VALUES clauses exceed GET URL length limits
 
     values_str     = " ".join(f'"{gid}"' for gid in gnids)
     label_vars     = " ".join(f"?label_{lang}" for lang in locales)
@@ -356,6 +379,85 @@ def _enrich_with_wikidata(gnids, locales=None, use_qlever=False):
     return result
 
 
+def _fetch_alternatenames_wkdt(cc):
+    """Download alternatenames/{CC}.zip and extract Wikidata QID mappings.
+
+    Returns dict: gnid (str) → qid (str, bare, e.g. 'Q99')
+    Historic entries (isHistoric == '1') are excluded.
+    """
+    cc  = cc.upper()
+    url = f"https://download.geonames.org/export/dump/alternatenames/{cc}.zip"
+    print(f"  Downloading alternatenames/{cc}.zip for wkdt crosswalk ...")
+    try:
+        with urllib.request.urlopen(url, timeout=120) as resp:
+            zdata = resp.read()
+    except Exception as exc:
+        print(f"  Warning: could not download alternatenames/{cc}.zip: {exc}",
+              file=sys.stderr)
+        return {}
+    result = {}
+    try:
+        with zipfile.ZipFile(io.BytesIO(zdata)) as zf:
+            fname = f"{cc}.txt"
+            with zf.open(fname) as fh:
+                for line in io.TextIOWrapper(fh, encoding="utf-8", errors="replace"):
+                    cols = line.rstrip("\n").split("\t")
+                    if len(cols) < 4:
+                        continue
+                    if cols[2] != "wkdt":
+                        continue
+                    if len(cols) >= 8 and cols[7] == "1":   # isHistoric
+                        continue
+                    gnid = cols[1].strip()
+                    qid  = cols[3].strip()
+                    if gnid and qid:
+                        result[gnid] = qid
+    except Exception as exc:
+        print(f"  Warning: could not parse alternatenames/{cc}.zip: {exc}",
+              file=sys.stderr)
+        return {}
+    print(f"    Loaded {len(result)} wkdt QID mappings from alternatenames/{cc}.zip")
+    return result
+
+
+def _enrich_with_alternatenames_then_sparql(cc, gnids, locales, use_qlever=False):
+    """Two-step Wikidata QID crosswalk for a per-country set of GeoNames IDs.
+
+    Step A — GeoNames alternateNames (primary, no API calls):
+      Download alternatenames/{CC}.zip and extract wkdt entries.
+
+    Step B — P1566 SPARQL fallback (for gnids with no wkdt entry):
+      Batched reverse-lookup via _enrich_with_wikidata().
+
+    Reports match counts for each step.
+    Returns dict: gnid → {qid, labels, desc}
+    """
+    wkdt_map  = _fetch_alternatenames_wkdt(cc)
+    wd_data   = {}
+    unmatched = []
+    for gnid in gnids:
+        qid = wkdt_map.get(gnid)
+        if qid:
+            wd_data[gnid] = {"qid": qid, "labels": {}, "desc": ""}
+        else:
+            unmatched.append(gnid)
+    n_alt = len(gnids) - len(unmatched)
+    pct_alt = 100 * n_alt // len(gnids) if gnids else 0
+    print(f"  alternateNames wkdt: {n_alt}/{len(gnids)} matched ({pct_alt}%)")
+
+    if unmatched:
+        print(f"  P1566 SPARQL fallback for {len(unmatched)} unmatched gnids ...")
+        wd_extra = _enrich_with_wikidata(unmatched, locales=locales, use_qlever=use_qlever)
+        n_sparql = sum(1 for v in wd_extra.values() if v.get("qid"))
+        print(f"    P1566 fallback matched: {n_sparql}/{len(unmatched)}")
+        wd_data.update(wd_extra)
+
+    n_total   = sum(1 for v in wd_data.values() if v.get("qid"))
+    pct_total = 100 * n_total // len(gnids) if gnids else 0
+    print(f"  Total crosswalk: {n_total}/{len(gnids)} ({pct_total}%) have a Wikidata QID")
+    return wd_data
+
+
 def _wikidata_sovereignty_batch(qids):
     """Query P31 sovereignty + P17 parent country for a batch of Wikidata QIDs.
 
@@ -374,7 +476,7 @@ SELECT ?item ?is_sovereign ?parent WHERE {{
 """
     result = {}
     try:
-        for row in _sparql_query(sparql, timeout=60):
+        for row in _sparql_query(sparql, timeout=60, use_post=True):
             item_uri = row.get("item", {}).get("value", "")
             qid      = _qid_from_uri(item_uri)
             if not qid:
@@ -1147,7 +1249,7 @@ def _build_adm1_yaml(key, source, data, locales=None):
 
     source_url  = (source.get("reachable_from") or {}).get("source_ontology", _GEONAMES_ADM1_URL)
     scope_label = f"for {scope}" if scope != "global" else "(global)"
-    enum_key    = f"GeoNamesADM1_{scope}" if scope != "global" else "GeoNamesADM1"
+    enum_key    = f"GeoNamesAdm1{scope}" if scope != "global" else "GeoNamesAdm1"
     schema = make_config_schema(
         id=source_url,
         name=key,
@@ -1198,7 +1300,7 @@ def _build_adm2_yaml(key, source, data, locales=None):
 
     # If adm1_entries absent (old cached payload), load from ADM1 zip directly
     if not adm1_entries and scope:
-        adm1_cache = _load_cached_adm_payload(f"GeoNames_{scope}_ADM1")
+        adm1_cache = _load_cached_adm_payload(f"GeoNames_ADM1_{scope}")
         if adm1_cache:
             adm1_entries      = adm1_cache.get("entries", [])
             adm1_wd_data      = adm1_cache.get("wikidata", {})
@@ -1317,10 +1419,10 @@ def _build_adm2_yaml(key, source, data, locales=None):
     print(f"  Crosswalk: {n_match}/{n} ADM2 entries ({pct}%) have Wikidata P1566 links")
 
     source_url = (source.get("reachable_from") or {}).get("source_ontology", _GEONAMES_ADM2_URL)
-    enum_key   = f"GeoNamesADM2_{scope}"
+    enum_key   = f"GeoNamesAdm2{scope}"
     enum_dict  = {"name": enum_key, "title": "County or District"}
     if has_adm1:
-        enum_dict["inherits"] = f"GeoNamesADM1_{scope}"
+        enum_dict["inherits"] = f"GeoNamesAdm1{scope}"
     enum_dict["permissible_values"] = pvs
     schema = make_config_schema(
         id=source_url,
@@ -1342,11 +1444,14 @@ def _build_adm2_yaml(key, source, data, locales=None):
         print(f"  SSSOM: {len(sssom_rows)} mappings written to {_GEONAMES_SSSOM}")
 
 
-def _build_adm3_yaml(key, source, data, locales=None):
+def _build_adm3_yaml(key, source, data, locales=None, only_levels=None):
     """Write sources/{key}.yaml for GeoNamesADM3 or GeoNamesADM4 scope (per-country only).
 
     Groups entries by ADM2 compound code (synthetic headers as is_a parents).
     compound_code is stored in aliases; geonameId is the PV code.
+
+    only_levels: set of level names to emit, e.g. {"ADM3"} or {"ADM4"}.
+    None means emit all levels present in data (backward-compatible default).
     """
     locales      = locales or ["en"]
     primary_lang = "en" if "en" in locales else locales[0]
@@ -1361,7 +1466,7 @@ def _build_adm3_yaml(key, source, data, locales=None):
 
     # Load ADM2 cache for labels (always) and compound→gnid mapping if absent from payload
     if scope:
-        adm2_cache = _load_cached_adm_payload(f"GeoNames_{scope}_ADM2")
+        adm2_cache = _load_cached_adm_payload(f"GeoNames_ADM2_{scope}")
         if adm2_cache:
             adm2_wd = adm2_cache.get("wikidata", {})
             for e in adm2_cache.get("entries", []):
@@ -1378,8 +1483,8 @@ def _build_adm3_yaml(key, source, data, locales=None):
             # (e.g. US.DC.001) that have ADM3 entries but no ADM2 in GeoNames.
             adm1_code_to_gnid = adm2_cache.get("adm1_gnids", {})
         elif not adm2_compound_to_gnid:
-            print(f"  Note: no cached GeoNames_{scope}_ADM2 — ADM3 parent keys will use "
-                  f"compound codes (run '-a GeoNames_{scope}_ADM2' first for gnid keys).",
+            print(f"  Note: no cached GeoNames_ADM2_{scope} — ADM3 parent keys will use "
+                  f"compound codes (run '-a GeoNames_ADM2_{scope}' first for gnid keys).",
                   file=sys.stderr)
 
     # Separate ADM3 and ADM4 entries
@@ -1387,7 +1492,7 @@ def _build_adm3_yaml(key, source, data, locales=None):
     adm4_entries = [e for e in entries if e.get("feat_code") == "ADM4"]
 
     # When the ADM2 compound→gnid mapping is available, the enum can inherit
-    # GeoNamesADM2_{scope} so is_a links resolve to parent ADM2 entries.  Without
+    # GeoNamesAdm2{scope} so is_a links resolve to parent ADM2 entries.  Without
     # ADM2 data, synthetic title-only parent headers are embedded directly.
     has_adm2   = bool(adm2_compound_to_gnid)
     sssom_rows = []
@@ -1396,7 +1501,7 @@ def _build_adm3_yaml(key, source, data, locales=None):
         """Build pvs for a list of entries.
 
         When has_adm2 is True, synthetic parent headers are omitted because the
-        parent ADM2 entries come from the inherited GeoNamesADM2_{scope} enum.
+        parent ADM2 entries come from the inherited GeoNamesAdm2{scope} enum.
         When has_adm2 is False, title-only headers are embedded directly so the
         enum is still navigable as a self-contained file.
         """
@@ -1455,16 +1560,16 @@ def _build_adm3_yaml(key, source, data, locales=None):
 
     enums = {}
 
-    if adm3_entries:
+    if adm3_entries and (only_levels is None or "ADM3" in only_levels):
         adm3_pvs  = _build_pvs(
             adm3_entries,
             lambda e: (adm2_compound_to_gnid.get(f"{scope}.{e['adm1_code']}.{e['adm2_code']}")
                        or f"{scope}.{e['adm1_code']}.{e['adm2_code']}"),
         )
-        enum3_key  = f"GeoNamesADM3_{scope}"
+        enum3_key  = f"GeoNamesAdm3{scope}"
         enum3_dict = {"name": enum3_key, "title": "Municipality"}
         if has_adm2:
-            enum3_dict["inherits"] = f"GeoNamesADM2_{scope}"
+            enum3_dict["inherits"] = f"GeoNamesAdm2{scope}"
         enum3_dict["permissible_values"] = adm3_pvs
         enums[enum3_key] = enum3_dict
         n3 = len(adm3_entries)
@@ -1472,16 +1577,18 @@ def _build_adm3_yaml(key, source, data, locales=None):
         print(f"  Crosswalk: {m3}/{n3} ADM3 entries ({100*m3//n3 if n3 else 0}%) "
               f"have Wikidata P1566 links")
 
-    if adm4_entries:
+    if adm4_entries and (only_levels is None or "ADM4" in only_levels):
         adm4_pvs  = _build_pvs(
             adm4_entries,
             lambda e: (adm2_compound_to_gnid.get(f"{scope}.{e['adm1_code']}.{e['adm2_code']}")
                        or f"{scope}.{e['adm1_code']}.{e['adm2_code']}"),
         )
-        enum4_key  = f"GeoNamesADM4_{scope}"
+        enum4_key  = f"GeoNamesAdm4{scope}"
         enum4_dict = {"name": enum4_key, "title": "Sub-municipality"}
-        if has_adm2:
-            enum4_dict["inherits"] = f"GeoNamesADM2_{scope}"
+        if adm3_entries:
+            enum4_dict["inherits"] = f"GeoNamesAdm3{scope}"
+        elif has_adm2:
+            enum4_dict["inherits"] = f"GeoNamesAdm2{scope}"
         enum4_dict["permissible_values"] = adm4_pvs
         enums[enum4_key] = enum4_dict
         n4 = len(adm4_entries)
@@ -1493,13 +1600,18 @@ def _build_adm3_yaml(key, source, data, locales=None):
         print(f"  Warning: no ADM3/ADM4 entries to write for {scope}", file=sys.stderr)
         return
 
-    lv_str     = "/".join(levels)
+    if only_levels == {"ADM3"}:
+        lv_str = "ADM3"
+    elif only_levels == {"ADM4"}:
+        lv_str = "ADM4"
+    else:
+        lv_str = "/".join(levels)
     source_url = (source.get("reachable_from") or {}).get(
         "source_ontology", _GEONAMES_CC_URL.format(CC=scope))
     schema = make_config_schema(
         id=source_url,
         name=key,
-        title=source.get("title") or f"GeoNames ADM3/ADM4 for {scope}",
+        title=source.get("title") or f"GeoNames {lv_str} for {scope}",
         description=(
             f"{len(entries)} {lv_str} administrative divisions for {scope} from GeoNames."
         ),
@@ -1535,10 +1647,12 @@ def _build_ppl_yaml(key, source, data, locales=None):
     locales      = locales or ["en"]
     primary_lang = "en" if "en" in locales else locales[0]
 
-    scope      = data.get("scope", "")
-    entries    = data.get("entries", [])
-    wd_data    = data.get("wikidata", {})
-    adm1_names = data.get("adm1_names", {})   # adm1_code → province/state name
+    scope                 = data.get("scope", "")
+    entries               = data.get("entries", [])
+    wd_data               = data.get("wikidata", {})
+    adm1_names            = data.get("adm1_names", {})            # adm1_code → province/state name
+    adm1_gnids            = data.get("adm1_gnids", {})            # adm1_code → GeoNames ID
+    adm2_compound_to_gnid = data.get("adm2_compound_to_gnid", {}) # compound_code → GeoNames ID
 
     # Collect unique ADM1 compound codes for synthetic headers
     adm1_compounds = {}
@@ -1612,6 +1726,29 @@ def _build_ppl_yaml(key, source, data, locales=None):
                 sssom_rows.append({"subject_id": f"gnf:{gnid}", "predicate_id": "skos:exactMatch",
                                    "object_id": f"wd:{qid}", "mapping_justification": "semapv:ManualMappingCuration",
                                    "subject_label": label, "object_label": label})
+            # skos:broader: settlement → containing ADM2 (if gnid known from cached ADM2 payload)
+            adm2_gnid = (adm2_compound_to_gnid.get(f"{scope}.{adm1_code}.{adm2_code}")
+                         if adm1_code and adm2_code else None)
+            if adm2_gnid:
+                sssom_rows.append({
+                    "subject_id":            f"gnf:{gnid}",
+                    "predicate_id":          "skos:broader",
+                    "object_id":             f"gnf:{adm2_gnid}",
+                    "mapping_justification": "semapv:ManualMappingCuration",
+                    "subject_label":         label,
+                    "object_label":          "",
+                })
+            # skos:broader: settlement → containing ADM1 (always available when adm1_code is known)
+            adm1_gnid = adm1_gnids.get(adm1_code) if adm1_code else None
+            if adm1_gnid:
+                sssom_rows.append({
+                    "subject_id":            f"gnf:{gnid}",
+                    "predicate_id":          "skos:broader",
+                    "object_id":             f"gnf:{adm1_gnid}",
+                    "mapping_justification": "semapv:ManualMappingCuration",
+                    "subject_label":         label,
+                    "object_label":          "",
+                })
 
     # Entries with no ADM1 code: append sorted at the end
     for entry in sorted(no_adm1_entries, key=lambda e: _title_sort_key(_lbl(e))):
@@ -1641,7 +1778,7 @@ def _build_ppl_yaml(key, source, data, locales=None):
 
     source_url = (source.get("reachable_from") or {}).get(
         "source_ontology", _GEONAMES_CC_URL.format(CC=scope))
-    enum_key = f"GeoNamesSettlement_{scope}"
+    enum_key = f"GeoNamesSettlement{scope}"
     schema = make_config_schema(
         id=source_url,
         name=key,
@@ -1723,8 +1860,14 @@ def _fetch_adm1_payload(cc, locales, use_qlever=False):
     entries = _fetch_geonames_adm1(country_filter=country_filter)
     gnids   = [e["gnid"] for e in entries]
 
-    print(f"  Enriching {len(gnids)} ADM1 IDs with Wikidata P1566 ...")
-    wd_data = _enrich_with_wikidata(gnids, locales=locales, use_qlever=use_qlever)
+    if cc and gnids:
+        wd_data = _enrich_with_alternatenames_then_sparql(
+            cc, gnids, locales, use_qlever=use_qlever)
+    elif gnids:
+        print(f"  Enriching {len(gnids)} ADM1 IDs with Wikidata P1566 ...")
+        wd_data = _enrich_with_wikidata(gnids, locales=locales, use_qlever=use_qlever)
+    else:
+        wd_data = {}
 
     payload = {
         "type":            "adm1",
@@ -1758,8 +1901,11 @@ def _fetch_adm2_payload(cc, locales, use_qlever=False):
     entries = _fetch_geonames_adm2({cc.upper()})
     gnids   = [e["gnid"] for e in entries]
 
-    print(f"  Enriching {len(gnids)} ADM2 IDs with Wikidata P1566 ...")
-    wd_data = _enrich_with_wikidata(gnids, locales=locales, use_qlever=use_qlever)
+    if gnids:
+        wd_data = _enrich_with_alternatenames_then_sparql(
+            cc, gnids, locales, use_qlever=use_qlever)
+    else:
+        wd_data = {}
 
     # Always fetch ADM1 flat file for names + gnids (fast, authoritative)
     adm1_rows  = _fetch_geonames_adm1(country_filter={cc.upper()})
@@ -1767,7 +1913,7 @@ def _fetch_adm2_payload(cc, locales, use_qlever=False):
     adm1_gnids = {e["adm1_code"]: e["gnid"] for e in adm1_rows}
 
     # Load cached ADM1 Wikidata payload for province type grouping
-    adm1_key     = f"GeoNames_{cc.upper()}_ADM1"
+    adm1_key     = f"GeoNames_ADM1_{cc.upper()}"
     adm1_payload = _load_cached_adm_payload(adm1_key)
     if adm1_payload:
         adm1_entries      = adm1_payload.get("entries", [])
@@ -1780,7 +1926,7 @@ def _fetch_adm2_payload(cc, locales, use_qlever=False):
         adm1_wd_data      = {}
         adm1_country_name = ""
         print(f"  Note: no cached {adm1_key}.zip — province grouping will be flat "
-              f"(run '-a GeoNames_{cc.upper()}_ADM1' first for type grouping).",
+              f"(run '-a GeoNames_ADM1_{cc.upper()}' first for type grouping).",
               file=sys.stderr)
 
     return {
@@ -1806,24 +1952,37 @@ def _fetch_ppl_payload(cc, locales, use_qlever=False):
     source_modified = _geonames_head_date(_GEONAMES_CC_URL.format(CC=cc))
     entries = _fetch_geonames_ppl(cc)
 
-    # Fetch ADM1 names for this country to use as readable synthetic-header titles
+    # Fetch ADM1 names and gnids for synthetic headers + skos:broader SSSOM links
     adm1_rows  = _fetch_geonames_adm1(country_filter={cc})
     adm1_names = {e["adm1_code"]: e["name"] for e in adm1_rows}   # e.g. {"07": "Noord-Holland"}
+    adm1_gnids = {e["adm1_code"]: e["gnid"] for e in adm1_rows}   # e.g. {"07": "2749879"}
+
+    # Load cached ADM2 compound_code → gnid for skos:broader settlement → ADM2 links
+    adm2_key              = f"GeoNames_ADM2_{cc}"
+    adm2_payload          = _load_cached_adm_payload(adm2_key)
+    adm2_compound_to_gnid = {}
+    if adm2_payload:
+        for e in adm2_payload.get("entries", []):
+            adm2_compound_to_gnid[e["compound_code"]] = e["gnid"]
+        print(f"  Loaded ADM2 gnid map ({len(adm2_compound_to_gnid)} entries) "
+              f"from cached {adm2_key}.zip for SSSOM broader links.")
 
     gnids = [e["gnid"] for e in entries]
     if gnids:
-        print(f"  Enriching {len(gnids)} settlement IDs with Wikidata P1566 ...")
-        wd_data = _enrich_with_wikidata(gnids, locales=locales, use_qlever=use_qlever)
+        wd_data = _enrich_with_alternatenames_then_sparql(
+            cc, gnids, locales, use_qlever=use_qlever)
     else:
         wd_data = {}
 
     return {
-        "type":            "ppl",
-        "scope":           cc,
-        "entries":         entries,
-        "wikidata":        wd_data,
-        "adm1_names":      adm1_names,
-        "source_modified": source_modified,
+        "type":                   "ppl",
+        "scope":                  cc,
+        "entries":                entries,
+        "wikidata":               wd_data,
+        "adm1_names":             adm1_names,
+        "adm1_gnids":             adm1_gnids,
+        "adm2_compound_to_gnid":  adm2_compound_to_gnid,
+        "source_modified":        source_modified,
     }
 
 
@@ -1839,15 +1998,15 @@ def _fetch_adm34_payload(cc, levels, locales, use_qlever=False):
     entries = _fetch_geonames_adm34(cc, levels=levels)
     gnids   = [e["gnid"] for e in entries]
 
+    # Skip alternateNames for ADM3/ADM4: wkdt coverage is minimal at this level
+    # (~0% match rate vs 22 MB download). Use P1566 SPARQL directly.
     if gnids:
-        lv_str = "/".join(levels)
-        print(f"  Enriching {len(gnids)} {lv_str} IDs with Wikidata P1566 ...")
         wd_data = _enrich_with_wikidata(gnids, locales=locales, use_qlever=use_qlever)
     else:
         wd_data = {}
 
     # Load cached ADM2 payload for compound_code → gnid mapping
-    adm2_key     = f"GeoNames_{cc}_ADM2"
+    adm2_key     = f"GeoNames_ADM2_{cc}"
     adm2_payload = _load_cached_adm_payload(adm2_key)
     adm2_compound_to_gnid = {}
     if adm2_payload:
@@ -1857,7 +2016,7 @@ def _fetch_adm34_payload(cc, levels, locales, use_qlever=False):
               f"from cached {adm2_key}.zip.")
     else:
         print(f"  Note: no cached {adm2_key}.zip — ADM3 parent keys will use "
-              f"compound codes (run '-a GeoNames_{cc}_ADM2' first for gnid keys).",
+              f"compound codes (run '-a GeoNames_ADM2_{cc}' first for gnid keys).",
               file=sys.stderr)
 
     return {
@@ -1917,7 +2076,7 @@ def _register_countries(config_file):
 
 
 def _register_adm1(cc, config_file):
-    key    = f"GeoNames_{cc}_ADM1" if cc else "GeoNames_ADM1"
+    key    = f"GeoNames_ADM1_{cc}" if cc else "GeoNames_ADM1"
     config = _load_config(config_file)
     if key in config.get("sources", {}):
         print(f"  Skipping: '{key}' already in {config_file}", file=sys.stderr)
@@ -1950,7 +2109,7 @@ def _register_adm1(cc, config_file):
 
 
 def _register_adm2(cc, config_file):
-    key    = f"GeoNames_{cc}_ADM2"
+    key    = f"GeoNames_ADM2_{cc}"
     config = _load_config(config_file)
     if key in config.get("sources", {}):
         print(f"  Skipping: '{key}' already in {config_file}", file=sys.stderr)
@@ -1985,7 +2144,7 @@ def _register_adm2(cc, config_file):
 def _register_adm34(cc, levels, config_file):
     """Register GeoNames ADM3 or ADM3+ADM4 for a single country."""
     lv_str = "".join(sorted(levels))          # e.g. "ADM3" or "ADM3ADM4"
-    key    = f"GeoNames_{cc}_{lv_str}"
+    key    = f"GeoNames_{lv_str}_{cc}"
     config = _load_config(config_file)
     if key in config.get("sources", {}):
         print(f"  Skipping: '{key}' already in {config_file}", file=sys.stderr)
@@ -2021,9 +2180,98 @@ def _register_adm34(cc, levels, config_file):
     return True
 
 
+def _register_adm3(cc, config_file):
+    """Register GeoNamesADM3 for a single country (municipalities only)."""
+    key    = f"GeoNames_ADM3_{cc}"
+    config = _load_config(config_file)
+    if key in config.get("sources", {}):
+        print(f"  Skipping: '{key}' already in {config_file}", file=sys.stderr)
+        return True
+
+    locales    = config.get("locales") or ["en"]
+    use_qlever = bool(config.get("apis", {}).get("qlever"))
+    print(f"  Fetching GeoNames ADM3 (+ ADM4 data) for {cc} from {cc}.zip ...")
+    payload = _fetch_adm34_payload(cc, {"ADM3", "ADM4"}, locales, use_qlever=use_qlever)
+    if not payload.get("entries"):
+        print(f"  Warning: no ADM3/ADM4 entries found for {cc}.", file=sys.stderr)
+        return True
+    _save_json(key, payload)
+
+    src_url = _GEONAMES_CC_URL.format(CC=cc.upper())
+    entry = make_source_entry(
+        key, src_url, "GeoNamesADM3", "zip",
+        title=f"GeoNames ADM3 for {cc}",
+        description=f"ADM3 administrative divisions for {cc} from GeoNames {cc}.zip.",
+    )
+    entry["country"]  = cc.upper()
+    entry["prefixes"] = dict(_SOURCE_PREFIXES)
+    entry["license"]  = "CC-BY 4.0"
+    if payload.get("source_modified"):
+        entry["version"] = payload["source_modified"]
+    config.setdefault("sources", {})[key] = entry
+    write_config(config, config_file)
+    print(f"  Added source '{key}' to {config_file}")
+
+    _build_adm3_yaml(key, config["sources"][key], payload, locales=locales,
+                     only_levels={"ADM3"})
+    return True
+
+
+def _register_adm4(cc, config_file):
+    """Register GeoNamesADM4 for a single country (sub-municipalities).
+
+    Reuses the ADM3 cached payload when available to avoid re-downloading.
+    """
+    key     = f"GeoNames_ADM4_{cc}"
+    adm3_key = f"GeoNames_ADM3_{cc}"
+    config  = _load_config(config_file)
+    if key in config.get("sources", {}):
+        print(f"  Skipping: '{key}' already in {config_file}", file=sys.stderr)
+        return True
+
+    locales    = config.get("locales") or ["en"]
+    use_qlever = bool(config.get("apis", {}).get("qlever"))
+
+    if _entry_exists(adm3_key):
+        print(f"  Reusing cached {adm3_key} data for GeoNames ADM4 {cc} ...")
+        payload = _load_json(adm3_key)
+    else:
+        print(f"  Fetching GeoNames ADM3+ADM4 for {cc} from {cc}.zip ...")
+        payload = _fetch_adm34_payload(cc, {"ADM3", "ADM4"}, locales, use_qlever=use_qlever)
+        if payload.get("entries"):
+            _save_json(adm3_key, payload)  # cache under ADM3 key too
+
+    if not payload.get("entries"):
+        adm4_count = sum(1 for e in payload.get("entries", [])
+                         if e.get("feat_code") == "ADM4")
+        if adm4_count == 0:
+            print(f"  Warning: no ADM4 entries found for {cc}.", file=sys.stderr)
+            return True
+    _save_json(key, payload)
+
+    src_url = _GEONAMES_CC_URL.format(CC=cc.upper())
+    entry = make_source_entry(
+        key, src_url, "GeoNamesADM4", "zip",
+        title=f"GeoNames ADM4 for {cc}",
+        description=f"ADM4 administrative divisions for {cc} from GeoNames {cc}.zip.",
+    )
+    entry["country"]  = cc.upper()
+    entry["prefixes"] = dict(_SOURCE_PREFIXES)
+    entry["license"]  = "CC-BY 4.0"
+    if payload.get("source_modified"):
+        entry["version"] = payload["source_modified"]
+    config.setdefault("sources", {})[key] = entry
+    write_config(config, config_file)
+    print(f"  Added source '{key}' to {config_file}")
+
+    _build_adm3_yaml(key, config["sources"][key], payload, locales=locales,
+                     only_levels={"ADM4"})
+    return True
+
+
 def _register_ppl(cc, config_file):
     """Register GeoNames populated places (settlements) for a single country."""
-    key    = f"GeoNames_{cc}_PPL"
+    key    = f"GeoNames_Settlement_{cc}"
     config = _load_config(config_file)
     if key in config.get("sources", {}):
         print(f"  Skipping: '{key}' already in {config_file}", file=sys.stderr)
@@ -2070,11 +2318,11 @@ def match_geonames_code(url, config_file=MENU_CONFIG):
 
     Matches:
       GeoNames_countries       → register GeoNamesCountries
-      GeoNames_ADM1            → register GeoNamesADM1 (global)
-      GeoNames_{CC}_ADM1       → register GeoNamesADM1 for one country
-      GeoNames_{CC}_ADM2       → register GeoNamesADM2 for one country
-      GeoNames_{CC}_ADM3       → register GeoNamesADM3 for one country
-      GeoNames_{CC}_ADM3ADM4   → register both ADM3 and ADM4 for one country
+      GeoNames_ADM1            → register GeoNamesAdm1 (global)
+      GeoNames_ADM1_{CC}       → register GeoNamesAdm1 for one country
+      GeoNames_ADM2_{CC}       → register GeoNamesAdm2 for one country
+      GeoNames_ADM3_{CC}       → register GeoNamesAdm3 for one country
+      GeoNames_ADM3ADM4_{CC}   → register both GeoNamesAdm3 and Adm4 for one country
       https://download.geonames.org/export/dump/countryInfo.txt → GeoNamesCountries
 
     Returns True if the URL was matched (regardless of success).
@@ -2089,8 +2337,8 @@ def match_geonames_code(url, config_file=MENU_CONFIG):
         return False
 
     scope_global = m.group(1)   # "countries" or "ADM1" (or None)
-    cc           = m.group(2)   # two-letter country code (or None)
-    adm_level    = m.group(3)   # "ADM1"/"ADM2"/… (or None)
+    adm_level    = m.group(2)   # "ADM1"/"ADM2"/… (or None) — per-country level
+    cc           = m.group(3)   # two-letter country code (or None)
 
     if scope_global:
         sg = scope_global.lower()
@@ -2098,21 +2346,21 @@ def match_geonames_code(url, config_file=MENU_CONFIG):
             return _register_countries(config_file)
         if sg == "adm1":
             return _register_adm1(None, config_file)
-    elif cc and adm_level:
+    elif adm_level and cc:
         level = adm_level.upper()
         if level == "ADM1":
             return _register_adm1(cc.upper(), config_file)
         if level == "ADM2":
             return _register_adm2(cc.upper(), config_file)
         if level == "ADM3":
-            return _register_adm34(cc.upper(), ("ADM3",), config_file)
-        if level == "ADM3ADM4":
-            return _register_adm34(cc.upper(), ("ADM3", "ADM4"), config_file)
+            return _register_adm3(cc.upper(), config_file)
         if level == "ADM4":
-            print(f"  Use GeoNames_{cc}_ADM3ADM4 to fetch both ADM3 and ADM4 together.",
-                  file=sys.stderr)
-            return True
-        if level == "PPL":
+            return _register_adm4(cc.upper(), config_file)
+        if level == "ADM3ADM4":
+            # Backward-compat: register both as separate sources
+            _register_adm3(cc.upper(), config_file)
+            return _register_adm4(cc.upper(), config_file)
+        if level == "SETTLEMENT":
             return _register_ppl(cc.upper(), config_file)
 
     return False
@@ -2157,6 +2405,33 @@ def fetch_geonames_source(key, source, config_file=MENU_CONFIG):
         if payload:
             _save_json(key, payload, config_file=config_file)
 
+    elif content_type == "GeoNamesADM3":
+        cc = source.get("country", "")
+        if not cc:
+            print(f"  Error: GeoNamesADM3 source '{key}' has no country field.", file=sys.stderr)
+            return
+        print(f"  Re-fetching GeoNames ADM3 for {cc} (combined ADM3+ADM4 payload cached for ADM4 reuse) ...")
+        payload = _fetch_adm34_payload(cc, {"ADM3", "ADM4"}, locales, use_qlever=use_qlever)
+        if payload:
+            _save_json(key, payload, config_file=config_file)
+
+    elif content_type == "GeoNamesADM4":
+        cc = source.get("country", "")
+        if not cc:
+            print(f"  Error: GeoNamesADM4 source '{key}' has no country field.", file=sys.stderr)
+            return
+        adm3_key = f"GeoNames_ADM3_{cc}"
+        if _entry_exists(adm3_key):
+            print(f"  Reusing cached {adm3_key} payload for GeoNames ADM4 {cc} ...")
+            payload = _load_json(adm3_key)
+        else:
+            print(f"  Re-fetching GeoNames ADM4 for {cc} (combined ADM3+ADM4 payload cached under ADM3 key) ...")
+            payload = _fetch_adm34_payload(cc, {"ADM3", "ADM4"}, locales, use_qlever=use_qlever)
+            if payload:
+                _save_json(adm3_key, payload, config_file=config_file)
+        if payload:
+            _save_json(key, payload, config_file=config_file)
+
     elif content_type == "GeoNamesSettlement":
         cc = source.get("country", "")
         if not cc:
@@ -2175,12 +2450,27 @@ def fetch_geonames_source(key, source, config_file=MENU_CONFIG):
 
 def process_geonames_source(key, source, config_file=MENU_CONFIG, locales=None):
     """Build sources/{key}.yaml from the cached GeoNames zip for *key*."""
-    if not _entry_exists(key):
-        print(f"  Error: {key}.json not found in {_SHARED_ZIP} — run '-f {key}' first",
-              file=sys.stderr)
-        return
+    content_type = source.get("content_type", "")
+    actual_key   = key
 
-    data    = _load_json(key)
+    if not _entry_exists(key):
+        # Migration fallback: new split keys can reuse old combined ADM3ADM4 cache
+        cc = source.get("country", "")
+        if content_type in ("GeoNamesADM3", "GeoNamesADM4") and cc:
+            old_key = f"GeoNames_ADM3ADM4_{cc}"
+            if _entry_exists(old_key):
+                print(f"  Note: using cached {old_key} data for {key} (migration) ...")
+                actual_key = old_key
+            else:
+                print(f"  Error: {key}.json not found in {_SHARED_ZIP} — run '-f {key}' first",
+                      file=sys.stderr)
+                return
+        else:
+            print(f"  Error: {key}.json not found in {_SHARED_ZIP} — run '-f {key}' first",
+                  file=sys.stderr)
+            return
+
+    data    = _load_json(actual_key)
     locales = locales or _get_project_locales(config_file)
     dtype   = data.get("type", "")
 
@@ -2191,7 +2481,12 @@ def process_geonames_source(key, source, config_file=MENU_CONFIG, locales=None):
     elif dtype == "adm2":
         _build_adm2_yaml(key, source, data, locales=locales)
     elif dtype == "adm34":
-        _build_adm3_yaml(key, source, data, locales=locales)
+        if content_type == "GeoNamesADM3":
+            _build_adm3_yaml(key, source, data, locales=locales, only_levels={"ADM3"})
+        elif content_type == "GeoNamesADM4":
+            _build_adm3_yaml(key, source, data, locales=locales, only_levels={"ADM4"})
+        else:
+            _build_adm3_yaml(key, source, data, locales=locales)
     elif dtype == "ppl":
         _build_ppl_yaml(key, source, data, locales=locales)
     else:

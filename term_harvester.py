@@ -363,6 +363,8 @@ from source_utils import (
     keys_from_minus,
     is_curie,
     rank_and_sort_permissible_values,
+    camel_to_snake,
+    make_auto_slots,
 )
 
 # SSSOM predicate_id → LinkML permissible_value attribute name.
@@ -371,6 +373,7 @@ from source_utils import (
 SSSOM_PREDICATE_MAP = {
     "skos:closeMatch":   "close_mappings",
     "skos:broadMatch":   "broad_mappings",
+    "skos:broader":      "broad_mappings",
     "skos:narrowMatch":  "narrow_mappings",
     "skos:exactMatch":   "exact_mappings",
     "skos:relatedMatch": "related_mappings",
@@ -559,6 +562,7 @@ def apply_sssom_mappings(predicates=None, schema_file="schema.yaml", config_file
     SSSOM predicate_id → LinkML permissible_value attribute:
       skos:closeMatch   → close_mappings
       skos:broadMatch   → broad_mappings
+      skos:broader      → broad_mappings  (same-scheme containment, e.g. PPL → ADM)
       skos:narrowMatch  → narrow_mappings
       skos:exactMatch   → exact_mappings  (also → *_uri for schema-object rows)
       skos:relatedMatch → related_mappings
@@ -886,6 +890,7 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
         "prefixes": {"anthropics": "https://github.com/anthropics/"},
         "default_prefix": "menu",
         "imports": ["linkml:types"],
+        "classes": {},
         "slots": {},
         "enums": {}
     }
@@ -902,6 +907,7 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
         action = "Created"
 
     # Sync enums and prefixes from harvester_config.yaml sources
+    _schema_class_enabled = False  # set inside config block below when slots: automatic
     prefix_conflicts = []      # collected at end for stdout summary
     # Track which source registered each prefix key so conflicts can name both parties.
     # Pre-populate with "schema.yaml" for prefixes already present in the loaded file.
@@ -914,7 +920,10 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
             config = yaml.safe_load(f) or {}
         all_sources = config.get("sources", {})
 
-        # Sync enums from each source's yaml file into schema
+        _auto_slots_enabled = config.get("slots") == "automatic"
+        _schema_class_enabled = _auto_slots_enabled and config.get("schema_class", True)
+
+        # Sync enums (and slots when slots: automatic) from each source's yaml file into schema
         sources_to_build = {k: v for k, v in all_sources.items() if keys is None or k in keys}
         _build_rows = []  # (key, added, updated, reported, excl, deleted, empty_names, conflicts, concepts, pvs)
         if keys:
@@ -929,6 +938,17 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
 
             with open(source_path, "r") as f:
                 source_data = yaml.safe_load(f)
+
+            # Merge slots from source YAML into schema when slots: automatic
+            if _auto_slots_enabled:
+                for slot_name, slot_def in (source_data.get("slots") or {}).items():
+                    if slot_name not in schema["slots"]:
+                        if isinstance(slot_def, dict):
+                            slot_def = dict(slot_def)  # shallow copy — don't mutate source_data
+                            slot_def["slot_group"] = key
+                        schema["slots"][slot_name] = slot_def
+                    elif isinstance(schema["slots"].get(slot_name), dict):
+                        schema["slots"][slot_name]["slot_group"] = key
 
             # Build full prefix map for this source (source YAML + any config additions).
             # Only prefixes actually referenced in permissible_value meanings are added
@@ -1316,8 +1336,32 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
                 else:
                     print(f"  {enum_key}  (no imported_from annotation)")
 
+    # Build SlotLibrary class when auto-slots + schema_class are enabled
+    # Slots are ordered by slot_group first, then alphabetically within each group.
+    def _slot_item_key(item):
+        """Sort key for schema slots items: (slot_group, slot_name), case-insensitive."""
+        slot_name, slot_def = item
+        grp = (slot_def.get("slot_group") or "").lower() if isinstance(slot_def, dict) else ""
+        return (grp, slot_name.lower())
+
+    if _schema_class_enabled and schema.get("slots"):
+        slot_items_sorted = sorted(schema["slots"].items(), key=_slot_item_key)
+        slot_names = [name for name, _ in slot_items_sorted]
+        schema.setdefault("classes", {})["SlotLibrary"] = {
+            "name": "SlotLibrary",
+            "title": "Slot Library",
+            "tree_root": True,
+            "slots": slot_names,
+        }
+
     if schema.get("enums"):
         schema["enums"] = dict(sorted(schema["enums"].items(), key=lambda x: x[0].lower()))
+
+    if schema.get("slots"):
+        schema["slots"] = dict(sorted(schema["slots"].items(), key=_slot_item_key))
+
+    if schema.get("classes"):
+        schema["classes"] = dict(sorted(schema["classes"].items(), key=lambda x: x[0].lower()))
 
     if schema.get("prefixes"):
         schema["prefixes"] = sort_prefixes(schema["prefixes"])
@@ -1773,6 +1817,203 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
         process_sources([key], config_file)
 
 
+def _geo_enum_to_source_key(enum_name: str, all_sources: dict) -> str | None:
+    """Reverse-map a GeoNames/GeoWiki enum class name to its config source key.
+
+    Examples::
+
+        GeoWikiAdm2CA  → GeoWiki_ADM2_CA
+        GeoNamesAdm3CA → GeoNames_ADM3_CA  (split key preferred, ADM3ADM4 as fallback)
+        GeoNamesAdm4CA → GeoNames_ADM4_CA  (split key preferred, ADM3ADM4 as fallback)
+        GeoWikiAdm1US  → GeoWiki_ADM1_US
+    """
+    m = re.match(r'^(GeoWiki|GeoNames)((?:Adm\d+)+)([A-Z]{2})?$', enum_name)
+    if not m:
+        return None
+    fam    = m.group(1)                          # "GeoWiki" | "GeoNames"
+    levels = re.findall(r'\d+', m.group(2))      # ['2'] | ['3','4']
+    cc     = m.group(3) or ""                    # "CA" | ""
+    combined = "ADM" + "ADM".join(levels)        # "ADM2" | "ADM3ADM4"
+    cands = [f"{fam}_{combined}_{cc}".rstrip("_")]
+    if len(levels) == 1:
+        n = int(levels[0])
+        # For ADM3/ADM4, try the combined key as fallback (backward compat)
+        cands.append(f"{fam}_ADM{n}ADM{n+1}_{cc}".rstrip("_"))
+    for cand in cands:
+        if cand in all_sources:
+            return cand
+    return None
+
+
+_GEO_CONTENT_TYPES_GN = frozenset({
+    "GeoNamesCountries", "GeoNamesADM1", "GeoNamesADM2",
+    "GeoNamesADM34", "GeoNamesADM3", "GeoNamesADM4", "GeoNamesSettlement",
+})
+_GEO_CONTENT_TYPES_GW = frozenset({
+    "GeoWikiCountries", "GeoWikiADM1", "GeoWikiADM2",
+    "GeoWikiADM34", "GeoWikiADM3", "GeoWikiADM4", "GeoWikiSettlement",
+})
+
+
+def _geo_cache_exists(key: str) -> bool:
+    """Return True if {key}.json is cached in the GeoNames or GeoWiki shared zip."""
+    import zipfile as _zf
+    for family in ("GeoNames", "GeoWiki"):
+        zp = f"sources/{family}.zip"
+        if not os.path.exists(zp):
+            continue
+        try:
+            with _zf.ZipFile(zp, "r") as _z:
+                if f"{key}.json" in _z.namelist():
+                    return True
+        except Exception:
+            pass
+    return False
+
+
+def _get_geo_dep_keys(key: str, source: dict, all_sources: dict) -> list:
+    """Return source keys that must be pre-fetched before this GeoNames/GeoWiki source.
+
+    ADM3/ADM4 sources require ADM2 + ADM1 (for SSSOM crosswalk and ``inherits`` chain).
+    ADM2 sources require ADM1.
+    Settlement sources require ADM1 + ADM2 (for SSSOM broader containment links).
+
+    Only returns keys that are actually present in ``all_sources``.
+    """
+    ct  = source.get("content_type", "")
+    cc  = source.get("country", "")
+    fam = "GeoNames" if ct.startswith("GeoNames") else "GeoWiki"
+    deps: list = []
+
+    if ct in ("GeoNamesADM34", "GeoWikiADM34"):
+        for lvl in ("ADM2", "ADM1"):
+            cand = re.sub(r"ADM3ADM4", lvl, key)
+            if cand != key and cand in all_sources:
+                deps.append(cand)
+    elif ct in ("GeoNamesADM3", "GeoWikiADM3",
+                "GeoNamesADM4", "GeoWikiADM4"):
+        # Need ADM2 and ADM1 (replace ADM3 or ADM4 with target level)
+        for lvl in ("ADM2", "ADM1"):
+            cand = re.sub(r"ADM[34]", lvl, key)
+            if cand != key and cand in all_sources:
+                deps.append(cand)
+    elif ct in ("GeoNamesADM2", "GeoWikiADM2"):
+        cand = re.sub(r"ADM2", "ADM1", key)
+        if cand != key and cand in all_sources:
+            deps.append(cand)
+    elif ct in ("GeoNamesSettlement", "GeoWikiSettlement") and cc:
+        for lvl in ("ADM1", "ADM2"):
+            cand = f"{fam}_{lvl}_{cc}"
+            if cand in all_sources:
+                deps.append(cand)
+    return deps
+
+
+def _resolve_geo_inherits_deps(
+    key: str,
+    all_sources: dict,
+    config_file: str,
+    locales: list,
+    do_fetch: bool = True,
+    _visited: "set | None" = None,
+) -> set:
+    """After processing a GeoNames/GeoWiki source, auto-resolve parent-level sources
+    referenced by ``inherits`` annotations on its enums.  Runs transitively so
+    ADM3 → ADM2 → ADM1 are all processed when their YAML is absent.
+
+    When ``do_fetch=True`` (used during ``-f``): fetches the dep zip if absent.
+    When ``do_fetch=False`` (used during ``-c``): warns and skips if zip is absent
+    (zip should already have been fetched by a prior ``-f`` run).
+
+    Returns the set of dep source keys that were newly processed.
+    """
+    if _visited is None:
+        _visited = set()
+    if key in _visited:
+        return set()
+    _visited.add(key)
+
+    yaml_path = f"sources/{key}.yaml"
+    if not os.path.exists(yaml_path):
+        return set()
+
+    with open(yaml_path) as _yf:
+        data = yaml.safe_load(_yf) or {}
+
+    targets: set = set()
+    for enum_def in (data.get("enums") or {}).values():
+        inh = (enum_def or {}).get("inherits")
+        if inh:
+            targets.add(inh)
+    if not targets:
+        return set()
+
+    # Build index: enum_name → first source_key that defines it
+    existing: dict = {}
+    if os.path.isdir("sources"):
+        for fname in os.listdir("sources"):
+            if not fname.endswith(".yaml"):
+                continue
+            fkey = fname[:-5]
+            try:
+                with open(f"sources/{fname}") as _ef:
+                    fdata = yaml.safe_load(_ef) or {}
+            except Exception:
+                continue
+            for ename in (fdata.get("enums") or {}):
+                existing.setdefault(ename, fkey)
+
+    processed: set = set()
+    for target in sorted(targets):
+        if target in existing:
+            processed.update(
+                _resolve_geo_inherits_deps(existing[target], all_sources, config_file,
+                                           locales, do_fetch, _visited)
+            )
+            continue
+
+        dep_key = _geo_enum_to_source_key(target, all_sources)
+        if not dep_key:
+            print(f"  Warning: inherits target '{target}' (from {key}) not resolvable "
+                  f"to any config source — skipping", file=sys.stderr)
+            continue
+
+        dep_source = all_sources[dep_key]
+        dep_ct     = dep_source.get("content_type", "")
+
+        if not _geo_cache_exists(dep_key):
+            if not do_fetch:
+                print(f"  Warning: dep '{dep_key}' has no cached data — "
+                      f"run '-f {key}' to pre-fetch it", file=sys.stderr)
+                continue
+            print(f"  Inherits dep: fetching {dep_key} ({dep_ct}) ...")
+            if dep_ct in _GEO_CONTENT_TYPES_GN:
+                fetch_geonames_source(dep_key, dep_source, config_file)
+            elif dep_ct in _GEO_CONTENT_TYPES_GW:
+                fetch_geowiki_source(dep_key, dep_source, config_file)
+            else:
+                print(f"  Warning: no fetch handler for '{dep_ct}' (dep {dep_key})",
+                      file=sys.stderr)
+                continue
+
+        print(f"  Inherits dep: processing {dep_key} ({dep_ct}) ...")
+        if dep_ct in _GEO_CONTENT_TYPES_GN:
+            process_geonames_source(dep_key, dep_source, config_file, locales=locales)
+        elif dep_ct in _GEO_CONTENT_TYPES_GW:
+            process_geowiki_source(dep_key, dep_source, config_file, locales=locales)
+        else:
+            print(f"  Warning: no process handler for '{dep_ct}' (dep {dep_key})",
+                  file=sys.stderr)
+            continue
+
+        processed.add(dep_key)
+        processed.update(
+            _resolve_geo_inherits_deps(dep_key, all_sources, config_file,
+                                       locales, do_fetch, _visited)
+        )
+    return processed
+
+
 def _require_source_file(key, ext, fallback_ext=None):
     """Return the source file path if it exists, else print a warning and return None.
 
@@ -1837,6 +2078,7 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
     _freetext_ran = 0   # FreeText sources explicitly processed
     _freetext_wrote = 0  # of those, how many wrote a YAML
     _non_freetext_ran = False  # whether any non-FreeText source was processed
+    _geo_dep_keys: set = set()  # dep keys auto-processed via inherits resolution
 
     for key in keys_to_process:
         source = all_sources[key]
@@ -1871,14 +2113,18 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
             process_iso_country_source(key, source, config_file, locales=locales)
             continue
 
-        if content_type in ("GeoNamesCountries", "GeoNamesADM1", "GeoNamesADM2",
-                            "GeoNamesADM34", "GeoNamesSettlement"):
+        if content_type in _GEO_CONTENT_TYPES_GN:
             process_geonames_source(key, source, config_file, locales=locales)
+            _geo_dep_keys.update(
+                _resolve_geo_inherits_deps(key, all_sources, config_file, locales,
+                                           do_fetch=False))
             continue
 
-        if content_type in ("GeoWikiCountries", "GeoWikiADM1", "GeoWikiADM2",
-                            "GeoWikiSettlement"):
+        if content_type in _GEO_CONTENT_TYPES_GW:
             process_geowiki_source(key, source, config_file, locales=locales)
+            _geo_dep_keys.update(
+                _resolve_geo_inherits_deps(key, all_sources, config_file, locales,
+                                           do_fetch=False))
             continue
 
         if content_type == "NAPCSCanada":
@@ -1990,6 +2236,13 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
 
         process_linkml_source(key, source, config_file)
 
+    # Auto-slot generation: add slot entries to source YAMLs when slots: automatic
+    with open(config_file) as _f:
+        _top_cfg = yaml.safe_load(_f) or {}
+    if _top_cfg.get("slots") == "automatic":
+        extra_dep_keys = sorted(_geo_dep_keys - set(keys_to_process))
+        _apply_auto_slots(keys_to_process + extra_dep_keys, config_file)
+
     # Skip index rebuild only when every explicitly-run source was FreeText and none wrote a YAML
     _index_total = None
     if not (_freetext_ran and _freetext_wrote == 0 and not _non_freetext_ran):
@@ -2004,6 +2257,101 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
 # OWL: -f downloads sources/{key}.zip; -c runs owlready2 to generate sources/{key}.yaml.
 # OntologyAPI: -f fetches the API graph to sources/{key}.zip; -c processes to yaml.
 _REGEN_C_TYPES = {"OWL", "OntologyAPI"}
+
+
+def _key_to_class_name(key: str) -> str:
+    """Convert a source key (underscore-separated) to a CamelCase class name.
+
+    Segments that are already mixed-case (e.g. ``GeoWiki``, ``GeoNames``) are
+    kept as-is.  Two-character all-alpha uppercase segments are treated as ISO
+    country codes and kept uppercase (``CA``, ``NL``).  All-uppercase segments
+    (optionally containing digits) are split at letter/digit boundaries and
+    each chunk is capitalised (``ADM1`` → ``Adm1``, ``ADM3ADM4`` →
+    ``Adm3Adm4``, ``PPL`` → ``Ppl``).  All-lowercase segments are capitalised
+    (``countries`` → ``Countries``).
+
+    Examples::
+
+        GeoWiki_ADM1_CA      → GeoWikiAdm1CA
+        GeoNames_countries   → GeoNamesCountries
+        GeoWiki_PPL_NL       → GeoWikiPplNL
+        GeoWiki_ADM3ADM4_CA  → GeoWikiAdm3Adm4CA
+    """
+    parts = []
+    for seg in key.split("_"):
+        if not seg:
+            continue
+        if any(c.islower() for c in seg):
+            # Mixed or all-lowercase segment: capitalise first letter of each word
+            parts.append(seg.capitalize() if seg.islower() else seg)
+        elif seg.isalpha() and len(seg) == 2:
+            # 2-char all-alpha uppercase: ISO country code — keep uppercase
+            parts.append(seg)
+        else:
+            # All-uppercase segment possibly with digits: split at letter/digit
+            # boundaries so 'ADM3ADM4' → ['ADM3', 'ADM4'] → 'Adm3Adm4'
+            chunks = re.findall(r'[A-Z]+[0-9]*', seg) or [seg]
+            parts.extend(c.capitalize() for c in chunks)
+    return "".join(parts)
+
+
+def _apply_auto_slots(keys_to_process: list, config_file: str) -> int:
+    """Add auto-generated slots and a matching class to source YAMLs.
+
+    For each key in keys_to_process whose sources/{key}.yaml exists, calls
+    make_auto_slots() for every enum in the file and writes new slot entries
+    back to the YAML.  Slots whose snake_case name already exists are skipped.
+
+    Also writes (or updates) an auto-class whose name is the CamelCase form of
+    the source key, whose description mirrors the schema-level description, and
+    whose ``slots`` list contains every slot key in the file.  The class is
+    updated whenever the slot list changes.
+
+    Returns the total number of new slots written across all files.
+    """
+    total = 0
+    for key in keys_to_process:
+        path = f"sources/{key}.yaml"
+        if not os.path.exists(path):
+            continue
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+        enums = data.get("enums") or {}
+        slots = data.get("slots") or {}
+        new   = make_auto_slots(enums, slots)
+        slots.update(new)
+
+        if not slots:
+            continue
+
+        data["slots"] = slots
+
+        # Auto-class: one class per source that lists all its slots, giving
+        # downstream tools (DataHarmonizer, validators) a concrete template.
+        class_name    = _key_to_class_name(key)
+        description   = data.get("description", "")
+        slot_list     = list(slots.keys())
+        classes       = data.get("classes") or {}
+        updated_class = {
+            "name":        class_name,
+            "description": description,
+            "tree_root":   True,
+            "slots":       slot_list,
+        }
+        changed = bool(new) or (classes.get(class_name) != updated_class)
+        if not changed:
+            continue
+
+        classes[class_name] = updated_class
+        data["classes"]     = classes
+        with open(path, "w") as f:
+            yaml.dump(data, f, Dumper=IndentedDumper,
+                      default_flow_style=False, sort_keys=False)
+        total += len(new)
+        if new:
+            print(f"  Auto-slots: added {len(new)} slot(s) to sources/{key}.yaml")
+        print(f"  Auto-class: {class_name} ({len(slot_list)} slots) → sources/{key}.yaml")
+    return total
 
 
 def _report_missing_yamls(config_file):
@@ -4018,17 +4366,37 @@ def main():
                 fetch_iso_country_source(key, source, config_file)
                 process_iso_country_source(key, source, config_file, locales=locales_cfg)
                 continue
-            # GeoNames flat-file sources
-            if content_type in ("GeoNamesCountries", "GeoNamesADM1", "GeoNamesADM2",
-                                "GeoNamesADM34", "GeoNamesSettlement"):
+            # GeoNames flat-file sources — pre-fetch dep zips (ADM2/ADM1) before main fetch
+            if content_type in _GEO_CONTENT_TYPES_GN:
+                for _dep_key in _get_geo_dep_keys(key, source, all_sources):
+                    if not _geo_cache_exists(_dep_key):
+                        _dep_src = all_sources[_dep_key]
+                        _dep_ct  = _dep_src.get("content_type", "")
+                        print(f"  Pre-fetching dep {_dep_key} ({_dep_ct}) ...")
+                        if _dep_ct in _GEO_CONTENT_TYPES_GN:
+                            fetch_geonames_source(_dep_key, _dep_src, config_file)
+                        elif _dep_ct in _GEO_CONTENT_TYPES_GW:
+                            fetch_geowiki_source(_dep_key, _dep_src, config_file)
                 fetch_geonames_source(key, source, config_file)
                 process_geonames_source(key, source, config_file, locales=locales_cfg)
+                _resolve_geo_inherits_deps(key, all_sources, config_file, locales_cfg,
+                                           do_fetch=False)
                 continue
-            # GeoWiki (Wikidata) sources
-            if content_type in ("GeoWikiCountries", "GeoWikiADM1", "GeoWikiADM2",
-                                "GeoWikiSettlement"):
+            # GeoWiki (Wikidata) sources — pre-fetch dep zips before main fetch
+            if content_type in _GEO_CONTENT_TYPES_GW:
+                for _dep_key in _get_geo_dep_keys(key, source, all_sources):
+                    if not _geo_cache_exists(_dep_key):
+                        _dep_src = all_sources[_dep_key]
+                        _dep_ct  = _dep_src.get("content_type", "")
+                        print(f"  Pre-fetching dep {_dep_key} ({_dep_ct}) ...")
+                        if _dep_ct in _GEO_CONTENT_TYPES_GN:
+                            fetch_geonames_source(_dep_key, _dep_src, config_file)
+                        elif _dep_ct in _GEO_CONTENT_TYPES_GW:
+                            fetch_geowiki_source(_dep_key, _dep_src, config_file)
                 fetch_geowiki_source(key, source, config_file)
                 process_geowiki_source(key, source, config_file, locales=locales_cfg)
+                _resolve_geo_inherits_deps(key, all_sources, config_file, locales_cfg,
+                                           do_fetch=False)
                 continue
             # NSDB sources: multi-page crawl — build sources/{key}.zip, not a single HTML.
             if content_type in ("NSDBSNT", "NSDBSLT", "NSDBSLC"):

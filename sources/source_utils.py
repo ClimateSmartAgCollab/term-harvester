@@ -25,6 +25,8 @@ Public API:
     rename_source_key(old_key, new_key, config_file)
     keys_from_minus(value)
     is_curie(value)
+    camel_to_snake(name)
+    make_auto_slots(enums, existing_slots)
     _get_type_conf(api_conf, type_name)
     rank_and_sort_permissible_values(permissible_values)
 """
@@ -674,3 +676,57 @@ def keys_from_minus(value):
     if isinstance(value, (list, tuple)):
         return set(value)
     return {str(value)}
+
+
+def camel_to_snake(name: str) -> str:
+    """Convert a CamelCase (or mixed) identifier to snake_case.
+
+    Treats compound geo-prefixes as atomic words so 'GeoWiki' and 'GeoNames'
+    each produce a single token rather than two.  The digit-before-uppercase
+    boundary (e.g. '1' before 'CA') is handled by the first re.sub, so
+    'GeoWikiAdm1CA' correctly becomes 'geowiki_adm1_ca':
+
+        GeoWikiAdm1CA         → geowiki_adm1_ca
+        GeoWikiAdm3Adm4CA     → geowiki_adm3_adm4_ca
+        GeoNamesAdm1CA        → geonames_adm1_ca
+        GeoWikiCountry        → geowiki_country
+        GeoWikiSettlementNL   → geowiki_settlement_nl
+    """
+    # Treat known compound prefixes as single words before splitting
+    name = name.replace("GeoWiki", "Geowiki").replace("GeoNames", "Geonames")
+    s = re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', name)
+    s = re.sub(r'([A-Z]+)([A-Z][a-z])', r'\1_\2', s)
+    return s.lower()
+
+
+def make_auto_slots(enums: dict, existing_slots: dict | None = None) -> dict:
+    """Return new slot definitions for enums not already in existing_slots.
+
+    For each enum whose snake_case slot name is absent from existing_slots,
+    produces a single-valued slot with:
+        name        = snake_case of the enum name
+        title       = "<EnumName> menu"
+        description = enum description (omitted if empty)
+        range       = enum name
+        multivalued = false
+
+    Only slots absent from existing_slots are returned; callers are responsible
+    for merging the result into the target slots dict.
+    """
+    existing = existing_slots or {}
+    new_slots: dict = {}
+    for enum_name, enum_data in (enums or {}).items():
+        slot_name = camel_to_snake(enum_name)
+        if slot_name in existing:
+            continue
+        slot: dict = {
+            "name":        slot_name,
+            "title":       f"{enum_name} menu",
+            "range":       enum_name,
+            "multivalued": False,
+        }
+        desc = ((enum_data or {}).get("description") or "").strip()
+        if desc:
+            slot["description"] = desc
+        new_slots[slot_name] = slot
+    return new_slots

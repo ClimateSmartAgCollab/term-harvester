@@ -28,6 +28,7 @@
 #       ontologies: [agrovoc]
 
 output: schema.yaml
+slots: automatic
 locales:
   - en
   - fr
@@ -40,7 +41,7 @@ sources:
     file_format: zip
     reachable_from:
       source_ontology: https://www.fao.org/gsfaonline/docs/CXS_192e.pdf
-    download_date: '2026-07-22'
+    download_date: '2026-11-01'
     description: 'The Codex General Standard for Food Additives (CXS 192-1995, formerly
       CODEX STAN 192-1995) is the internationally agreed standard that establishes
       conditions under which food additives may be safely used in foods and specifies
@@ -61,7 +62,7 @@ sources:
     file_format: zip
     reachable_from:
       source_ontology: https://sis.agr.gc.ca/cansis/taxa/cssc3/index.html
-    download_date: '2026-10-23'
+    download_date: '2026-11-01'
     description: The hierarchical taxonomy of the Canadian System of Soil Classification
       (CSSC, Third Edition), covering all three categorical levels in a single enumeration.
       Soil Order codes identify the 10 highest-level taxa (e.g., BR for Brunisolic);
@@ -79,202 +80,286 @@ sources:
     file_format: json
     reachable_from:
       source_ontology: https://www.wikidata.org/wiki/Q171318
-    download_date: '2026-10-23'
+    download_date: '2026-11-01'
     description: Food additive E numbers as recorded in Wikidata via property P628.
       Covers EU/UK approved additives and related international INS codes.
     prefix_dict:
       wd: http://www.wikidata.org/entity/
-  GeoNames_CA_ADM1:
+  GeoNames_ADM1_CA:
     title: GeoNames ADM1 for CA
-    name: GeoNames_CA_ADM1
-    version: '2026-10-23'
+    name: GeoNames_ADM1_CA
+    version: '2026-11-01'
     content_type: GeoNamesADM1
     file_format: zip
     reachable_from:
       source_ontology: https://download.geonames.org/export/dump/admin1CodesASCII.txt
-    download_date: '2026-10-23'
+    download_date: '2026-11-01'
     country: CA
     prefixes:
       wd: http://www.wikidata.org/entity/
       gnf: https://sws.geonames.org/
       iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
     license: CC-BY 4.0
-  GeoNames_CA_ADM2:
-    title: GeoNames ADM2 for CA
-    name: GeoNames_CA_ADM2
-    version: '2026-10-23'
-    content_type: GeoNamesADM2
+    minus:
+      status:
+        - historical
+  GeoNames_ADM1_NL:
+    title: GeoNames ADM1 for NL
+    name: GeoNames_ADM1_NL
+    version: '2026-11-01'
+    content_type: GeoNamesADM1
     file_format: zip
     reachable_from:
-      source_ontology: https://download.geonames.org/export/dump/admin2Codes.txt
-    download_date: '2026-10-23'
-    country: CA
+      source_ontology: https://download.geonames.org/export/dump/admin1CodesASCII.txt
+    download_date: '2026-11-01'
+    country: NL
     prefixes:
       wd: http://www.wikidata.org/entity/
       gnf: https://sws.geonames.org/
       iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
     license: CC-BY 4.0
-  GeoNames_CA_ADM3ADM4:
-    title: GeoNames ADM3/ADM4 for CA
-    name: GeoNames_CA_ADM3ADM4
-    version: '2026-10-24'
-    content_type: GeoNamesADM34
+    minus:
+      status:
+        - historical
+  GeoNames_ADM1_US:
+    title: GeoNames ADM1 for US
+    name: GeoNames_ADM1_US
+    version: '2026-11-01'
+    content_type: GeoNamesADM1
     file_format: zip
     reachable_from:
-      source_ontology: https://download.geonames.org/export/dump/CA.zip
-    download_date: '2026-10-23'
-    description: ADM3/ADM4 administrative divisions for CA from GeoNames CA.zip.
-    country: CA
-    levels:
-      - ADM3
-      - ADM4
+      source_ontology: https://download.geonames.org/export/dump/admin1CodesASCII.txt
+    download_date: '2026-11-01'
+    country: US
     prefixes:
       wd: http://www.wikidata.org/entity/
       gnf: https://sws.geonames.org/
       gno: http://www.geonames.org/ontology#
       iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
     license: CC-BY 4.0
+    minus:
+      status:
+        - historical
+  GeoNames_ADM2_CA:
+    title: GeoNames ADM2 for CA
+    name: GeoNames_ADM2_CA
+    version: '2026-11-01'
+    content_type: GeoNamesADM2
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/admin2Codes.txt
+    download_date: '2026-11-01'
+    country: CA
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+    minus:
+      status:
+        - historical
+  GeoNames_ADM2_NL:
+    title: GeoNames ADM2 for NL
+    name: GeoNames_ADM2_NL
+    version: '2026-11-01'
+    content_type: GeoNamesADM2
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/admin2Codes.txt
+    download_date: '2026-11-01'
+    country: NL
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+    minus:
+      status:
+        - historical
+  GeoNames_ADM2_US:
+    title: GeoNames ADM2 for US
+    name: GeoNames_ADM2_US
+    version: '2026-11-01'
+    content_type: GeoNamesADM2
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/admin2Codes.txt
+    download_date: '2026-11-01'
+    country: US
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+    minus:
+      status:
+        - historical
+  GeoNames_ADM3_CA:
+    title: GeoNames ADM3 for CA
+    name: GeoNames_ADM3_CA
+    version: '2026-11-01'
+    content_type: GeoNamesADM3
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/CA.zip
+    download_date: '2026-11-01'
+    description: ADM3 administrative divisions for CA from GeoNames CA.zip.
+    country: CA
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+    minus:
+      status:
+        - historical
+  GeoNames_ADM3_NL:
+    title: GeoNames ADM3 for NL
+    name: GeoNames_ADM3_NL
+    version: '2026-11-01'
+    content_type: GeoNamesADM3
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/NL.zip
+    download_date: '2026-11-01'
+    description: ADM3 administrative divisions for NL from GeoNames NL.zip.
+    country: NL
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+    minus:
+      status:
+        - historical
+  GeoNames_ADM3_US:
+    title: GeoNames ADM3 for US
+    name: GeoNames_ADM3_US
+    version: '2026-11-01'
+    content_type: GeoNamesADM3
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/US.zip
+    download_date: '2026-11-01'
+    description: ADM3 administrative divisions for US from GeoNames US.zip.
+    country: US
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+    minus:
+      status:
+        - historical
+  GeoNames_ADM4_CA:
+    title: GeoNames ADM4 for CA
+    name: GeoNames_ADM4_CA
+    version: '2026-11-01'
+    content_type: GeoNamesADM4
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/CA.zip
+    download_date: '2026-11-01'
+    description: ADM4 administrative divisions for CA from GeoNames CA.zip.
+    country: CA
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC-BY 4.0
+    minus:
+      status:
+        - historical
   GeoNames_countries:
     title: GeoNames Countries, Continents, and Oceans
     name: GeoNames_countries
-    version: '2026-10-23'
+    version: '2026-11-01'
     content_type: GeoNamesCountries
     file_format: zip
     reachable_from:
       source_ontology: https://download.geonames.org/export/dump/countryInfo.txt
-    download_date: '2026-10-23'
+    download_date: '2026-11-01'
     description: Sovereign states, territories, continents, and major oceans from
       GeoNames with Wikidata P1566 cross-references.
     prefixes:
       wd: http://www.wikidata.org/entity/
       gnf: https://sws.geonames.org/
     license: CC-BY 4.0
-  GeoNames_NL_ADM1:
-    title: GeoNames ADM1 for NL
-    name: GeoNames_NL_ADM1
-    version: '2026-10-23'
-    content_type: GeoNamesADM1
+  GeoNames_Settlement_CA:
+    title: GeoNames Settlements for CA
+    name: GeoNames_Settlement_CA
+    version: '2026-11-01'
+    content_type: GeoNamesSettlement
     file_format: zip
     reachable_from:
-      source_ontology: https://download.geonames.org/export/dump/admin1CodesASCII.txt
-    download_date: '2026-10-23'
-    country: NL
+      source_ontology: https://download.geonames.org/export/dump/CA.zip
+    download_date: '2026-11-01'
+    description: 'Populated places for CA from GeoNames CA.zip. Historical entries
+      marked status: historical.'
+    country: CA
     prefixes:
       wd: http://www.wikidata.org/entity/
       gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
       iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
     license: CC-BY 4.0
-  GeoNames_NL_ADM2:
-    title: GeoNames ADM2 for NL
-    name: GeoNames_NL_ADM2
-    version: '2026-10-23'
-    content_type: GeoNamesADM2
-    file_format: zip
-    reachable_from:
-      source_ontology: https://download.geonames.org/export/dump/admin2Codes.txt
-    download_date: '2026-10-23'
-    country: NL
-    prefixes:
-      wd: http://www.wikidata.org/entity/
-      gnf: https://sws.geonames.org/
-      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
-    license: CC-BY 4.0
-  GeoNames_NL_ADM3:
-    title: GeoNames ADM3 for NL
-    name: GeoNames_NL_ADM3
-    version: '2026-10-23'
-    content_type: GeoNamesADM34
-    file_format: zip
-    reachable_from:
-      source_ontology: https://download.geonames.org/export/dump/NL.zip
-    download_date: '2026-10-23'
-    description: ADM3 administrative divisions for NL from GeoNames NL.zip.
-    country: NL
-    levels:
-      - ADM3
-    prefixes:
-      wd: http://www.wikidata.org/entity/
-      gnf: https://sws.geonames.org/
-      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
-    license: CC-BY 4.0
-  GeoNames_NL_PPL:
+    minus:
+      status:
+        - historical
+  GeoNames_Settlement_NL:
     title: GeoNames Settlements for NL
-    name: GeoNames_NL_PPL
-    version: '2026-10-23'
+    name: GeoNames_Settlement_NL
+    version: '2026-11-01'
     content_type: GeoNamesSettlement
     file_format: zip
     reachable_from:
       source_ontology: https://download.geonames.org/export/dump/NL.zip
-    download_date: '2026-10-23'
+    download_date: '2026-11-01'
     description: 'Populated places for NL from GeoNames NL.zip. Historical entries
-      marked status: deprecated.'
+      marked status: historical.'
     country: NL
     prefixes:
       wd: http://www.wikidata.org/entity/
       gnf: https://sws.geonames.org/
       iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
     license: CC-BY 4.0
-  GeoNames_US_ADM1:
-    title: GeoNames ADM1 for US
-    name: GeoNames_US_ADM1
-    version: '2026-10-24'
-    content_type: GeoNamesADM1
-    file_format: zip
-    reachable_from:
-      source_ontology: https://download.geonames.org/export/dump/admin1CodesASCII.txt
-    download_date: '2026-10-23'
-    country: US
-    prefixes:
-      wd: http://www.wikidata.org/entity/
-      gnf: https://sws.geonames.org/
-      gno: http://www.geonames.org/ontology#
-      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
-    license: CC-BY 4.0
-  GeoNames_US_ADM2:
-    title: GeoNames ADM2 for US
-    name: GeoNames_US_ADM2
-    version: '2026-10-24'
-    content_type: GeoNamesADM2
-    file_format: zip
-    reachable_from:
-      source_ontology: https://download.geonames.org/export/dump/admin2Codes.txt
-    download_date: '2026-10-23'
-    country: US
-    prefixes:
-      wd: http://www.wikidata.org/entity/
-      gnf: https://sws.geonames.org/
-      gno: http://www.geonames.org/ontology#
-      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
-    license: CC-BY 4.0
-  GeoNames_US_ADM3ADM4:
-    title: GeoNames ADM3/ADM4 for US
-    name: GeoNames_US_ADM3ADM4
-    version: '2026-10-24'
-    content_type: GeoNamesADM34
+    minus:
+      status:
+        - historical
+  GeoNames_Settlement_US:
+    title: GeoNames Settlements for US
+    name: GeoNames_Settlement_US
+    version: '2026-11-01'
+    content_type: GeoNamesSettlement
     file_format: zip
     reachable_from:
       source_ontology: https://download.geonames.org/export/dump/US.zip
-    download_date: '2026-10-23'
-    description: ADM3/ADM4 administrative divisions for US from GeoNames US.zip.
+    download_date: '2026-11-01'
+    description: 'Populated places for US from GeoNames US.zip. Historical entries
+      marked status: historical.'
     country: US
-    levels:
-      - ADM3
-      - ADM4
     prefixes:
       wd: http://www.wikidata.org/entity/
       gnf: https://sws.geonames.org/
       gno: http://www.geonames.org/ontology#
       iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
     license: CC-BY 4.0
-  GeoWiki_CA_ADM1:
+    minus:
+      status:
+        - historical
+  GeoWiki_ADM1_CA:
     title: Wikidata ADM1 for CA
-    name: GeoWiki_CA_ADM1
+    name: GeoWiki_ADM1_CA
     version: null
     content_type: GeoWikiADM1
     file_format: zip
     reachable_from:
       source_ontology: https://www.wikidata.org/wiki/QQ16
-    download_date: '2026-10-23'
+    download_date: '2026-11-01'
     description: First-order administrative divisions of CA from Wikidata.
     country: CA
     prefixes:
@@ -282,30 +367,18 @@ sources:
       gnf: https://sws.geonames.org/
       iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
     license: CC0 1.0
-  GeoWiki_countries:
-    title: Wikidata Countries, Continents, and Oceans
-    name: GeoWiki_countries
-    version: null
-    content_type: GeoWikiCountries
-    file_format: zip
-    reachable_from:
-      source_ontology: https://www.wikidata.org/wiki/Wikidata:Main_Page
-    download_date: '2026-10-23'
-    description: Current sovereign states (P297), continents (P31=Q5107), and oceans
-      (P31=Q9430) from Wikidata with GeoNames P1566 cross-references.
-    prefixes:
-      wd: http://www.wikidata.org/entity/
-      gnf: https://sws.geonames.org/
-    license: CC0 1.0
-  GeoWiki_LU_ADM1:
+    minus:
+      status:
+        - historical
+  GeoWiki_ADM1_LU:
     title: Wikidata ADM1 for LU
-    name: GeoWiki_LU_ADM1
+    name: GeoWiki_ADM1_LU
     version: null
     content_type: GeoWikiADM1
     file_format: zip
     reachable_from:
       source_ontology: https://www.wikidata.org/wiki/QQ32
-    download_date: '2026-10-23'
+    download_date: '2026-11-01'
     description: First-order administrative divisions of LU from Wikidata.
     country: LU
     prefixes:
@@ -313,32 +386,18 @@ sources:
       gnf: https://sws.geonames.org/
       iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
     license: CC0 1.0
-  GeoWiki_LU_PPL:
-    title: Wikidata Settlements for LU
-    name: GeoWiki_LU_PPL
-    version: null
-    content_type: GeoWikiSettlement
-    file_format: zip
-    reachable_from:
-      source_ontology: https://www.wikidata.org/
-    download_date: '2026-10-23'
-    description: 'Populated places for LU from Wikidata. Dissolved entries marked
-      status: deprecated.'
-    country: LU
-    prefixes:
-      wd: http://www.wikidata.org/entity/
-      gnf: https://sws.geonames.org/
-      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
-    license: CC0 1.0
-  GeoWiki_US_ADM1:
+    minus:
+      status:
+        - historical
+  GeoWiki_ADM1_US:
     title: Wikidata ADM1 for US
-    name: GeoWiki_US_ADM1
+    name: GeoWiki_ADM1_US
     version: null
     content_type: GeoWikiADM1
     file_format: zip
     reachable_from:
       source_ontology: https://www.wikidata.org/wiki/QQ30
-    download_date: '2026-10-23'
+    download_date: '2026-11-01'
     description: First-order administrative divisions of US from Wikidata.
     country: US
     prefixes:
@@ -347,15 +406,38 @@ sources:
       gno: http://www.geonames.org/ontology#
       iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
     license: CC0 1.0
-  GeoWiki_US_ADM2:
+    minus:
+      status:
+        - historical
+  GeoWiki_ADM2_CA:
+    title: Wikidata ADM2 for CA
+    name: GeoWiki_ADM2_CA
+    version: null
+    content_type: GeoWikiADM2
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/wiki/QQ16
+    download_date: '2026-11-01'
+    description: Second-order administrative divisions of CA from Wikidata.
+    country: CA
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+    minus:
+      status:
+        - historical
+  GeoWiki_ADM2_US:
     title: Wikidata ADM2 for US
-    name: GeoWiki_US_ADM2
+    name: GeoWiki_ADM2_US
     version: null
     content_type: GeoWikiADM2
     file_format: zip
     reachable_from:
       source_ontology: https://www.wikidata.org/wiki/QQ30
-    download_date: '2026-10-23'
+    download_date: '2026-11-01'
     description: Second-order administrative divisions of US from Wikidata.
     country: US
     prefixes:
@@ -364,3 +446,131 @@ sources:
       gno: http://www.geonames.org/ontology#
       iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
     license: CC0 1.0
+    minus:
+      status:
+        - historical
+  GeoWiki_ADM3_CA:
+    title: Wikidata ADM3 for CA
+    name: GeoWiki_ADM3_CA
+    version: null
+    content_type: GeoWikiADM3
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/CA.zip
+    download_date: '2026-11-01'
+    description: Third-order administrative divisions of CA from GeoNames with Wikidata
+      QIDs.
+    country: CA
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+    minus:
+      status:
+        - historical
+  GeoWiki_ADM4_CA:
+    title: Wikidata ADM4 for CA
+    name: GeoWiki_ADM4_CA
+    version: null
+    content_type: GeoWikiADM4
+    file_format: zip
+    reachable_from:
+      source_ontology: https://download.geonames.org/export/dump/CA.zip
+    download_date: '2026-11-01'
+    description: Fourth-order administrative divisions of CA from GeoNames with Wikidata
+      QIDs.
+    country: CA
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+    minus:
+      status:
+        - historical
+  GeoWiki_countries:
+    title: Wikidata Countries, Continents, and Oceans
+    name: GeoWiki_countries
+    version: null
+    content_type: GeoWikiCountries
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/wiki/Wikidata:Main_Page
+    download_date: '2026-11-01'
+    description: Current sovereign states (P297), continents (P31=Q5107), and oceans
+      (P31=Q9430) from Wikidata with GeoNames P1566 cross-references.
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+    license: CC0 1.0
+    minus:
+      status:
+        - historical
+  GeoWiki_Settlement_CA:
+    title: Wikidata Settlements for CA
+    name: GeoWiki_Settlement_CA
+    version: null
+    content_type: GeoWikiSettlement
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/
+    download_date: '2026-11-01'
+    description: 'Populated places for CA from Wikidata. Dissolved entries marked
+      status: historical.'
+    country: CA
+    apis:
+      qlever: true
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+    minus:
+      status:
+        - historical
+  GeoWiki_Settlement_LU:
+    title: Wikidata Settlements for LU
+    name: GeoWiki_Settlement_LU
+    version: null
+    content_type: GeoWikiSettlement
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/
+    download_date: '2026-11-01'
+    description: 'Populated places for LU from Wikidata. Dissolved entries marked
+      status: historical.'
+    country: LU
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+    minus:
+      status:
+        - historical
+  GeoWiki_Settlement_US:
+    title: Wikidata Settlements for US
+    name: GeoWiki_Settlement_US
+    version: null
+    content_type: GeoWikiSettlement
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/
+    download_date: '2026-11-01'
+    description: 'Populated places for US from Wikidata. Dissolved entries marked
+      status: historical.'
+    country: US
+    apis:
+      qlever: true
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+    minus:
+      status:
+        - historical
