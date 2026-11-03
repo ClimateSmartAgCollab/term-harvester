@@ -22,6 +22,10 @@ GeoWikiADM34
     QIDs; entries with no QID found are omitted from the output YAML.  GeoNames
     numeric IDs and GeoNames → Wikidata cross-references are written to
     GeoWiki.sssom.tsv.  Per-country only.
+    Inherits chain: GeoWikiAdm4{CC} → GeoWikiAdm3{CC} → GeoWikiAdm2{CC} →
+    GeoWikiAdm1{CC}.  Each level automatically fetches its ancestors if absent
+    (zip only, no config entry): fetching ADM4 also fetches ADM3, ADM2, and ADM1;
+    fetching ADM3 also fetches ADM2 and ADM1; fetching ADM2 fetches ADM1.
 GeoWikiSettlement
     Populated places (P31 in settlement type set, P17 = country) from Wikidata.
     All non-current settlements are emitted as status: historical — both archaic
@@ -375,6 +379,22 @@ def _qlever_enabled(source):
 def _title_sort_key(s):
     """Unicode-aware sort key: NFD decomposition so Å sorts with A, é with e."""
     return unicodedata.normalize('NFD', s or '').casefold()
+
+
+def _best_label(item, locales, *fallback_keys):
+    """Return the best available label for a Wikidata item dict.
+
+    Tries each locale in *locales* order, then falls back through *fallback_keys*
+    (field names on *item*).  Returns "" if nothing is found.
+    """
+    lbls = item.get("labels", {})
+    for lang in locales:
+        if lbls.get(lang):
+            return lbls[lang]
+    for key in fallback_keys:
+        if item.get(key):
+            return item[key]
+    return ""
 
 
 def _adm1_enum_title(type_words_by_freq, country_name):
@@ -919,10 +939,7 @@ def _build_countries_yaml(key, source, data, locales=None):
     continents = data.get("continents", [])
     oceans     = data.get("oceans",     [])
 
-    def _lbl(item):
-        return (item.get("labels", {}).get(primary_lang)
-                or item.get("labels", {}).get("en")
-                or item.get("qid", ""))
+    def _lbl(item): return _best_label(item, locales, "qid")
 
     # --- Split sovereign states vs territories ---
     # Old cached payloads lack 'is_sovereign'; treat all as sovereign in that case.
@@ -1276,11 +1293,14 @@ def _build_countries_yaml(key, source, data, locales=None):
             (continents_sorted, "GeoWikiContinent"),
             (oceans_sorted,     "GeoWikiOcean"),
         ]:
-            lang_pvs = {
-                item["qid"]: {"title": normalize_text(item["labels"][lang])}
-                for item in items_list
-                if item.get("labels", {}).get(lang)
-            }
+            lang_pvs = {}
+            for item in items_list:
+                lbl = item.get("labels", {}).get(lang, "")
+                if not lbl:
+                    continue
+                default = normalize_text(_lbl(item))
+                if normalize_text(lbl) != default:
+                    lang_pvs[item["qid"]] = {"title": normalize_text(lbl)}
             if lang_pvs:
                 locale_enums[enum_key] = {"permissible_values": lang_pvs}
         if locale_enums:
@@ -1338,10 +1358,7 @@ def _build_adm1_yaml(key, source, data, locales=None):
     country_qid  = data.get("country_qid", "")
     country_name = data.get("country_name", scope if scope != "global" else "")
 
-    def _lbl(entry):
-        return (entry.get("labels", {}).get(primary_lang)
-                or entry.get("labels", {}).get("en")
-                or entry.get("qid", ""))
+    def _lbl(entry): return _best_label(entry, locales, "qid")
 
     sssom_rows = []
     pvs = {}
@@ -1567,10 +1584,7 @@ def _build_ppl_yaml(key, source, data, locales=None):
     scope   = data.get("scope", "")
     entries = data.get("entries", [])
 
-    def _lbl(item):
-        return (item.get("labels", {}).get(primary_lang)
-                or item.get("labels", {}).get("en")
-                or item.get("qid", ""))
+    def _lbl(item): return _best_label(item, locales, "qid")
 
     sorted_entries = sorted(entries, key=lambda x: _title_sort_key(_lbl(x)))
 
@@ -1632,6 +1646,22 @@ def _build_ppl_yaml(key, source, data, locales=None):
                 "object_label":         "",
             })
 
+    # Mark stype headers status: historical when every child is historical so that
+    # minus: {status: [historical]} also prunes the now-empty category headers.
+    # Only synthetic headers (no "meaning") are eligible; real entities are not touched.
+    _hdr_all_hist: dict = {}   # header_key → True if all children seen so far are historical
+    for pv_val in pvs.values():
+        parent = pv_val.get("is_a")
+        if parent and parent in pvs and "meaning" not in pvs[parent]:
+            child_hist = pv_val.get("status") == "historical"
+            if parent not in _hdr_all_hist:
+                _hdr_all_hist[parent] = child_hist
+            else:
+                _hdr_all_hist[parent] = _hdr_all_hist[parent] and child_hist
+    for hdr_key, all_hist in _hdr_all_hist.items():
+        if all_hist:
+            pvs[hdr_key]["status"] = "historical"
+
     n          = len(entries)
     n_archaic  = sum(1 for e in entries if e.get("is_archaic"))
     n_dissolved = sum(1 for e in entries if e.get("is_dissolved") and not e.get("is_archaic"))
@@ -1668,11 +1698,14 @@ def _build_ppl_yaml(key, source, data, locales=None):
     for lang in locales:
         if lang == "en":
             continue
-        lang_pvs = {
-            e["qid"]: {"title": normalize_text(e["labels"][lang])}
-            for e in sorted_entries
-            if e.get("labels", {}).get(lang)
-        }
+        lang_pvs = {}
+        for e in sorted_entries:
+            lbl = e.get("labels", {}).get(lang, "")
+            if not lbl:
+                continue
+            default = normalize_text(_lbl(e))
+            if normalize_text(lbl) != default:
+                lang_pvs[e["qid"]] = {"title": normalize_text(lbl)}
         if lang_pvs:
             ext = _make_locale_extensions(
                 source_url, key, source.get("version") or "", lang,
@@ -1960,8 +1993,13 @@ SELECT ?item ?label WHERE {{
             "country_qid":  country_qid,
         })
 
-    # Load cached ADM1 payload for province hierarchy embedding
-    adm1_key     = f"GeoWiki_ADM1_{alpha2.upper()}"
+    # Load cached ADM1 payload for province hierarchy embedding.
+    # Auto-fetch if absent (inherits chain; zip only, no config entry).
+    adm1_key = f"GeoWiki_ADM1_{alpha2.upper()}"
+    if not _entry_exists(adm1_key):
+        print(f"  Auto-fetching {adm1_key} (inherits chain; no config entry) ...")
+        _save_json(adm1_key, _fetch_adm1_payload(alpha2, locales,
+                                                   endpoint=endpoint, use_post=use_post))
     adm1_payload = None
     if _entry_exists(adm1_key):
         try:
@@ -2008,11 +2046,7 @@ def _build_adm2_yaml(key, source, data, locales=None):
     adm1_entries = data.get("adm1_entries", [])
     country_name = data.get("country_name", scope)
 
-    def _lbl(entry):
-        return (entry.get("labels", {}).get(primary_lang)
-                or entry.get("labels", {}).get("en")
-                or entry.get("name", "")
-                or entry.get("qid", ""))
+    def _lbl(entry): return _best_label(entry, locales, "name", "qid")
 
     # If adm1_entries absent (old cached payload), try loading from shared zip
     if not adm1_entries and scope:
@@ -2282,6 +2316,21 @@ def _build_adm2_yaml(key, source, data, locales=None):
             _GEOWIKI_SSSOM_ID, _GEOWIKI_SSSOM_DESC,
         )
         print(f"  SSSOM: {len(sssom_rows)} mappings written to {_GEOWIKI_SSSOM}")
+
+    # Companion ADM1 yaml: cascade up the inherits chain (ADM2 → ADM1)
+    if scope and adm1_entries:
+        companion1_path = f"sources/GeoWiki_ADM1_{scope}.yaml"
+        if not os.path.exists(companion1_path):
+            adm1_data = {
+                "scope":        scope,
+                "entries":      adm1_entries,
+                "country_name": country_name,
+                "country_qid":  data.get("country_qid", ""),
+            }
+            print(f"  Companion {companion1_path}: building from cache ...")
+            _build_adm1_yaml(f"GeoWiki_ADM1_{scope}", {}, adm1_data, locales)
+        else:
+            print(f"  Companion {companion1_path} already exists; skipping.")
 
 
 # ---------------------------------------------------------------------------
@@ -2689,6 +2738,30 @@ SELECT DISTINCT ?item ?name ?desc WHERE {{
     return wd_by_gnid
 
 
+def _ensure_ancestor_caches_gw(alpha2, locales, endpoint=_WDQS_ENDPOINT, use_post=True):
+    """Fetch and cache GeoWiki ADM1 and ADM2 for *alpha2* if not already cached.
+
+    Called automatically at the start of every ADM3/ADM4 fetch (covers both -f and
+    -a paths).  _fetch_adm2_payload also independently auto-fetches ADM1 if absent,
+    so the per-level cascade holds even when ADM2 is fetched directly.
+
+    No config entry is written (config_file omitted → zip-only).  ADM1 is fetched
+    before ADM2 because _fetch_adm2_payload loads the ADM1 cache to build the
+    province hierarchy embedded in the ADM2 output.
+    """
+    alpha2 = alpha2.upper()
+    adm1_key = f"GeoWiki_ADM1_{alpha2}"
+    if not _entry_exists(adm1_key):
+        print(f"  Auto-fetching {adm1_key} (inherits chain; no config entry) ...")
+        _save_json(adm1_key, _fetch_adm1_payload(alpha2, locales,
+                                                   endpoint=endpoint, use_post=use_post))
+    adm2_key = f"GeoWiki_ADM2_{alpha2}"
+    if not _entry_exists(adm2_key):
+        print(f"  Auto-fetching {adm2_key} (inherits chain; no config entry) ...")
+        _save_json(adm2_key, _fetch_adm2_payload(alpha2, locales,
+                                                   endpoint=endpoint, use_post=use_post))
+
+
 def _fetch_adm34_payload(alpha2, levels, locales, endpoint=_WDQS_ENDPOINT, use_post=True):
     """Build ADM3/ADM4 payload for a single country.
 
@@ -2698,12 +2771,12 @@ def _fetch_adm34_payload(alpha2, levels, locales, endpoint=_WDQS_ENDPOINT, use_p
          for ADM3/ADM4 — wkdt coverage is ~0% at this level.)
       2. Secondary: name + P131 (parent ADM2) / P17 (country) for entries not
          matched in stage 1.
-    The cached GeoWiki_{CC}_ADM2 payload is loaded before enrichment to supply
-    ADM2 compound_code → QID maps used in both hierarchy linking and the secondary
-    lookup.  All output entries with no QID after all stages are still stored
-    (qid="") so the YAML builder can log and skip them.
+    Auto-fetches and caches ADM1 and ADM2 (zip only, no config entry) if absent,
+    so that parent compound_code → QID maps and the companion yaml cascade have
+    everything they need.
     """
     cc = alpha2.upper()
+    _ensure_ancestor_caches_gw(alpha2, locales, endpoint=endpoint, use_post=use_post)
 
     # Load cached ADM2 payload FIRST — needed for secondary enrichment and is_a links
     adm2_key     = f"GeoWiki_ADM2_{cc}"
@@ -2814,6 +2887,14 @@ def _build_adm34_yaml(key, source, data, locales=None, only_levels=None):
     None means emit all levels present in data (backward-compatible default).
     Note: ADM3 compound→QID mapping is always built (needed for ADM4 is_a links),
     but the ADM3 enum is only added to output when only_levels includes "ADM3" or is None.
+
+    Side-effects: companion yaml files for the full ADM inherits chain are written
+    for any ancestor level whose yaml is absent but whose cached payload exists:
+    - ADM4-only: writes GeoWiki_ADM3_{scope}.yaml companion first
+    - ADM3 or ADM4: then writes GeoWiki_ADM2_{scope}.yaml (if ADM2 cached), which
+      in turn cascades to write GeoWiki_ADM1_{scope}.yaml (if ADM1 cached)
+    Full chain ADM4 → ADM3 → ADM2 → ADM1 is satisfied automatically when all
+    intermediate caches are present in GeoWiki.zip.
     """
     locales      = locales or ["en"]
     primary_lang = "en" if "en" in locales else locales[0]
@@ -2823,12 +2904,7 @@ def _build_adm34_yaml(key, source, data, locales=None, only_levels=None):
     adm2_entries = data.get("adm2_entries", [])
     levels       = set(data.get("levels", ["ADM3"]))
 
-    def _lbl(entry):
-        return (entry.get("labels", {}).get(primary_lang)
-                or entry.get("labels", {}).get("en")
-                or entry.get("name", "")
-                or entry.get("qid", "")
-                or entry.get("gnid", ""))
+    def _lbl(entry): return _best_label(entry, locales, "name", "qid", "gnid")
 
     # Build compound_code → pv_code from ADM2 entries (QID preferred, gnid fallback)
     adm2_compound_to_code: dict = {}
@@ -2937,7 +3013,7 @@ def _build_adm34_yaml(key, source, data, locales=None, only_levels=None):
 
     source_url = (source.get("reachable_from") or {}).get(
         "source_ontology",
-        _GEONAMES_CC_URL.format(CC=scope),
+        "https://www.wikidata.org/",
     )
 
     enums: dict = {}
@@ -2976,6 +3052,67 @@ def _build_adm34_yaml(key, source, data, locales=None, only_levels=None):
         }
         enums[enum4_key] = enum4_dict
         log_extraction(enum4_key, count=len(adm4_pvs))
+
+    # Companion ADM3 yaml: written as a side-effect when processing ADM4-only, so
+    # that GeoWikiAdm4{scope}'s inherits: GeoWikiAdm3{scope} dependency resolves
+    # automatically without requiring a separate GeoWiki_ADM3_{scope} config entry.
+    if only_levels == {"ADM4"} and adm3_pvs:
+        companion_path = f"sources/GeoWiki_ADM3_{scope}.yaml"
+        if not os.path.exists(companion_path):
+            n3_out = len(adm3_pvs)
+            c_enum3_dict: dict = {
+                "name":        enum3_key,
+                "title":       f"Municipalities of {scope}",
+                "description": (
+                    f"{n3_out} third-order administrative divisions for {scope} from GeoNames "
+                    f"identified by Wikidata QID ({n3_out}/{n3} GeoNames entries matched). "
+                    f"Auto-generated as companion to GeoWiki_ADM4_{scope}."
+                ),
+            }
+            if has_adm2:
+                c_enum3_dict["inherits"] = adm2_enum_key
+            c_enum3_dict["permissible_values"] = adm3_pvs
+            c_schema = make_config_schema(
+                id=source_url,
+                name=f"GeoWiki_ADM3_{scope}",
+                title=f"Wikidata ADM3 for {scope}",
+                description=(
+                    f"Third-order administrative divisions for {scope} from GeoNames "
+                    f"with Wikidata QIDs. Auto-generated as companion to "
+                    f"GeoWiki_ADM4_{scope}."
+                ),
+                license="CC0 1.0",
+                prefixes=_SOURCE_PREFIXES,
+                enums={enum3_key: c_enum3_dict},
+            )
+            with open(companion_path, "w") as f:
+                yaml.dump(c_schema, f, Dumper=IndentedDumper, default_flow_style=False,
+                          sort_keys=False)
+            log_extraction(enum3_key, count=n3_out)
+            print(f"  Companion {companion_path} written ({n3_out} ADM3 terms) "
+                  f"to satisfy GeoWikiAdm4{scope} inherits dependency.")
+        else:
+            print(f"  Companion {companion_path} already exists; skipping.")
+
+    # Companion ADM2 yaml: cascade up the inherits chain (ADM3 → ADM2 → ADM1)
+    # _build_adm2_yaml will itself cascade to ADM1 if its cache is present.
+    if scope:
+        companion2_path = f"sources/GeoWiki_ADM2_{scope}.yaml"
+        if not os.path.exists(companion2_path):
+            if _entry_exists(f"GeoWiki_ADM2_{scope}"):
+                try:
+                    adm2_payload = _load_json(f"GeoWiki_ADM2_{scope}")
+                    print(f"  Companion {companion2_path}: building from cache ...")
+                    _build_adm2_yaml(f"GeoWiki_ADM2_{scope}", {}, adm2_payload, locales)
+                except Exception as exc:
+                    print(f"  Note: could not load GeoWiki_ADM2_{scope} from cache: {exc}",
+                          file=sys.stderr)
+            else:
+                print(f"  Note: GeoWiki_ADM2_{scope} not in cache; "
+                      f"companion ADM2 yaml skipped "
+                      f"(run '-f GeoWiki_ADM2_{scope}' to fetch).", file=sys.stderr)
+        else:
+            print(f"  Companion {companion2_path} already exists; skipping.")
 
     if only_levels == {"ADM3"}:
         lv_str = "ADM3"
@@ -3086,7 +3223,7 @@ def _register_adm1(alpha2, config_file):
     _save_json(key, payload)
 
     entry = make_source_entry(
-        key, f"https://www.wikidata.org/wiki/Q{payload.get('country_qid', '')}",
+        key, "https://www.wikidata.org/",
         "GeoWikiADM1", "zip",
         title=f"Wikidata ADM1 for {alpha2}",
         description=f"First-order administrative divisions of {alpha2} from Wikidata.",
@@ -3123,7 +3260,7 @@ def _register_adm2(alpha2, config_file):
     _save_json(key, payload)
 
     entry = make_source_entry(
-        key, f"https://www.wikidata.org/wiki/Q{payload.get('country_qid', '')}",
+        key, "https://www.wikidata.org/",
         "GeoWikiADM2", "zip",
         title=f"Wikidata ADM2 for {alpha2}",
         description=f"Second-order administrative divisions of {alpha2} from Wikidata.",
@@ -3162,7 +3299,7 @@ def _register_adm34(alpha2, levels, config_file):
     _save_json(key, payload)
 
     entry = make_source_entry(
-        key, _GEONAMES_CC_URL.format(CC=alpha2.upper()),
+        key, "https://www.wikidata.org/",
         "GeoWikiADM34", "zip",
         title=f"Wikidata {lv_str} for {alpha2}",
         description=(
@@ -3202,7 +3339,7 @@ def _register_adm3(alpha2, config_file):
     _save_json(key, payload)
 
     entry = make_source_entry(
-        key, _GEONAMES_CC_URL.format(CC=alpha2.upper()),
+        key, "https://www.wikidata.org/",
         "GeoWikiADM3", "zip",
         title=f"Wikidata ADM3 for {alpha2}",
         description=(
@@ -3252,7 +3389,7 @@ def _register_adm4(alpha2, config_file):
     _save_json(key, payload)
 
     entry = make_source_entry(
-        key, _GEONAMES_CC_URL.format(CC=alpha2.upper()),
+        key, "https://www.wikidata.org/",
         "GeoWikiADM4", "zip",
         title=f"Wikidata ADM4 for {alpha2}",
         description=(
@@ -3440,7 +3577,7 @@ def fetch_geowiki_source(key, source, config_file=MENU_CONFIG):
             print(f"  Re-fetching GeoNames ADM4 for {alpha2} (combined ADM3+ADM4 payload cached under ADM3 key) ...")
             payload = _fetch_adm34_payload(alpha2, {"ADM3", "ADM4"}, locales, endpoint, use_p)
             if payload:
-                _save_json(adm3_key, payload, config_file=config_file)
+                _save_json(adm3_key, payload)   # companion cache — not a config entry
         if payload:
             _save_json(key, payload, config_file=config_file)
 

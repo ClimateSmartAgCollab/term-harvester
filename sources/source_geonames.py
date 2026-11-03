@@ -18,6 +18,10 @@ GeoNamesADM2
 GeoNamesADM34
     Third- and/or fourth-order divisions from per-country {CC}.zip allCountries
     file.  Per-country only.  Specify GeoNames_{CC}_ADM3 or GeoNames_{CC}_ADM3ADM4.
+    Inherits chain: GeoNamesAdm4{CC} → GeoNamesAdm3{CC} → GeoNamesAdm2{CC} →
+    GeoNamesAdm1{CC}.  Each level automatically fetches its ancestors if absent
+    (zip only, no config entry): fetching ADM4 also fetches ADM3, ADM2, and ADM1;
+    fetching ADM3 also fetches ADM2 and ADM1; fetching ADM2 fetches ADM1.
 GeoNamesSettlement
     Populated places (feature class P) from per-country {CC}.zip.  Includes both
     current settlements and historical/abandoned ones (PPLH, PPLCH, PPLQ, PPLW).
@@ -379,23 +383,35 @@ def _enrich_with_wikidata(gnids, locales=None, use_qlever=False):
     return result
 
 
-def _fetch_alternatenames_wkdt(cc):
-    """Download alternatenames/{CC}.zip and extract Wikidata QID mappings.
+def _fetch_alternatenames_wkdt(cc, extra_langs=None):
+    """Download alternatenames/{CC}.zip and extract Wikidata QID mappings and language labels.
 
-    Returns dict: gnid (str) → qid (str, bare, e.g. 'Q99')
-    Historic entries (isHistoric == '1') are excluded.
+    extra_langs: optional list/set of BCP-47 language codes (e.g. ['fr', 'de']) whose
+        preferred labels should also be extracted.  When None or empty, only wkdt entries
+        are collected and lang_labels is returned empty.
+
+    Returns (gnid_to_qid, gnid_to_labels):
+        gnid_to_qid:    dict gnid → qid (bare, e.g. 'Q99') from wkdt entries
+        gnid_to_labels: dict gnid → {lang: label} for each requested language
+    Historic entries (isHistoric == '1') and colloquial entries (isColloquial == '1')
+    are excluded from language labels.  For each (gnid, lang) pair the isPreferredName
+    entry wins; otherwise the first non-historic/non-colloquial entry is kept.
     """
     cc  = cc.upper()
     url = f"https://download.geonames.org/export/dump/alternatenames/{cc}.zip"
-    print(f"  Downloading alternatenames/{cc}.zip for wkdt crosswalk ...")
+    extra_langs_set = set(extra_langs) if extra_langs else set()
+    print(f"  Downloading alternatenames/{cc}.zip for wkdt crosswalk"
+          + (f" + {sorted(extra_langs_set)} labels" if extra_langs_set else "") + " ...")
     try:
         with urllib.request.urlopen(url, timeout=120) as resp:
             zdata = resp.read()
     except Exception as exc:
         print(f"  Warning: could not download alternatenames/{cc}.zip: {exc}",
               file=sys.stderr)
-        return {}
+        return {}, {}
     result = {}
+    # Track best label per (gnid, lang): (priority, label) where priority 1=preferred, 0=first-seen
+    lang_best: dict = {}   # (gnid, lang) → (priority, label)
     try:
         with zipfile.ZipFile(io.BytesIO(zdata)) as zf:
             fname = f"{cc}.txt"
@@ -404,20 +420,36 @@ def _fetch_alternatenames_wkdt(cc):
                     cols = line.rstrip("\n").split("\t")
                     if len(cols) < 4:
                         continue
-                    if cols[2] != "wkdt":
-                        continue
-                    if len(cols) >= 8 and cols[7] == "1":   # isHistoric
-                        continue
-                    gnid = cols[1].strip()
-                    qid  = cols[3].strip()
-                    if gnid and qid:
-                        result[gnid] = qid
+                    iso_lang = cols[2]
+                    gnid     = cols[1].strip()
+                    if iso_lang == "wkdt":
+                        if len(cols) >= 8 and cols[7] == "1":   # isHistoric
+                            continue
+                        qid = cols[3].strip()
+                        if gnid and qid:
+                            result[gnid] = qid
+                    elif iso_lang in extra_langs_set:
+                        if len(cols) >= 8 and cols[7] == "1":   # isHistoric
+                            continue
+                        if len(cols) >= 7 and cols[6] == "1":   # isColloquial
+                            continue
+                        name         = cols[3].strip()
+                        is_preferred = len(cols) >= 5 and cols[4] == "1"
+                        priority     = 1 if is_preferred else 0
+                        key          = (gnid, iso_lang)
+                        if key not in lang_best or priority > lang_best[key][0]:
+                            lang_best[key] = (priority, name)
     except Exception as exc:
         print(f"  Warning: could not parse alternatenames/{cc}.zip: {exc}",
               file=sys.stderr)
-        return {}
-    print(f"    Loaded {len(result)} wkdt QID mappings from alternatenames/{cc}.zip")
-    return result
+        return {}, {}
+    # Flatten lang_best → {gnid: {lang: label}}
+    lang_labels: dict = {}
+    for (gnid, lang), (_, label) in lang_best.items():
+        lang_labels.setdefault(gnid, {})[lang] = label
+    print(f"    Loaded {len(result)} wkdt QID mappings from alternatenames/{cc}.zip"
+          + (f"; {len(lang_labels)} gnids with ≥1 language label" if lang_labels else ""))
+    return result, lang_labels
 
 
 def _enrich_with_alternatenames_then_sparql(cc, gnids, locales, use_qlever=False):
@@ -425,6 +457,8 @@ def _enrich_with_alternatenames_then_sparql(cc, gnids, locales, use_qlever=False
 
     Step A — GeoNames alternateNames (primary, no API calls):
       Download alternatenames/{CC}.zip and extract wkdt entries.
+      When locales contains non-English languages, also extracts translated labels
+      from the same file (using isPreferredName where available).
 
     Step B — P1566 SPARQL fallback (for gnids with no wkdt entry):
       Batched reverse-lookup via _enrich_with_wikidata().
@@ -432,13 +466,16 @@ def _enrich_with_alternatenames_then_sparql(cc, gnids, locales, use_qlever=False
     Reports match counts for each step.
     Returns dict: gnid → {qid, labels, desc}
     """
-    wkdt_map  = _fetch_alternatenames_wkdt(cc)
+    extra_langs = [l for l in (locales or []) if l != "en"]
+    wkdt_map, lang_labels_map = _fetch_alternatenames_wkdt(
+        cc, extra_langs=extra_langs if extra_langs else None
+    )
     wd_data   = {}
     unmatched = []
     for gnid in gnids:
         qid = wkdt_map.get(gnid)
         if qid:
-            wd_data[gnid] = {"qid": qid, "labels": {}, "desc": ""}
+            wd_data[gnid] = {"qid": qid, "labels": lang_labels_map.get(gnid, {}), "desc": ""}
         else:
             unmatched.append(gnid)
     n_alt = len(gnids) - len(unmatched)
@@ -1052,17 +1089,26 @@ def _build_countries_yaml(key, source, data, locales=None):
         ext_lang_pvs  = {}
         cont_lang_pvs = {}
         for country in sovereign_countries:
-            lbl = wd_data.get(country["gnid"], {}).get("labels", {}).get(lang, "")
+            gnid = country["gnid"]
+            lbl  = wd_data.get(gnid, {}).get("labels", {}).get(lang, "")
             if lbl:
-                c_lang_pvs[country["gnid"]] = {"title": normalize_text(lbl)}
+                default = country_pvs.get(gnid, {}).get("title", "")
+                if normalize_text(lbl) != default:
+                    c_lang_pvs[gnid] = {"title": normalize_text(lbl)}
         for country in territory_countries:
-            lbl = wd_data.get(country["gnid"], {}).get("labels", {}).get(lang, "")
+            gnid = country["gnid"]
+            lbl  = wd_data.get(gnid, {}).get("labels", {}).get(lang, "")
             if lbl:
-                ext_lang_pvs[country["gnid"]] = {"title": normalize_text(lbl)}
+                default = extended_pvs.get(gnid, {}).get("title", "")
+                if normalize_text(lbl) != default:
+                    ext_lang_pvs[gnid] = {"title": normalize_text(lbl)}
         for cont in continents_sorted:
-            lbl = wd_data.get(cont["gnid"], {}).get("labels", {}).get(lang, "")
+            gnid = cont["gnid"]
+            lbl  = wd_data.get(gnid, {}).get("labels", {}).get(lang, "")
             if lbl:
-                cont_lang_pvs[cont["gnid"]] = {"title": normalize_text(lbl)}
+                default = continent_pvs.get(gnid, {}).get("title", "")
+                if normalize_text(lbl) != default:
+                    cont_lang_pvs[gnid] = {"title": normalize_text(lbl)}
 
         locale_enums = {}
         if c_lang_pvs:
@@ -1265,6 +1311,25 @@ def _build_adm1_yaml(key, source, data, locales=None):
             },
         },
     )
+    # Locale extensions — only when non-default locales are configured
+    for lang in locales:
+        if lang == "en":
+            continue
+        lang_pvs = {}
+        for code, pv in pvs.items():
+            lbl = wd_data.get(code, {}).get("labels", {}).get(lang, "")
+            if lbl:
+                default = pv.get("title", "")
+                if normalize_text(lbl) != default:
+                    lang_pvs[code] = {"title": normalize_text(lbl)}
+        if lang_pvs:
+            ext = _make_locale_extensions(
+                source_url, key, source.get("version") or "", lang,
+                enums={enum_key: {"permissible_values": lang_pvs}},
+            )
+            existing = schema.get("extensions", {}).get("locales", {}).get("value", {})
+            existing.update(ext.get("locales", {}).get("value", {}))
+            schema["extensions"] = {"locales": {"tag": "locales", "value": existing}}
     yaml_path = f"sources/{key}.yaml"
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
@@ -1433,6 +1498,25 @@ def _build_adm2_yaml(key, source, data, locales=None):
         prefixes=_SOURCE_PREFIXES,
         enums={enum_key: enum_dict},
     )
+    # Locale extensions for ADM2 entries (ADM1 locales live in the companion yaml)
+    for lang in locales:
+        if lang == "en":
+            continue
+        lang_pvs = {}
+        for gnid, pv in pvs.items():
+            lbl = wd_data.get(gnid, {}).get("labels", {}).get(lang, "")
+            if lbl:
+                default = pv.get("title", "")
+                if normalize_text(lbl) != default:
+                    lang_pvs[gnid] = {"title": normalize_text(lbl)}
+        if lang_pvs:
+            ext = _make_locale_extensions(
+                source_url, key, source.get("version") or "", lang,
+                enums={enum_key: {"permissible_values": lang_pvs}},
+            )
+            existing = schema.get("extensions", {}).get("locales", {}).get("value", {})
+            existing.update(ext.get("locales", {}).get("value", {}))
+            schema["extensions"] = {"locales": {"tag": "locales", "value": existing}}
     yaml_path = f"sources/{key}.yaml"
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
@@ -1443,6 +1527,21 @@ def _build_adm2_yaml(key, source, data, locales=None):
                              _GEONAMES_SSSOM_ID, _GEONAMES_SSSOM_DESC)
         print(f"  SSSOM: {len(sssom_rows)} mappings written to {_GEONAMES_SSSOM}")
 
+    # Companion ADM1 yaml: cascade up the inherits chain (ADM2 → ADM1)
+    if scope and adm1_entries:
+        companion1_path = f"sources/GeoNames_ADM1_{scope}.yaml"
+        if not os.path.exists(companion1_path):
+            adm1_data = {
+                "scope":        scope,
+                "entries":      adm1_entries,
+                "wikidata":     adm1_wd_data,
+                "country_name": adm1_country_name,
+            }
+            print(f"  Companion {companion1_path}: building from cache ...")
+            _build_adm1_yaml(f"GeoNames_ADM1_{scope}", {}, adm1_data, locales)
+        else:
+            print(f"  Companion {companion1_path} already exists; skipping.")
+
 
 def _build_adm3_yaml(key, source, data, locales=None, only_levels=None):
     """Write sources/{key}.yaml for GeoNamesADM3 or GeoNamesADM4 scope (per-country only).
@@ -1452,6 +1551,14 @@ def _build_adm3_yaml(key, source, data, locales=None, only_levels=None):
 
     only_levels: set of level names to emit, e.g. {"ADM3"} or {"ADM4"}.
     None means emit all levels present in data (backward-compatible default).
+
+    Side-effects: companion yaml files for the full ADM inherits chain are written
+    for any ancestor level whose yaml is absent but whose cached payload exists:
+    - ADM4-only: writes GeoNames_ADM3_{scope}.yaml companion first
+    - ADM3 or ADM4: then writes GeoNames_ADM2_{scope}.yaml (if ADM2 cached), which
+      in turn cascades to write GeoNames_ADM1_{scope}.yaml (if ADM1 cached)
+    Full chain ADM4 → ADM3 → ADM2 → ADM1 is satisfied automatically when all
+    intermediate caches are present in GeoNames.zip.
     """
     locales      = locales or ["en"]
     primary_lang = "en" if "en" in locales else locales[0]
@@ -1560,12 +1667,15 @@ def _build_adm3_yaml(key, source, data, locales=None, only_levels=None):
 
     enums = {}
 
-    if adm3_entries and (only_levels is None or "ADM3" in only_levels):
-        adm3_pvs  = _build_pvs(
+    # Compute ADM3 pvs whenever entries exist (needed for enum output OR companion yaml)
+    adm3_pvs: dict = {}
+    if adm3_entries:
+        adm3_pvs = _build_pvs(
             adm3_entries,
             lambda e: (adm2_compound_to_gnid.get(f"{scope}.{e['adm1_code']}.{e['adm2_code']}")
                        or f"{scope}.{e['adm1_code']}.{e['adm2_code']}"),
         )
+    if adm3_pvs and (only_levels is None or "ADM3" in only_levels):
         enum3_key  = f"GeoNamesAdm3{scope}"
         enum3_dict = {"name": enum3_key, "title": "Municipality"}
         if has_adm2:
@@ -1619,6 +1729,29 @@ def _build_adm3_yaml(key, source, data, locales=None, only_levels=None):
         prefixes=_SOURCE_PREFIXES,
         enums=enums,
     )
+    # Locale extensions for ADM3/ADM4 enums
+    for lang in locales:
+        if lang == "en":
+            continue
+        locale_enums = {}
+        for ek, ev in enums.items():
+            lang_pvs = {}
+            for gnid, pv in ev["permissible_values"].items():
+                lbl = wd_data.get(gnid, {}).get("labels", {}).get(lang, "")
+                if lbl:
+                    default = pv.get("title", "")
+                    if normalize_text(lbl) != default:
+                        lang_pvs[gnid] = {"title": normalize_text(lbl)}
+            if lang_pvs:
+                locale_enums[ek] = {"permissible_values": lang_pvs}
+        if locale_enums:
+            ext = _make_locale_extensions(
+                source_url, key, source.get("version") or "", lang,
+                enums=locale_enums,
+            )
+            existing = schema.get("extensions", {}).get("locales", {}).get("value", {})
+            existing.update(ext.get("locales", {}).get("value", {}))
+            schema["extensions"] = {"locales": {"tag": "locales", "value": existing}}
     yaml_path = f"sources/{key}.yaml"
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
@@ -1629,6 +1762,72 @@ def _build_adm3_yaml(key, source, data, locales=None, only_levels=None):
         write_sssom_mappings(_GEONAMES_SSSOM, sssom_rows, _SSSOM_PREFIXES,
                              _GEONAMES_SSSOM_ID, _GEONAMES_SSSOM_DESC)
         print(f"  SSSOM: {len(sssom_rows)} mappings written to {_GEONAMES_SSSOM}")
+
+    # Companion ADM3 yaml: written as a side-effect when processing ADM4-only, so that
+    # GeoNamesAdm4{scope}'s inherits: GeoNamesAdm3{scope} dependency resolves
+    # automatically without requiring a separate GeoNames_ADM3_{scope} config entry.
+    if only_levels == {"ADM4"} and adm3_pvs:
+        companion_path = f"sources/GeoNames_ADM3_{scope}.yaml"
+        if not os.path.exists(companion_path):
+            enum3_key  = f"GeoNamesAdm3{scope}"
+            enum3_dict = {"name": enum3_key, "title": "Municipality"}
+            if has_adm2:
+                enum3_dict["inherits"] = f"GeoNamesAdm2{scope}"
+            enum3_dict["permissible_values"] = adm3_pvs
+            c_schema = make_config_schema(
+                id=source_url,
+                name=f"GeoNames_ADM3_{scope}",
+                title=f"GeoNames ADM3 for {scope}",
+                description=(
+                    f"Third-order administrative divisions for {scope} from GeoNames. "
+                    f"Auto-generated as companion to GeoNames_ADM4_{scope}."
+                ),
+                license="CC-BY 4.0",
+                prefixes=_SOURCE_PREFIXES,
+                enums={enum3_key: enum3_dict},
+            )
+            for lang in locales:
+                if lang == "en":
+                    continue
+                lang_pvs = {}
+                for gnid, pv in adm3_pvs.items():
+                    lbl = wd_data.get(gnid, {}).get("labels", {}).get(lang, "")
+                    if lbl:
+                        default = pv.get("title", "")
+                        if normalize_text(lbl) != default:
+                            lang_pvs[gnid] = {"title": normalize_text(lbl)}
+                if lang_pvs:
+                    ext = _make_locale_extensions(
+                        source_url, f"GeoNames_ADM3_{scope}", "", lang,
+                        enums={enum3_key: {"permissible_values": lang_pvs}},
+                    )
+                    existing = c_schema.get("extensions", {}).get("locales", {}).get("value", {})
+                    existing.update(ext.get("locales", {}).get("value", {}))
+                    c_schema["extensions"] = {"locales": {"tag": "locales", "value": existing}}
+            with open(companion_path, "w") as f:
+                yaml.dump(c_schema, f, Dumper=IndentedDumper, default_flow_style=False,
+                          sort_keys=False)
+            log_extraction(enum3_key, count=len(adm3_pvs))
+            print(f"  Companion {companion_path} written ({len(adm3_pvs)} ADM3 terms) "
+                  f"to satisfy GeoNamesAdm4{scope} inherits dependency.")
+        else:
+            print(f"  Companion {companion_path} already exists; skipping.")
+
+    # Companion ADM2 yaml: cascade up the inherits chain (ADM3 → ADM2 → ADM1)
+    # _build_adm2_yaml will itself cascade to ADM1 if its cache is present.
+    if scope:
+        companion2_path = f"sources/GeoNames_ADM2_{scope}.yaml"
+        if not os.path.exists(companion2_path):
+            adm2_payload = _load_cached_adm_payload(f"GeoNames_ADM2_{scope}")
+            if adm2_payload:
+                print(f"  Companion {companion2_path}: building from cache ...")
+                _build_adm2_yaml(f"GeoNames_ADM2_{scope}", {}, adm2_payload, locales)
+            else:
+                print(f"  Note: GeoNames_ADM2_{scope} not in cache; "
+                      f"companion ADM2 yaml skipped "
+                      f"(run '-f GeoNames_ADM2_{scope}' to fetch).", file=sys.stderr)
+        else:
+            print(f"  Companion {companion2_path} already exists; skipping.")
 
 
 def _build_ppl_yaml(key, source, data, locales=None):
@@ -1797,6 +1996,25 @@ def _build_ppl_yaml(key, source, data, locales=None):
             },
         },
     )
+    # Locale extensions — only settlement entries (gnid keys); ADM1 headers use plain names
+    for lang in locales:
+        if lang == "en":
+            continue
+        lang_pvs = {}
+        for gnid, pv in pvs.items():
+            lbl = wd_data.get(gnid, {}).get("labels", {}).get(lang, "")
+            if lbl:
+                default = pv.get("title", "")
+                if normalize_text(lbl) != default:
+                    lang_pvs[gnid] = {"title": normalize_text(lbl)}
+        if lang_pvs:
+            ext = _make_locale_extensions(
+                source_url, key, source.get("version") or "", lang,
+                enums={enum_key: {"permissible_values": lang_pvs}},
+            )
+            existing = schema.get("extensions", {}).get("locales", {}).get("value", {})
+            existing.update(ext.get("locales", {}).get("value", {}))
+            schema["extensions"] = {"locales": {"tag": "locales", "value": existing}}
     yaml_path = f"sources/{key}.yaml"
     with open(yaml_path, "w") as f:
         yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
@@ -1912,22 +2130,23 @@ def _fetch_adm2_payload(cc, locales, use_qlever=False):
     adm1_names = {e["adm1_code"]: e["name"] for e in adm1_rows}
     adm1_gnids = {e["adm1_code"]: e["gnid"] for e in adm1_rows}
 
-    # Load cached ADM1 Wikidata payload for province type grouping
-    adm1_key     = f"GeoNames_ADM1_{cc.upper()}"
+    # Load cached ADM1 Wikidata payload for province type grouping.
+    # Auto-fetch if absent (inherits chain; zip only, no config entry).
+    adm1_key = f"GeoNames_ADM1_{cc.upper()}"
+    if not _entry_exists(adm1_key):
+        print(f"  Auto-fetching {adm1_key} (inherits chain; no config entry) ...")
+        _save_json(adm1_key, _fetch_adm1_payload(cc, locales, use_qlever=use_qlever))
     adm1_payload = _load_cached_adm_payload(adm1_key)
     if adm1_payload:
         adm1_entries      = adm1_payload.get("entries", [])
         adm1_wd_data      = adm1_payload.get("wikidata", {})
         adm1_country_name = adm1_payload.get("country_name", "")
-        print(f"  Loaded ADM1 data from cached {adm1_key}.zip for province hierarchy.")
+        print(f"  Loaded ADM1 data from cached {adm1_key} for province hierarchy.")
     else:
-        # Fallback: flat-file entries without Wikidata (province list will be flat)
+        # Fallback only if auto-fetch failed (e.g. network error)
         adm1_entries      = adm1_rows
         adm1_wd_data      = {}
         adm1_country_name = ""
-        print(f"  Note: no cached {adm1_key}.zip — province grouping will be flat "
-              f"(run '-a GeoNames_ADM1_{cc.upper()}' first for type grouping).",
-              file=sys.stderr)
 
     return {
         "type":              "adm2",
@@ -1986,14 +2205,37 @@ def _fetch_ppl_payload(cc, locales, use_qlever=False):
     }
 
 
+def _ensure_ancestor_caches_gn(cc, locales, use_qlever=False):
+    """Fetch and cache GeoNames ADM1 and ADM2 for *cc* if not already cached.
+
+    Called automatically at the start of every ADM3/ADM4 fetch (covers both -f and
+    -a paths).  _fetch_adm2_payload also independently auto-fetches ADM1 if absent,
+    so the per-level cascade holds even when ADM2 is fetched directly.
+
+    No config entry is written (config_file omitted → zip-only).  ADM1 is fetched
+    before ADM2 because _fetch_adm2_payload loads the ADM1 cache to build the
+    province hierarchy embedded in the ADM2 output.
+    """
+    cc = cc.upper()
+    adm1_key = f"GeoNames_ADM1_{cc}"
+    if not _entry_exists(adm1_key):
+        print(f"  Auto-fetching {adm1_key} (inherits chain; no config entry) ...")
+        _save_json(adm1_key, _fetch_adm1_payload(cc, locales, use_qlever=use_qlever))
+    adm2_key = f"GeoNames_ADM2_{cc}"
+    if not _entry_exists(adm2_key):
+        print(f"  Auto-fetching {adm2_key} (inherits chain; no config entry) ...")
+        _save_json(adm2_key, _fetch_adm2_payload(cc, locales, use_qlever=use_qlever))
+
+
 def _fetch_adm34_payload(cc, levels, locales, use_qlever=False):
     """Download GeoNames ADM3/ADM4 for country cc via per-country allCountries zip.
 
-    Also loads the cached ADM2 payload (GeoNames_{CC}_ADM2.zip) to get the
-    ADM2 compound_code → gnid mapping, so _build_adm3_yaml can use gnid-based
-    parent keys that align with GeoNamesADM2 PV codes.
+    Auto-fetches and caches ADM1 and ADM2 (zip only, no config entry) if absent,
+    so that parent compound_code → gnid resolution and the companion yaml cascade
+    have everything they need.
     """
     cc      = cc.upper()
+    _ensure_ancestor_caches_gn(cc, locales, use_qlever)
     source_modified = _geonames_head_date(_GEONAMES_CC_URL.format(CC=cc))
     entries = _fetch_geonames_adm34(cc, levels=levels)
     gnids   = [e["gnid"] for e in entries]
@@ -2428,7 +2670,7 @@ def fetch_geonames_source(key, source, config_file=MENU_CONFIG):
             print(f"  Re-fetching GeoNames ADM4 for {cc} (combined ADM3+ADM4 payload cached under ADM3 key) ...")
             payload = _fetch_adm34_payload(cc, {"ADM3", "ADM4"}, locales, use_qlever=use_qlever)
             if payload:
-                _save_json(adm3_key, payload, config_file=config_file)
+                _save_json(adm3_key, payload)   # companion cache — not a config entry
         if payload:
             _save_json(key, payload, config_file=config_file)
 

@@ -1940,77 +1940,94 @@ def _resolve_geo_inherits_deps(
     with open(yaml_path) as _yf:
         data = yaml.safe_load(_yf) or {}
 
+    own_enums: set = set((data.get("enums") or {}).keys())
     targets: set = set()
     for enum_def in (data.get("enums") or {}).values():
         inh = (enum_def or {}).get("inherits")
         if inh:
             targets.add(inh)
+    targets -= own_enums  # same-file inherits (e.g. GeoNamesCountryExtended → GeoNamesCountry)
     if not targets:
         return set()
 
-    # Build index: enum_name → first source_key that defines it
-    existing: dict = {}
-    if os.path.isdir("sources"):
-        for fname in os.listdir("sources"):
-            if not fname.endswith(".yaml"):
-                continue
-            fkey = fname[:-5]
-            try:
-                with open(f"sources/{fname}") as _ef:
-                    fdata = yaml.safe_load(_ef) or {}
-            except Exception:
-                continue
-            for ename in (fdata.get("enums") or {}):
-                existing.setdefault(ename, fkey)
-
     processed: set = set()
     for target in sorted(targets):
-        if target in existing:
+        # ── Case 1 & 2: target maps to a registered config source ──────────
+        dep_key = _geo_enum_to_source_key(target, all_sources)
+        if dep_key:
+            if os.path.exists(f"sources/{dep_key}.yaml"):
+                # YAML already written — just propagate recursively
+                processed.update(
+                    _resolve_geo_inherits_deps(dep_key, all_sources, config_file,
+                                               locales, do_fetch, _visited)
+                )
+                continue
+
+            # YAML absent — need to fetch/process this dep
+            dep_source = all_sources[dep_key]
+            dep_ct     = dep_source.get("content_type", "")
+
+            if not _geo_cache_exists(dep_key):
+                if not do_fetch:
+                    print(f"  Warning: dep '{dep_key}' has no cached data — "
+                          f"run '-f {key}' to pre-fetch it", file=sys.stderr)
+                    continue
+                print(f"  Inherits dep: fetching {dep_key} ({dep_ct}) ...")
+                if dep_ct in _GEO_CONTENT_TYPES_GN:
+                    fetch_geonames_source(dep_key, dep_source, config_file)
+                elif dep_ct in _GEO_CONTENT_TYPES_GW:
+                    fetch_geowiki_source(dep_key, dep_source, config_file)
+                else:
+                    print(f"  Warning: no fetch handler for '{dep_ct}' (dep {dep_key})",
+                          file=sys.stderr)
+                    continue
+
+            print(f"  Inherits dep: processing {dep_key} ({dep_ct}) ...")
+            if dep_ct in _GEO_CONTENT_TYPES_GN:
+                process_geonames_source(dep_key, dep_source, config_file, locales=locales)
+            elif dep_ct in _GEO_CONTENT_TYPES_GW:
+                process_geowiki_source(dep_key, dep_source, config_file, locales=locales)
+            else:
+                print(f"  Warning: no process handler for '{dep_ct}' (dep {dep_key})",
+                      file=sys.stderr)
+                continue
+
+            processed.add(dep_key)
             processed.update(
-                _resolve_geo_inherits_deps(existing[target], all_sources, config_file,
+                _resolve_geo_inherits_deps(dep_key, all_sources, config_file,
                                            locales, do_fetch, _visited)
             )
             continue
 
-        dep_key = _geo_enum_to_source_key(target, all_sources)
-        if not dep_key:
-            print(f"  Warning: inherits target '{target}' (from {key}) not resolvable "
-                  f"to any config source — skipping", file=sys.stderr)
-            continue
-
-        dep_source = all_sources[dep_key]
-        dep_ct     = dep_source.get("content_type", "")
-
-        if not _geo_cache_exists(dep_key):
-            if not do_fetch:
-                print(f"  Warning: dep '{dep_key}' has no cached data — "
-                      f"run '-f {key}' to pre-fetch it", file=sys.stderr)
-                continue
-            print(f"  Inherits dep: fetching {dep_key} ({dep_ct}) ...")
-            if dep_ct in _GEO_CONTENT_TYPES_GN:
-                fetch_geonames_source(dep_key, dep_source, config_file)
-            elif dep_ct in _GEO_CONTENT_TYPES_GW:
-                fetch_geowiki_source(dep_key, dep_source, config_file)
+        # ── Case 3: companion file not in config — derive key by convention ─
+        # Enum names follow GeoNamesAdm3CA / GeoWikiAdm3CA pattern.
+        # Companion yaml files are named GeoNames_ADM3_CA.yaml etc.
+        _m = re.match(r'^(GeoWiki|GeoNames)((?:Adm\d+)+)([A-Z]{2})?$', target)
+        if _m:
+            fam    = _m.group(1)
+            levels = re.findall(r'\d+', _m.group(2))
+            cc     = _m.group(3) or ""
+            # Build candidate keys (split key preferred, combined as fallback)
+            _cands = [f"{fam}_ADM{'ADM'.join(levels)}_{cc}".rstrip("_")]
+            if len(levels) == 1:
+                n = int(levels[0])
+                _cands.append(f"{fam}_ADM{n}ADM{n+1}_{cc}".rstrip("_"))
+            for companion_key in _cands:
+                if os.path.exists(f"sources/{companion_key}.yaml"):
+                    processed.update(
+                        _resolve_geo_inherits_deps(companion_key, all_sources,
+                                                   config_file, locales,
+                                                   do_fetch, _visited)
+                    )
+                    break
             else:
-                print(f"  Warning: no fetch handler for '{dep_ct}' (dep {dep_key})",
-                      file=sys.stderr)
-                continue
-
-        print(f"  Inherits dep: processing {dep_key} ({dep_ct}) ...")
-        if dep_ct in _GEO_CONTENT_TYPES_GN:
-            process_geonames_source(dep_key, dep_source, config_file, locales=locales)
-        elif dep_ct in _GEO_CONTENT_TYPES_GW:
-            process_geowiki_source(dep_key, dep_source, config_file, locales=locales)
-        else:
-            print(f"  Warning: no process handler for '{dep_ct}' (dep {dep_key})",
-                  file=sys.stderr)
+                print(f"  Warning: inherits target '{target}' (from {key}) not resolvable "
+                      f"to any config source or companion file — skipping", file=sys.stderr)
             continue
 
-        processed.add(dep_key)
-        processed.update(
-            _resolve_geo_inherits_deps(dep_key, all_sources, config_file,
-                                       locales, do_fetch, _visited)
-        )
+        # ── Case 4: not recognisable ────────────────────────────────────────
+        print(f"  Warning: inherits target '{target}' (from {key}) not resolvable "
+              f"to any config source — skipping", file=sys.stderr)
     return processed
 
 
