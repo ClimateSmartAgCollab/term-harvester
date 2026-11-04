@@ -59,6 +59,7 @@ The term_harvester.py script fetches vocabulary sources, processes them into Lin
   - [Library of Congress Classification](#library-of-congress-classification-loc_classification)
   - [CRediT (Contributor Roles Taxonomy)](#credit-contributor-roles-taxonomy)
   - [AgriFoodCA picklists](#agrifoodca-picklists)
+  - [Darwin Core Simple Record (TDWG\_DWC\_Simple)](#darwin-core-simple-record-tdwg_dwc_simple)
   - [Codex Alimentarius (GSFA food additives)](#codex-alimentarius-gsfa-food-additives-codex)
   - [E Numbers (Wikidata P628)](#e-numbers-wikidata-p628-e_number)
   - [CANSIS Glossary of Terms in Soil Science](#cansis-glossary-of-terms-in-soil-science-cansis_glossary)
@@ -313,6 +314,8 @@ Check source section for details on command line configuration.
 
 | Detected as | Description |
 |---|---|
+| **Biodiversity** | |
+| [`TDWG_DWC_Simple`](#darwin-core-simple-record-tdwg_dwc_simple)<br>224 slots, 4 enums | TDWG Darwin Core Simple Record — a flat, standard representation of biodiversity occurrence data with 224 field slots across 10 sections and four closed controlled-vocabulary enumerations.<br>(URL matches `tdwg_dwc_simple.xsd` or `tdwg-dwc-simple.xsd`, pre-download) |
 | **Agricultural** | |
 | [`AgriFoodCA`](#agrifoodca-picklists)<br>~400 terms | AgriFoodData Canada bilingual (EN/FR) agricultural picklist CSVs; add an entire GitHub directory or a single CSV file.<br>(GitHub directory URL for `agrifooddatacanada/picklists_for_schemas`, pre-download; or CSV with first row matching `,title,description,keywords,source`, content-based) |
 | [`AGROVOC`](#agrovoc) → `OntologyAPI`<br>~40,000 terms (subtree on request) | FAO multilingual agricultural thesaurus covering farming, food, fisheries, and natural resources (~40 000 concepts).<br>(URL matches `aims.fao.org/aos/agrovoc/{id}`, pre-download) |
@@ -1096,6 +1099,96 @@ Source keys are derived from filenames: `AFC` + PascalCase(stem), e.g.
 
 When a source document URL is found in the CSV metadata (the `source` column of the
 `general` row), it is stored as `see_also` in `harvester_config.yaml`.
+
+---
+
+### Darwin Core Simple Record (`TDWG_DWC_Simple`)
+
+[Darwin Core](https://dwc.tdwg.org/) is the TDWG standard for sharing biodiversity occurrence
+data.  The *Simple Darwin Core* profile is a flat, single-table representation of an occurrence
+record — no extension tables, no nesting — defined by a W3C XML Schema (XSD) at
+`https://dwc.tdwg.org/xml/tdwg_dwc_simple.xsd`.
+
+```bash
+python term_harvester.py -a https://dwc.tdwg.org/xml/tdwg_dwc_simple.xsd
+python term_harvester.py -b
+```
+
+The URL is auto-detected as `TDWG_DWC_Simple`.  On first run `-a` registers the source, calls
+`-f` and `-c` automatically, and writes `sources/TDWG_DWC_Simple.yaml`.  To refresh term comments
+and vocabulary translations from the TDWG/GBIF GitHub repository:
+
+```bash
+python term_harvester.py -f TDWG_DWC_Simple   # re-fetches GBIF XML metadata and vocabulary translations
+python term_harvester.py -c TDWG_DWC_Simple   # re-generates sources/TDWG_DWC_Simple.yaml
+python term_harvester.py -b                    # updates schema.yaml
+```
+
+#### What is generated
+
+| Item | Count | Notes |
+|---|---|---|
+| Slots | 224 | One per DWC Simple field, snake_case key, with `slot_uri`, `slot_group`, `range`, `description`, `comments` |
+| Enums | 4 | Closed controlled vocabularies with `permissible_values`, `meaning`, and `title` |
+| Class | 1 | `DarwinCoreSimpleRecord` — tree-root class listing all 224 slots |
+
+The 224 slots are grouped into 10 sections (`slot_group`):
+
+| Section | Example fields |
+|---|---|
+| Record-Level Terms | `basis_of_record`, `type`, `institution_code`, `license` |
+| Occurrence | `occurrence_id`, `sex`, `life_stage`, `occurrence_status`, `recorded_by` |
+| Organism | `organism_id`, `organism_name`, `associated_organisms` |
+| Material Entity | `material_entity_id`, `preparations`, `disposition` |
+| Material Sample | `material_sample_id` |
+| Event | `event_id`, `event_date`, `habitat`, `sampling_protocol` |
+| Location | `decimal_latitude`, `decimal_longitude`, `country`, `locality` |
+| Geological Context | `formation`, `member`, `bed`, `earliest_epoch_or_lowest_series` |
+| Identification | `identified_by`, `identification_qualifier`, `type_status` |
+| Taxon | `scientific_name`, `taxon_rank`, `kingdom` through `family` |
+
+#### Closed enumerations
+
+| Enum | Entries | Source |
+|---|---|---|
+| `DCMIType` | 12 | [DCMI Type Vocabulary](https://www.dublincore.org/specifications/dublin-core/dcmi-type-vocabulary/) — `dcterms:` meanings |
+| `DwCDegreeOfEstablishment` | 11 | [TDWG dwcdoe vocabulary](https://dwc.tdwg.org/doe/) — Blackburn et al. 2011 category letters (A, B1–B3, C0–C3, D1, D2, E) as keys; `dwcdoe:eXXX` meanings |
+| `DwCEstablishmentMeans` | 7 | [TDWG dwcem vocabulary](https://dwc.tdwg.org/em/) — camelCase controlled values as keys; `dwcem:eXXX` meanings |
+| `DwCPathway` | 53 | [TDWG dwcpw vocabulary](https://dwc.tdwg.org/pw/) — camelCase controlled values as keys; `dwcpw:pXXX` meanings |
+
+Fields whose values are open recommendations rather than closed sets (e.g. `basis_of_record`,
+`sex`, `life_stage`, `occurrence_status`, `establishment_means`) carry an `examples` list on
+their slot definition instead of a range enum.
+
+#### Locale support
+
+When a locale such as `fr` is listed in `harvester_config.yaml`, term_harvester injects
+translated titles, descriptions, and enum labels for that language into `schema.yaml` during
+`-c`/`-b`.  Translations are sourced automatically during `-f` from two sets of TDWG/GBIF
+GitHub XML files and cached as sidecar files in the `sources/` folder alongside the module:
+
+| Sidecar | Contents |
+|---|---|
+| `source_dwc_simple_v{version}_translations.yaml` | 213 slot-level translations (title, description, comments) for `fr`, `cs`, `es`, `ru`, `zh` from `dwc-a/schemas/core/*.xml` |
+| `source_dwc_simple_v{version}_vocab_translations.yaml` | 71 enum-label translations keyed by concept IRI for `DwCPathway` (53 × 6 languages), `DwCEstablishmentMeans` (7 × 6 languages), `DwCDegreeOfEstablishment` (11 × 7 languages) |
+
+The available locale codes are `en`, `fr`, `cs`, `es`, `ru`, `zh` (slots) plus `ar`, `de`,
+`nl`, `pt`, `vi`, `zh-Hant` (some enum vocabularies).  Add any desired locales to
+`harvester_config.yaml`, then run `-c` and `-b`:
+
+```yaml
+# harvester_config.yaml
+locales:
+  - en
+  - fr
+```
+
+The resulting `schema.yaml` gains an `extensions.locales.value.fr` block containing
+189 translated slots and 71 translated permissible value titles.
+
+#### Diagram
+
+`-f` produces `sources/TDWG_DWC_Simple.drawio` — a draw.io diagram of the basic DwC elements.
 
 ---
 
