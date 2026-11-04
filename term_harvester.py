@@ -343,6 +343,7 @@ from source_freetext import (
     fetch_freetext_source,
 )
 from source_dwc_simple import (
+    _DWC_XSD_URL,
     match_dwc_simple,
     fetch_dwc_simple_source,
     process_dwc_simple_source,
@@ -1631,6 +1632,11 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
         if re.match(r'^CODEX$', url, re.IGNORECASE):
             print(f"  CODEX → {CODEX_GSFA_URL}")
             url = CODEX_GSFA_URL
+
+        # Resolve the bare shorthand "TDWG_DWC_Simple" to the canonical XSD URL.
+        if re.match(r'^TDWG_DWC_Simple$', url, re.IGNORECASE):
+            print(f"  TDWG_DWC_Simple → {_DWC_XSD_URL}")
+            url = _DWC_XSD_URL
 
         # FreeText: extract from provided text via Claude — no download needed.
         # Always stop after the call; do not fall through to other matchers

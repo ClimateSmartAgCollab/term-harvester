@@ -1110,7 +1110,7 @@ record — no extension tables, no nesting — defined by a W3C XML Schema (XSD)
 `https://dwc.tdwg.org/xml/tdwg_dwc_simple.xsd`.
 
 ```bash
-python term_harvester.py -a https://dwc.tdwg.org/xml/tdwg_dwc_simple.xsd
+python term_harvester.py -a TDWG_DWC_Simple   # shorthand, or use the full XSD URL
 python term_harvester.py -b
 ```
 
