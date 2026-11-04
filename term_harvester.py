@@ -342,6 +342,11 @@ from source_freetext import (
     process_freetext_source,
     fetch_freetext_source,
 )
+from source_dwc_simple import (
+    match_dwc_simple,
+    fetch_dwc_simple_source,
+    process_dwc_simple_source,
+)
 from source_utils import (
     MENU_CONFIG,
     BROWSER_HEADERS,
@@ -484,13 +489,18 @@ def _load_sssom(path_or_uri):
       curie_map — {prefix: uri} from the SSSOM curie_map block, or {}
     Rows whose subject_id is empty are silently skipped.
     """
-    import csv, io
+    import csv, io, zipfile
 
     if path_or_uri.startswith(("http://", "https://")):
         req = urllib.request.Request(path_or_uri, headers=BROWSER_HEADERS)
         with urllib.request.urlopen(req) as resp:
             charset = resp.headers.get_content_charset() or "utf-8"
             content = resp.read().decode(charset, errors="replace")
+    elif path_or_uri.endswith(".zip"):
+        member = os.path.basename(path_or_uri)[:-4] + ".tsv"  # e.g. GeoNames.sssom.tsv
+        with zipfile.ZipFile(path_or_uri, "r") as zf:
+            with zf.open(member) as fz:
+                content = fz.read().decode("utf-8")
     else:
         with open(path_or_uri, "r", encoding="utf-8") as f:
             content = f.read()
@@ -949,6 +959,38 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
                         schema["slots"][slot_name] = slot_def
                     elif isinstance(schema["slots"].get(slot_name), dict):
                         schema["slots"][slot_name]["slot_group"] = key
+
+            # Merge slot locale translations from source YAML extensions block
+            _src_locale_value = (
+                (source_data.get("extensions") or {})
+                .get("locales", {})
+                .get("value", {})
+            )
+            for _lang, _lang_locale in _src_locale_value.items():
+                _slot_trans = _lang_locale.get("slots") or {}
+                _enum_trans = _lang_locale.get("enums") or {}
+                if not _slot_trans and not _enum_trans:
+                    continue
+                _ext  = schema.setdefault("extensions", {})
+                _loc  = _ext.setdefault("locales", {"tag": "locales", "value": {}})
+                _lang_entry = _loc.setdefault("value", {}).setdefault(_lang, {
+                    "id":          _lang_locale.get("id", ""),
+                    "name":        _lang_locale.get("name", ""),
+                    "version":     _lang_locale.get("version", ""),
+                    "in_language": _lang,
+                    "enums":       {},
+                })
+                if _slot_trans:
+                    _lang_entry.setdefault("slots", {}).update(_slot_trans)
+                if _enum_trans:
+                    for _enum_name, _enum_locale_data in _enum_trans.items():
+                        _pv_trans = (_enum_locale_data or {}).get("permissible_values") or {}
+                        if _pv_trans:
+                            (_lang_entry
+                             .setdefault("enums", {})
+                             .setdefault(_enum_name, {})
+                             .setdefault("permissible_values", {})
+                             .update(_pv_trans))
 
             # Build full prefix map for this source (source YAML + any config additions).
             # Only prefixes actually referenced in permissible_value meanings are added
@@ -1652,6 +1694,8 @@ def add_source(urls, config_file=MENU_CONFIG, free_text=None):
             continue
         if match_geowiki_code(url, config_file):
             continue
+        if match_dwc_simple(url, config_file):
+            continue
 
         # Check if base URL already matches an existing source; skip download if so.
         _base_add_url = url.split("#")[0]
@@ -2251,6 +2295,10 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
                 _freetext_wrote += 1
             continue
 
+        if content_type == "TDWG_DWC_Simple":
+            process_dwc_simple_source(key, source, config_file)
+            continue
+
         process_linkml_source(key, source, config_file)
 
     # Auto-slot generation: add slot entries to source YAMLs when slots: automatic
@@ -2273,7 +2321,8 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
 # Content types whose yaml is generated via -c (process), not -f (file download).
 # OWL: -f downloads sources/{key}.zip; -c runs owlready2 to generate sources/{key}.yaml.
 # OntologyAPI: -f fetches the API graph to sources/{key}.zip; -c processes to yaml.
-_REGEN_C_TYPES = {"OWL", "OntologyAPI"}
+# TDWG_DWC_Simple: yaml is generated from the embedded versioned .txt file via -c.
+_REGEN_C_TYPES = {"OWL", "OntologyAPI", "TDWG_DWC_Simple"}
 
 
 def _key_to_class_name(key: str) -> str:
@@ -4442,6 +4491,10 @@ def main():
                 continue
             if content_type == "CANSIS_GLOSSARY":
                 fetch_cansis_glossary_source(key, source, config_file)
+                continue
+            # TDWG_DWC_Simple: check live XSD for version/field changes, regenerate diagram.
+            if content_type == "TDWG_DWC_Simple":
+                fetch_dwc_simple_source(key, source, config_file)
                 continue
             if content_type == "OWL":
                 fetch_owl_source(key, source, config_file)

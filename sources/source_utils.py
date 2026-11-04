@@ -32,10 +32,12 @@ Public API:
 """
 
 import datetime
+import io
 import os
 import re
 import urllib.request
 import yaml
+import zipfile
 
 
 MENU_CONFIG = "config.yaml"
@@ -473,7 +475,7 @@ def write_config(config, config_file=MENU_CONFIG):
 def write_sssom_mappings(sssom_path, new_rows, prefixes, mapping_set_id,
                          mapping_set_description=None,
                          license_uri="https://creativecommons.org/publicdomain/zero/1.0/"):
-    """Write or merge SSSOM exactMatch rows into an SSSOM TSV file.
+    """Write or merge SSSOM exactMatch rows into an SSSOM TSV (or zip) file.
 
     Reads any existing rows from sssom_path and merges them with new_rows.
     Rows are deduplicated on (subject_id, predicate_id, object_id); new_rows
@@ -482,7 +484,10 @@ def write_sssom_mappings(sssom_path, new_rows, prefixes, mapping_set_id,
     Parameters
     ----------
     sssom_path : str
-        Path to the .sssom.tsv file (created if absent).
+        Path to the output file.  When the path ends in ``.sssom.zip`` the TSV
+        is stored compressed inside a zip archive (member name = basename with
+        ``.zip`` stripped, e.g. ``GeoNames.sssom.tsv``).  Any other extension
+        is written as plain text.
     new_rows : list[dict]
         Each dict must have ``subject_id``, ``predicate_id``, ``object_id``,
         ``mapping_justification``.  ``subject_label`` and ``object_label``
@@ -499,19 +504,32 @@ def write_sssom_mappings(sssom_path, new_rows, prefixes, mapping_set_id,
     _COLUMNS = ["subject_id", "predicate_id", "object_id",
                 "mapping_justification", "subject_label", "object_label"]
 
+    is_zip = sssom_path.endswith(".zip")
+    # Member name inside the zip: replace trailing ".zip" with ".tsv"
+    zip_member = (os.path.basename(sssom_path)[:-4] + ".tsv") if is_zip else None
+
+    def _iter_existing_lines(path):
+        """Yield raw text lines from path, handling both zip and plain TSV."""
+        if is_zip:
+            with zipfile.ZipFile(path, "r") as zf:
+                with zf.open(zip_member) as fz:
+                    for raw in io.TextIOWrapper(fz, encoding="utf-8"):
+                        yield raw
+        else:
+            with open(path, encoding="utf-8") as f:
+                yield from f
+
     # Read existing rows (skip YAML header lines and the column-name line)
     existing: dict = {}
     if os.path.exists(sssom_path):
-        with open(sssom_path, encoding="utf-8") as f:
-            for line in f:
-                stripped = line.rstrip("\n")
-                if stripped.startswith("#") or stripped.startswith("subject_id"):
-                    continue
-                parts = stripped.split("\t")
-                if len(parts) >= 3 and parts[0] and parts[2]:
-                    key = (parts[0], parts[1], parts[2])
-                    # Pad to full column count
-                    existing[key] = (parts + [""] * len(_COLUMNS))[:len(_COLUMNS)]
+        for line in _iter_existing_lines(sssom_path):
+            stripped = line.rstrip("\n")
+            if stripped.startswith("#") or stripped.startswith("subject_id"):
+                continue
+            parts = stripped.split("\t")
+            if len(parts) >= 3 and parts[0] and parts[2]:
+                key = (parts[0], parts[1], parts[2])
+                existing[key] = (parts + [""] * len(_COLUMNS))[:len(_COLUMNS)]
 
     # Merge new rows (new rows win on duplicate key)
     for row in new_rows:
@@ -522,19 +540,31 @@ def write_sssom_mappings(sssom_path, new_rows, prefixes, mapping_set_id,
             continue
         existing[(s, p, o)] = [row.get(c, "") for c in _COLUMNS]
 
-    # Write YAML metadata header + TSV data
-    with open(sssom_path, "w", encoding="utf-8", newline="\n") as f:
-        f.write("# curie_map:\n")
-        for prefix, uri in sorted(prefixes.items()):
-            f.write(f"#   {prefix}: {uri}\n")
-        f.write(f"# mapping_set_id: {mapping_set_id}\n")
-        if mapping_set_description:
-            f.write(f"# mapping_set_description: \"{mapping_set_description}\"\n")
-        f.write(f"# license: {license_uri}\n")
-        f.write("\n")
-        f.write("\t".join(_COLUMNS) + "\n")
-        for row_vals in sorted(existing.values(), key=lambda r: (r[0], r[2])):
-            f.write("\t".join(row_vals) + "\n")
+    # Build TSV content in memory
+    buf = io.StringIO()
+    buf.write("# curie_map:\n")
+    for prefix, uri in sorted(prefixes.items()):
+        buf.write(f"#   {prefix}: {uri}\n")
+    buf.write(f"# mapping_set_id: {mapping_set_id}\n")
+    if mapping_set_description:
+        buf.write(f"# mapping_set_description: \"{mapping_set_description}\"\n")
+    buf.write(f"# license: {license_uri}\n")
+    buf.write("\n")
+    buf.write("\t".join(_COLUMNS) + "\n")
+    for row_vals in sorted(existing.values(), key=lambda r: (r[0], r[2])):
+        buf.write("\t".join(row_vals) + "\n")
+    tsv_content = buf.getvalue()
+
+    # Write as zip (deflated) or plain text
+    if is_zip:
+        tsv_bytes = tsv_content.encode("utf-8")
+        with zipfile.ZipFile(sssom_path, "w",
+                             compression=zipfile.ZIP_DEFLATED,
+                             compresslevel=9) as zf:
+            zf.writestr(zip_member, tsv_bytes)
+    else:
+        with open(sssom_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(tsv_content)
 
 
 def update_source_config(source_key, fields, config_file=MENU_CONFIG):

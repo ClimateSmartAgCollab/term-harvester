@@ -141,7 +141,7 @@ _SOURCE_PREFIXES = {
 }
 
 # SSSOM output file for GeoWiki → GeoNames / ISO exact-match cross-references
-_GEOWIKI_SSSOM      = os.path.join("sources", "GeoWiki.sssom.tsv")
+_GEOWIKI_SSSOM      = os.path.join("sources", "GeoWiki.sssom.zip")
 _GEOWIKI_SSSOM_ID   = "https://w3id.org/wikidata-geo/mappings"
 _GEOWIKI_SSSOM_DESC = ("Exact-match cross-references between Wikidata geographic entities "
                        "(wd: URIs) and GeoNames IDs (gnf:) / ISO 3166 codes (iso:).")
