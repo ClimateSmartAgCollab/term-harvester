@@ -6,9 +6,11 @@ Wikidata-native LinkML enums.  For GeoNames-native enums see source_geonames.py.
 Content types
 -------------
 GeoWikiCountries
-    Sovereign states (wdt:P297), continents (P31=Q5107), and major oceans
-    (P31=Q9430) from Wikidata.  Historical entities filtered by absence of
-    wdt:P576 (dissolved/abolished date).
+    Sovereign states (wdt:P297), continents (P31=Q5107), major oceans
+    (P31=Q9430), and international waterbodies (lakes/rivers with P17 spanning
+    2+ countries; seas, gulfs, straits, bays; all with 30+ Wikipedia sitelinks)
+    from Wikidata.  Historical entities filtered by absence of wdt:P576
+    (dissolved/abolished date).
 GeoWikiADM1
     First-order administrative divisions queried via P131/P17 from Wikidata.
     Per-country supported on WDQS; global mode requires QLever.
@@ -33,16 +35,42 @@ GeoWikiSettlement
     (P576 set).  The default config entry adds minus: {status: [historical]} so
     historical places are excluded from picklists unless the user opts in.
     Uses a 2-minute WDQS timeout; set apis.qlever: true for large countries.
+GeoWikiCountryWaters
+    Per-country water bodies (seas, gulfs, straits, bays, lakes, rivers) where
+    Wikidata P17 references the country.  Requires _WD_COUNTRY_WATERS_MIN_SITELINKS
+    (5) Wikipedia sitelinks.  A body shared by two countries (e.g. Lake Ontario for
+    CA and US) appears in each country's enum; duplication is intentional.
+    If GeoWiki_ADM1_{CC} and/or GeoWiki_ADM2_{CC} data are already cached in
+    GeoWiki.zip, the Wikidata P131 (located in administrative entity) property
+    is used to assign each water body to its province/territory (ADM1) or
+    district/county (ADM2) rather than the country root.  Bodies with no
+    resolvable P131 fall back to is_a: {country_qid}.  The enum gains
+    ``inherits: GeoWikiAdm2{CC}`` (or ADM1) when ADM data is available.
+    Coastal waters like Amundsen Gulf (Canada) are included; for truly
+    international bodies use GeoWikiWaterbody.
+GeoWikiFirstNations
+    Indigenous entities (First Nations bands for CA, federally recognized tribes
+    for US, iwi for NZ) from Wikidata.  Built from the cached GeoWiki_ADM2_{CC}
+    JSON (no extra SPARQL query); requires include_indigenous: true in config.yaml
+    so the ADM2 fetch includes indigenous entities.  Automatically registered when
+    GeoWiki_ADM2_{CC} is added with include_indigenous: true.
+    Hierarchy: top-level root (e.g. Q392316 "First Nations" for CA) →
+    provincial/regional grouping nodes → individual bands/nations.
+    For CA the provincial groups come from _INDIGENOUS_ADM1_GROUPS; for US/NZ
+    grouping is by adm1_qid (state/region).  Also available as a shorthand:
+      python term_harvester.py -a GeoWiki_FirstNations_CA
 
 Shorthand -a patterns
 ---------------------
-GeoWiki_countries       → GeoWikiCountries (sovereign states + continents + oceans)
-GeoWiki_ADM1            → GeoWikiAdm1 (all ADM1; QLever recommended globally)
-GeoWiki_ADM1_{CC}       → GeoWikiAdm1 single country (e.g. GeoWiki_ADM1_US)
-GeoWiki_ADM2_{CC}       → GeoWikiAdm2 single country (e.g. GeoWiki_ADM2_CA)
-GeoWiki_ADM3_{CC}       → GeoWikiAdm3 ADM3 only for one country
-GeoWiki_ADM3ADM4_{CC}   → GeoWikiAdm3 + Adm4 for one country (e.g. GeoWiki_ADM3ADM4_CA)
-GeoWiki_Settlement_{CC} → GeoWikiSettlement for one country (e.g. GeoWiki_Settlement_NL)
+GeoWiki_countries           → GeoWikiCountries (sovereign states + continents + oceans + waterbodies)
+GeoWiki_ADM1                → GeoWikiAdm1 (all ADM1; QLever recommended globally)
+GeoWiki_ADM1_{CC}           → GeoWikiAdm1 single country (e.g. GeoWiki_ADM1_US)
+GeoWiki_ADM2_{CC}           → GeoWikiAdm2 single country (e.g. GeoWiki_ADM2_CA)
+GeoWiki_ADM3_{CC}           → GeoWikiAdm3 ADM3 only for one country
+GeoWiki_ADM3ADM4_{CC}       → GeoWikiAdm3 + Adm4 for one country (e.g. GeoWiki_ADM3ADM4_CA)
+GeoWiki_Settlement_{CC}     → GeoWikiSettlement for one country (e.g. GeoWiki_Settlement_NL)
+GeoWiki_CountryWaters_{CC}  → GeoWikiCountryWaters for one country (e.g. GeoWiki_CountryWaters_CA)
+GeoWiki_FirstNations_{CC}   → GeoWikiFirstNations indigenous entities (e.g. GeoWiki_FirstNations_CA)
 
 Permissible value structure
 ---------------------------
@@ -63,7 +91,7 @@ Top-level hierarchy headers (no is_a)
 --------------------------------------
 AdministrativeLevel — countries, territories, admin divisions
 GeographicLandmass  — continents
-GeographicWaterBody — oceans, seas
+GeographicWaterBody — oceans, seas, international lakes and rivers
 
 Historical filtering
 --------------------
@@ -71,6 +99,10 @@ Countries:  must have wdt:P297 (ISO 3166-1 alpha-2) AND
             FILTER NOT EXISTS { ?item wdt:P576 ?end . }
 Continents: queried by P31=wd:Q5107, same dissolution filter
 Oceans:     queried by P31=wd:Q9430; nearly all are non-dissolved
+Waterbodies: lakes (P31=Q23397) and rivers (P31=Q4022) with P17 spanning 2+
+            countries; seas, gulfs, straits, bays with 30+ Wikipedia sitelinks;
+            oceans excluded
+CountryWaters: same water types with P17 = country; 5+ Wikipedia sitelinks
 ADM1/ADM2:  must have wdt:P131 (admin parent) pointing to expected entity AND
             FILTER NOT EXISTS { ?item wdt:P576 ?end . }
 
@@ -164,6 +196,36 @@ _GEONAMES_CC_URL      = "https://download.geonames.org/export/dump/{CC}.zip"
 _WD_CLASS_SOVEREIGN_STATE = "Q3624078"   # sovereign state
 _WD_CLASS_CONTINENT       = "Q5107"      # continent
 _WD_CLASS_OCEAN           = "Q9430"      # ocean
+_WD_CLASS_LAKE            = "Q23397"     # lake
+_WD_CLASS_RIVER           = "Q4022"      # river
+_WD_CLASS_SEA             = "Q165"       # sea (use P31/P279* to catch marginal/inland/etc.)
+_WD_CLASS_GULF            = "Q1322134"   # gulf
+_WD_CLASS_STRAIT          = "Q37901"     # strait
+_WD_CLASS_BAY             = "Q39594"     # bay
+
+# Minimum Wikipedia sitelinks for all items in GeoWikiWaterbody.
+# Threshold of 30 filters out thousands of obscure cross-border streams and
+# minor border lakes (e.g. small Norway/Sweden border lakes) while retaining
+# all major international water bodies.
+_WD_WATERBODY_MIN_SITELINKS = 30
+
+# Minimum Wikipedia sitelinks for per-country water body queries (GeoWikiCountryWaters).
+# Lower than the international threshold since we scope to one country and want
+# nationally significant bodies (e.g. Amundsen Gulf for Canada) that wouldn't
+# clear the global 30-sitelinks bar.
+_WD_COUNTRY_WATERS_MIN_SITELINKS = 5
+
+# Explicit sea subtypes used in GeoWikiWaterbody (avoids expensive P279* traversal).
+# Covers the main Wikidata sea subclasses; using direct P31 VALUES is much faster
+# on WDQS than ?item wdt:P31/wdt:P279* wd:Q165.
+_WD_SEA_TYPES = [
+    "Q165",       # sea (generic — e.g. Persian Gulf)
+    "Q204894",    # marginal sea (e.g. Baltic, North Sea)
+    "Q2578218",   # inland sea (e.g. Hudson Bay)
+    "Q12734855",  # epicontinental sea (e.g. Hudson Bay also)
+    "Q1973404",   # adjacent sea (e.g. Mediterranean Sea)
+    "Q986177",    # mediterranean-type sea (enclosed; e.g. Gulf of Mexico)
+]
 
 # GeoNames 2-letter continent code → Wikidata QID (stable, canonical)
 _GN_CONT_CODE_TO_WD_QID = {
@@ -303,20 +365,219 @@ _GNID_QID_OVERRIDES: dict[str, str] = {
 # is not directly in the ADM1 enum because Wikidata P131 points one level too
 # deep.  Add entries whenever "-c {CC}_ADM2" prints an orphan warning.
 _ADM2_INTERMEDIATE_PARENT_QIDS: dict[str, str] = {
-    "Q1474662":  "Q797",  # Unorganized Borough of Alaska → Alaska
-    "Q13188841": "Q99",   # City and County of San Francisco entity → California
+    # US
+    "Q1474662":  "Q797",   # Unorganized Borough of Alaska → Alaska
+    "Q13188841": "Q99",    # City and County of San Francisco entity → California
+    # Canada — Ontario (Q1904)
+    "Q21070830": "Q1904",  # Lake Helen 53A Indian Reserve → Ontario
+    "Q22541508": "Q1904",  # Lake Helen 53A (alternate QID) → Ontario
+    "Q22360801": "Q1904",  # Red Rock 53 Indian Reserve → Ontario
+    "Q22364531": "Q1904",  # Sucker Creek Indian Reserve No. 23 → Ontario
+    "Q22494407": "Q1904",  # Fort William Indian Reserve 52 → Ontario
+    "Q22612246": "Q1904",  # Whitesand Indian Reserve → Ontario
+    "Q22614638": "Q1904",  # M'Chigeeng Indian Reserve 22 → Ontario
+    "Q22627721": "Q1904",  # Garden River Indian Reserve 14 → Ontario
+    "Q7999949":  "Q1904",  # Wikwemikong Unceded Indian Reserve 26 → Ontario
+    "Q382508":   "Q1904",  # Muskoka District Municipality → Ontario
+    "Q953088":   "Q1904",  # Essex County → Ontario
+    "Q991601":   "Q1904",  # Bruce County → Ontario
+    "Q1406913":  "Q1904",  # Lambton County → Ontario
+    "Q1436530":  "Q1904",  # Nipissing District → Ontario
+    "Q1588807":  "Q1904",  # Hastings County → Ontario
+    "Q1638386":  "Q1904",  # Kenora District → Ontario
+    "Q1798108":  "Q1904",  # Parry Sound District → Ontario
+    "Q1931946":  "Q1904",  # Middlesex County → Ontario
+    "Q2140691":  "Q1904",  # Algoma District → Ontario
+    # Canada — Quebec (Q176)
+    "Q222948":   "Q176",   # Outaouais → Quebec
+    "Q321529":   "Q176",   # Abitibi-Témiscamingue → Quebec
+    "Q615914":   "Q176",   # Saguenay–Lac-Saint-Jean → Quebec
+    "Q669673":   "Q176",   # Eeyou Istchee → Quebec
+    "Q728139":   "Q176",   # Gaspésie–Îles-de-la-Madeleine → Quebec
+    "Q764294":   "Q176",   # Centre-du-Québec → Quebec
+    "Q927561":   "Q176",   # Nord-du-Québec → Quebec
+    "Q1124109":  "Q176",   # Côte-Nord → Quebec
+    "Q3285285":  "Q176",   # Manawan → Quebec
+    "Q3529001":  "Q176",   # Timiskaming (QC region) → Quebec
+    # Canada — British Columbia (Q1973)
+    "Q116187917": "Q1973", # Yale Division Yale Land District → BC
+    "Q1138212":  "Q1973",  # Cowichan Valley Regional District → BC
+    "Q1552137":  "Q1973",  # Strathcona Regional District → BC
+    "Q2095362":  "Q1973",  # Regional District of Nanaimo → BC
+    "Q2138250":  "Q1973",  # Regional District of Kitimat-Stikine → BC
+    "Q5600798":  "Q1973",  # Greater Vancouver → BC
+    "Q6475523":  "Q1973",  # Lake Cowichan → BC
+    # Canada — New Brunswick (Q1965)
+    "Q2138":     "Q1965",  # (St. Mary's FN secondary P131) → New Brunswick
+    "Q2542413":  "Q1965",  # Kent County → New Brunswick
+    "Q3365804":  "Q1965",  # Dalhousie Parish → New Brunswick
+    "Q3365810":  "Q1965",  # Douglas Parish → New Brunswick
+    "Q937673":   "Q1965",  # Northumberland County → New Brunswick
+    # Canada — Northwest Territories (Q2007)
+    "Q338686":   "Q2007",  # Inuvik → Northwest Territories
+    "Q420187":   "Q2007",  # Aklavik → Northwest Territories
+    "Q1014088":  "Q2007",  # Tsiigehtchic → Northwest Territories
+    "Q1014119":  "Q2007",  # Fort McPherson → Northwest Territories
+    # Canada — Manitoba (Q1948)
+    "Q48789915": "Q1948",  # Unorganized Division No. 19 → Manitoba
 }
 
 # Direct ADM2 QID → ADM1 QID overrides for entries where Wikidata returned no
 # P131 at all (adm1_qid empty).  Add entries whenever an entry appears as an
 # orphan and Wikidata lacks a P131 link.
 _ADM2_NO_PARENT_OVERRIDES: dict[str, str] = {
+    # US
     "Q25479087": "Q1370",  # City of Suffolk, Virginia → Virginia
+    # Canada — British Columbia (Q1973)
+    "Q2382930":  "Q1973",  # T'sou-ke Nation → BC
+    "Q2457355":  "Q1973",  # Tsartlip First Nation → BC
+    "Q5028135":  "Q1973",  # Wei Wai Kum First Nation → BC
+    "Q5149748":  "Q1973",  # ʔakisq̓nuk First Nation → BC
+    "Q5623217":  "Q1973",  # Gwa'Sala-'Nakwaxda'xw First Nation → BC
+    "Q5674878":  "Q1973",  # Gitga'at First Nation → BC
+    "Q6322485":  "Q1973",  # K'ómoks First Nation → BC
+    "Q6417896":  "Q1973",  # Kitasoo/Xaixais First Nation → BC
+    "Q6450195":  "Q1973",  # Kwantlen First Nation → BC
+    "Q6693555":  "Q1973",  # Lower Kootenay First Nation → BC
+    "Q7030489":  "Q1973",  # Nicomen First Nation → BC
+    "Q7590342":  "Q1973",  # ʔaq̓am → BC
+    "Q11708752": "Q1973",  # Heiltsuk Nation → BC
+    "Q12635666": "Q1973",  # Lytton First Nation → BC
+    "Q16212986": "Q1973",  # Mamalilikulla-Qwe'Qwa'Sot'Em First Nation → BC
+    "Q17027468": "Q1973",  # Wet'suwet'en First Nation → BC
+    "Q2621606":  "Q1973",  # Esquimalt First Nation → BC
+    # Canada — Alberta (Q1951)
+    "Q123033":   "Q1951",  # Tsuut'ina Nation → Alberta
+    "Q5471652":  "Q1951",  # Fort McMurray First Nation → Alberta
+    "Q7132507":  "Q1951",  # Papaschase → Alberta
+    "Q16242678": "Q1951",  # Michel Band → Alberta
+    # Canada — Ontario (Q1904)
+    "Q5101691":  "Q1904",  # Chippewas of Nawash Unceded First Nation → Ontario
+    "Q15256001": "Q1904",  # Moose Cree First Nation → Ontario
+    "Q16212442": "Q1904",  # Lac des Mille Lacs First Nation → Ontario
+    "Q20880558": "Q1904",  # Bearfoot Onondaga First Nation → Ontario
+    # Canada — Quebec (Q176)
+    "Q27655424": "Q176",   # Oujé-Bougoumou Cree Nation → Quebec
+    "Q85792671": "Q176",   # Pekuakamiulnuatsh First Nation (duplicate item) → Quebec
+    # Canada — Manitoba (Q1948)
+    "Q7060844":  "Q1948",  # Norway House Cree Nation → Manitoba
+    "Q15262579": "Q1948",  # (unlabeled First Nations band in Manitoba) → Manitoba
+}
+
+# Band-QID → province-QID overrides for First Nations bands whose Wikidata P131
+# does not resolve through _ADM2_INTERMEDIATE_PARENT_QIDS or _ADM2_NO_PARENT_OVERRIDES.
+# Extend whenever _build_first_nations_pvs prints orphan warnings.
+# These will be contributed back to Wikidata upstream.
+_FN_BAND_ADM1_OVERRIDES: dict[str, str] = {
+    # Canada — Ontario (Q1904)
+    "Q4661506": "Q1904",   # Aamjiwnaang First Nation → Ontario
+}
+
+# Water-body-QID → province/territory-QID overrides for country-waters entries
+# whose Wikidata P131 chain does not resolve to a province (adm_qid points to a
+# municipality, international region, or is absent).
+# Extend whenever _build_country_waters_yaml logs "country fallback" for an entry.
+# These will be contributed back to Wikidata upstream.
+_CW_WATER_OVERRIDES: dict[str, str] = {
+    # Canada — Quebec (Q176)
+    "Q1061490":  "Q176",   # Champlain Sea (prehistoric; primarily QC lowlands)
+    "Q22364469": "Q176",   # Lac Cacaoui (Côte-Nord, QC)
+    "Q3214781":  "Q176",   # Lac Cameron (Les Laurentides, QC)
+    "Q3215007":  "Q176",   # Lac Leamy (Gatineau, QC)
+    "Q3215091":  "Q176",   # Lac Nicolet (Centre-du-Québec)
+    "Q3215214":  "Q176",   # Lac Stukely (Estrie, QC)
+    "Q3215277":  "Q176",   # Wapizagonke Lake (Mauricie, QC)
+    "Q3215671":  "Q176",   # Lac des Nations (Sherbrooke, QC)
+    "Q3377256":  "Q176",   # Petit Lac Nominingue (Laurentides, QC)
+    "Q15303027": "Q176",   # Coaticook River (Estrie, QC; source in Vermont)
+    "Q16025268": "Q176",   # North Branch Missisquoi River (Estrie, QC; flows into Vermont)
+    # Canada — Nunavut (Q2023)
+    "Q1285117":  "Q2023",  # Lancaster Sound (Qikiqtaaluk Region, NU)
+    "Q243125":   "Q2023",  # Lincoln Sea (northern Ellesmere Island, NU)
+    "Q1932718":  "Q2023",  # Strait of Anián (mythical NW Passage; Wikidata coords in NU)
+    # Canada — Nova Scotia (Q1952)
+    "Q876470":   "Q1952",  # Gulf of Maine (borders NB and NS; NS has more coastline)
+}
+
+# Maps ISO alpha-2 scope → {province_qid → (grouping_qid, en_label)}.
+# Provides "First Nations in [Province/Territory]" (or equivalent) Wikidata
+# items as intermediate grouping nodes between a province and its individual
+# First Nation bands in the GeoWikiAdm2 enum.
+# Provinces/territories handled by _INDIGENOUS_REGIONAL_NODES (NL, NS) or
+# lacking a dedicated item entirely (NT, NU) are absent from this dict.
+_INDIGENOUS_ADM1_GROUPS: dict[str, dict[str, tuple]] = {
+    "CA": {
+        "Q1951": ("Q5453438",    "First Nations in Alberta"),
+        "Q1973": ("Q5453439",    "First Nations in British Columbia"),
+        "Q1948": ("Q5453440",    "First Nations in Manitoba"),
+        "Q1965": ("Q3402267",    "First Nations in New Brunswick"),
+        # Q2003 (NL) and Q1952 (NS): handled via _INDIGENOUS_REGIONAL_NODES below
+        "Q2007": ("Q8460333",    "First Nations in the Northwest Territories"),
+        # Q2023 (NU): no dedicated item — bands fall directly under province
+        "Q1904": ("Q5453441",    "First Nations in Ontario"),
+        "Q1978": ("Q122809634",  "First Nations in Prince Edward Island"),
+        "Q176":  ("Q2872543",    "Indigenous peoples in Quebec"),
+        "Q1989": ("Q5453442",    "First Nations in Saskatchewan"),
+        "Q2009": ("Q4200690",    "Indigenous peoples of Yukon"),
+    },
+}
+
+# Maps ISO alpha-2 scope → list of multi-province regional grouping specs.
+# When top_level is True, the group_qid node is inserted with no is_a (a sibling
+# of "Province of Canada" in the rendered list).  Bands from all adm1_qids in the
+# spec are placed under group_qid.
+# When top_level is absent/False, the legacy two-level hierarchy is used:
+#   regional_node (is_a=primary_adm1) → group_node → indigenous bands
+# adm1_qids: set of province QIDs whose indigenous bands are routed to this spec.
+# group_qid / group_label: the grouping node (e.g. "First Nations in Atlantic Canada").
+_INDIGENOUS_REGIONAL_NODES: dict[str, list] = {
+    "CA": [
+        {
+            # NL (Q2003) and NS (Q1952) both lack a province-specific grouping item.
+            # Their bands are placed under "First Nations in Atlantic Canada" (Q5453437)
+            # which appears as a top-level sibling of "Province of Canada" in the enum.
+            "top_level":   True,
+            "adm1_qids":   {"Q2003", "Q1952"},  # Newfoundland & Labrador and Nova Scotia
+            "group_qid":   "Q5453437",
+            "group_label": "First Nations in Atlantic Canada",
+        },
+    ],
+}
+
+# Maps ISO alpha-2 country code → Wikidata P31 QIDs for indigenous administrative
+# entities at approximately the ADM2 level (bands, tribes, iwi, etc.).
+# Used by _fetch_indigenous_entities when config has include_indigenous: true.
+# Extend this table as more countries are verified.  Counts reflect Wikidata as
+# of November 2026; validate with: SELECT (COUNT(?i) AS ?n) WHERE { ?i wdt:P17
+# wd:{country_qid} ; wdt:P31 wd:{type_qid} . }
+_INDIGENOUS_P31_BY_COUNTRY: dict[str, list[str]] = {
+    "CA": ["Q2882257"],   # First Nation band                    (~620)
+    "US": ["Q7840353"],   # federally recognized Native American tribe (~451)
+    "NZ": ["Q1676081"],   # iwi (Māori)                          (~95)
+    # AU: Q108750500 (Aboriginal and Torres Strait Islander corporation)
+    #     has only ~22 Wikidata entries — too sparse; revisit when coverage improves.
+    # GL: Inuit community types not yet verified.
+    # NO/SE/FI: Sámi siida/village types not yet verified.
+}
+
+# Maps ISO alpha-2 → (top_level_qid, en_label) for each country's First Nations root node.
+# Used by _build_first_nations_pvs and _build_first_nations_yaml.
+_INDIGENOUS_TOP_BY_COUNTRY: dict[str, tuple[str, str]] = {
+    "CA": ("Q392316", "First Nations"),
+    "US": ("Q9174982", "Native Americans"),
+    "NZ": ("Q1198765", "Māori people"),
+}
+
+# Short description for each country's First Nations enum (used as enum-level description).
+_INDIGENOUS_ENUM_DESC_BY_COUNTRY: dict[str, str] = {
+    "CA": "Indigenous peoples in Canada who are neither Inuit nor Métis",
+    "US": "Federally recognized Native American tribes in the United States",
+    "NZ": "Indigenous Polynesian people of mainland New Zealand",
 }
 
 # Shorthand regex: GeoWiki_countries, GeoWiki_ADM1, GeoWiki_ADM1_US, GeoWiki_ADM2_CA, GeoWiki_Settlement_NL
 _SHORTHAND_RE = re.compile(
-    r'^GeoWiki_(?:(countries|ADM1)|(ADM3ADM4|ADM[1-4]|Settlement)_([A-Za-z]{2}))$',
+    r'^GeoWiki_(?:(countries|ADM1)|(ADM3ADM4|ADM[1-4]|Settlement|CountryWaters|FirstNations)_([A-Za-z]{2}))$',
     re.IGNORECASE,
 )
 
@@ -662,6 +923,284 @@ SELECT ?item {label_vars} ?desc ?gnid WHERE {{
     return oceans
 
 
+def _fetch_wikidata_waterbodies(locales=None, endpoint=_WDQS_ENDPOINT, use_post=False):
+    """Query Wikidata for international water bodies, excluding oceans (GeoWikiOcean).
+
+    Included:
+      - Lakes (P31=Q23397) with P17 spanning two or more countries
+        (e.g. Great Lakes shared by US and Canada, Caspian Sea, Lake Victoria)
+      - Rivers (P31=Q4022) with P17 spanning two or more countries
+        (e.g. Rhine, Danube, Mekong, Nile)
+      - Seas (P31 in _WD_SEA_TYPES: sea, marginal sea, inland sea, etc.) with no
+        P17 or P17 spanning two or more countries (e.g. Mediterranean, Caribbean,
+        Baltic Sea).  Single-country seas like the Sea of Marmara (Turkey) are
+        excluded.
+      - Gulfs (Q1322134), straits (Q37901), bays (Q39594) with no P17 or P17
+        spanning two or more countries (e.g. Strait of Gibraltar, Gulf of Oman).
+        Single-country bodies like Amundsen Gulf (Canada) or Tokyo Bay (Japan)
+        are excluded.
+
+    All queries require at least _WD_WATERBODY_MIN_SITELINKS Wikipedia sitelinks,
+    filtering out the thousands of minor cross-border streams and border lakes
+    (e.g. the many small Norway/Sweden border lakes) that have P17 set for both
+    countries but are too local to be useful as sampling region identifiers.
+
+    Items with P31=Q9430 (ocean) are excluded because they appear in GeoWikiOcean.
+    Historical items (P576 set) are excluded.
+
+    Implementation note: the original single 6-arm UNION query reliably timed out
+    on WDQS due to the cross-product join on P17 for lakes and rivers combined with
+    the sitelinks filter.  The function now runs four separate, simpler queries and
+    merges the results in Python.  Each individual query completes well within the
+    60-second timeout; failures on any one sub-query are logged as warnings rather
+    than propagating as exceptions so that partial results are still returned.
+
+    Returns list of dicts: qid, labels, desc, gnid.
+    """
+    locales = locales or ["en"]
+    label_vars      = " ".join(f"?label_{lang}" for lang in locales)
+    label_optionals = "\n".join(
+        f'  OPTIONAL {{ ?item rdfs:label ?label_{lang} .'
+        f' FILTER(LANG(?label_{lang}) = "{lang}") }}'
+        for lang in locales
+    )
+    tail = f"""\
+{label_optionals}
+  OPTIONAL {{
+    ?item schema:description ?desc .
+    FILTER(LANG(?desc) = "en")
+  }}
+  OPTIONAL {{ ?item wdt:P1566 ?gnid . }}
+  OPTIONAL {{ ?item wdt:P30 ?continent . }}
+}}
+"""
+    common_filters = f"""\
+  ?item wikibase:sitelinks ?sl .
+  FILTER(?sl >= {_WD_WATERBODY_MIN_SITELINKS})
+  FILTER NOT EXISTS {{ ?item wdt:P31 wd:{_WD_CLASS_OCEAN} . }}
+  FILTER NOT EXISTS {{ ?item wdt:P576 ?end . }}
+"""
+    sea_values = " ".join(f"wd:{q}" for q in _WD_SEA_TYPES)
+    gsb_values = (f"wd:{_WD_CLASS_GULF} wd:{_WD_CLASS_STRAIT} wd:{_WD_CLASS_BAY}")
+
+    # Query 1: international lakes (P17 spans 2+ countries)
+    q_lakes = f"""
+SELECT DISTINCT ?item {label_vars} ?desc ?gnid ?continent WHERE {{
+  ?item wdt:P31 wd:{_WD_CLASS_LAKE} .
+  ?item wdt:P17 ?c1 . ?item wdt:P17 ?c2 . FILTER(?c1 != ?c2)
+{common_filters}{tail}"""
+
+    # Query 2: international rivers (P17 spans 2+ countries)
+    q_rivers = f"""
+SELECT DISTINCT ?item {label_vars} ?desc ?gnid ?continent WHERE {{
+  ?item wdt:P31 wd:{_WD_CLASS_RIVER} .
+  ?item wdt:P17 ?c1 . ?item wdt:P17 ?c2 . FILTER(?c1 != ?c2)
+{common_filters}{tail}"""
+
+    # Query 3: seas — multi-country P17 or no P17 (single-country excluded)
+    q_seas = f"""
+SELECT DISTINCT ?item {label_vars} ?desc ?gnid ?continent WHERE {{
+  VALUES ?sea_type {{ {sea_values} }}
+  ?item wdt:P31 ?sea_type .
+  {{ ?item wdt:P17 ?cs1 . ?item wdt:P17 ?cs2 . FILTER(?cs1 != ?cs2) }}
+  UNION
+  {{ FILTER NOT EXISTS {{ ?item wdt:P17 ?cs0 . }} }}
+{common_filters}{tail}"""
+
+    # Query 4: gulfs/straits/bays — multi-country P17 or no P17
+    q_gsb = f"""
+SELECT DISTINCT ?item {label_vars} ?desc ?gnid ?continent WHERE {{
+  VALUES ?gsb_type {{ {gsb_values} }}
+  ?item wdt:P31 ?gsb_type .
+  {{ ?item wdt:P17 ?cg1 . ?item wdt:P17 ?cg2 . FILTER(?cg1 != ?cg2) }}
+  UNION
+  {{ FILTER NOT EXISTS {{ ?item wdt:P17 ?cg0 . }} }}
+{common_filters}{tail}"""
+
+    print(f"  Querying Wikidata for international waterbodies "
+          f"(sitelinks >= {_WD_WATERBODY_MIN_SITELINKS}) ...")
+
+    seen = {}   # qid → row  (deduplicates across sub-queries)
+    sub_queries = [
+        ("lakes",             q_lakes),
+        ("rivers",            q_rivers),
+        ("seas",              q_seas),
+        ("gulfs/straits/bays", q_gsb),
+    ]
+    for label, sparql in sub_queries:
+        try:
+            rows = _sparql_query(sparql, timeout=60, endpoint=endpoint, use_post=use_post)
+            for row in rows:
+                qid = _qid_from_uri(row.get("item", {}).get("value", ""))
+                if qid and qid not in seen:
+                    seen[qid] = row
+            print(f"    {label}: {len(rows)} results (running total {len(seen)})")
+        except Exception as exc:
+            print(f"  Warning: waterbody sub-query '{label}' failed: {exc}",
+                  file=sys.stderr)
+
+    _canonical_cont = set(_GN_CONT_CODE_TO_WD_QID.values())
+
+    waterbodies = []
+    for qid, row in seen.items():
+        gnid   = row.get("gnid",   {}).get("value", "")
+        labels = {
+            lang: row[f"label_{lang}"]["value"]
+            for lang in locales if row.get(f"label_{lang}", {}).get("value")
+        }
+        desc = row.get("desc", {}).get("value", "")
+        raw_cont = _qid_from_uri(row.get("continent", {}).get("value", ""))
+        continent_qid = raw_cont if raw_cont in _canonical_cont else ""
+        waterbodies.append({"qid": qid, "labels": labels, "desc": desc, "gnid": gnid,
+                            "continent_qid": continent_qid})
+
+    with_cont = sum(1 for w in waterbodies if w["continent_qid"])
+    print(f"    Found {len(waterbodies)} international waterbodies "
+          f"({with_cont} with P30 continent).")
+    return waterbodies
+
+
+def _fetch_wikidata_country_waters(country_qid, locales=None,
+                                    endpoint=_WDQS_ENDPOINT, use_post=False):
+    """Query Wikidata for water bodies associated with a single country.
+
+    Returns all water bodies where wdt:P17 = country_qid, covering:
+      - Seas (_WD_SEA_TYPES): sea, marginal sea, inland sea, adjacent sea, etc.
+      - Gulfs (Q1322134), straits (Q37901), bays (Q39594)
+      - Lakes (Q23397) — includes inland seas recognized as lakes (e.g. Caspian)
+      - Rivers (Q4022)
+    All items must have at least _WD_COUNTRY_WATERS_MIN_SITELINKS Wikipedia
+    sitelinks.  Oceans (P31=Q9430) and historical items (P576) are excluded.
+
+    A body shared with another country (e.g. Lake Ontario for both CA and US)
+    will appear in both country enums; duplication is intentional.
+
+    Returns list of dicts: qid, labels, desc, gnid.
+    """
+    locales = locales or ["en"]
+    label_vars      = " ".join(f"?label_{lang}" for lang in locales)
+    label_optionals = "\n".join(
+        f'  OPTIONAL {{ ?item rdfs:label ?label_{lang} .'
+        f' FILTER(LANG(?label_{lang}) = "{lang}") }}'
+        for lang in locales
+    )
+
+    all_water_types = " ".join(
+        f"wd:{q}" for q in _WD_SEA_TYPES + [
+            _WD_CLASS_GULF, _WD_CLASS_STRAIT, _WD_CLASS_BAY,
+            _WD_CLASS_LAKE, _WD_CLASS_RIVER,
+        ]
+    )
+
+    sparql = f"""
+SELECT DISTINCT ?item {label_vars} ?desc ?gnid ?adm WHERE {{
+  VALUES ?wtype {{ {all_water_types} }}
+  ?item wdt:P31 ?wtype .
+  ?item wdt:P17 wd:{country_qid} .
+  ?item wikibase:sitelinks ?sl .
+  FILTER(?sl >= {_WD_COUNTRY_WATERS_MIN_SITELINKS})
+  FILTER NOT EXISTS {{ ?item wdt:P31 wd:{_WD_CLASS_OCEAN} . }}
+  FILTER NOT EXISTS {{ ?item wdt:P576 ?end . }}
+{label_optionals}
+  OPTIONAL {{
+    ?item schema:description ?desc .
+    FILTER(LANG(?desc) = "en")
+  }}
+  OPTIONAL {{ ?item wdt:P1566 ?gnid . }}
+  OPTIONAL {{ ?item wdt:P131 ?adm . }}
+}}
+"""
+    print(f"  Querying Wikidata for country waters "
+          f"(wd:{country_qid}, sitelinks >= {_WD_COUNTRY_WATERS_MIN_SITELINKS}) ...")
+    rows = _sparql_query(sparql, timeout=120, endpoint=endpoint, use_post=use_post)
+
+    entries = []
+    seen = set()
+    for row in rows:
+        qid = _qid_from_uri(row.get("item", {}).get("value", ""))
+        if not qid or qid in seen:
+            continue
+        seen.add(qid)
+        gnid    = row.get("gnid", {}).get("value", "")
+        adm_qid = _qid_from_uri(row.get("adm",  {}).get("value", ""))
+        labels  = {
+            lang: row[f"label_{lang}"]["value"]
+            for lang in locales if row.get(f"label_{lang}", {}).get("value")
+        }
+        desc = row.get("desc", {}).get("value", "")
+        entries.append({"qid": qid, "labels": labels, "desc": desc, "gnid": gnid,
+                        "adm_qid": adm_qid})
+
+    print(f"    Found {len(entries)} water bodies for wd:{country_qid}.")
+
+    # Supplemental batch query: fetch ALL P131 values + P1566/P518 qualifier values
+    # per water body.  Used in _build_country_waters_yaml to populate mixins for
+    # bodies that span multiple provinces (e.g. a lake straddling two provinces).
+    all_qids = [e["qid"] for e in entries if e.get("qid")]
+    if all_qids:
+        multi_adm = _fetch_waterbody_multi_adm(all_qids, endpoint, use_post)
+        for entry in entries:
+            extras = multi_adm.get(entry["qid"], [])
+            if extras:
+                entry["extra_adm_qids"] = extras
+
+    return entries
+
+
+def _fetch_waterbody_multi_adm(qids, endpoint=_WDQS_ENDPOINT, use_post=False):
+    """Batch-query all P131 values and P1566/P518 qualifier values for water bodies.
+
+    For each QID returns all candidate administrative entity QIDs from:
+      - wdt:P131  (located in administrative territorial entity — may be multiple)
+      - p:P1566/pq:P518  (GeoNames ID qualified with "applies to part" = province)
+
+    The P1566+P518 pattern is used by cross-boundary features (e.g. a lake
+    straddling two provinces has two P1566 statements each qualified with the
+    respective province).  P131 may also return multiple values for such features.
+
+    Returns dict: qid → list of candidate administrative QIDs (deduplicated).
+    """
+    if not qids:
+        return {}
+
+    result: defaultdict = defaultdict(list)
+    seen_pairs: set = set()
+    batch_size = 100
+
+    for i in range(0, len(qids), batch_size):
+        batch  = qids[i : i + batch_size]
+        values = " ".join(f"wd:{q}" for q in batch)
+        sparql = f"""
+SELECT ?item ?adm WHERE {{
+  VALUES ?item {{ {values} }}
+  {{
+    ?item wdt:P131 ?adm .
+  }} UNION {{
+    ?item p:P1566 ?stmt .
+    ?stmt pq:P518 ?adm .
+  }}
+}}
+"""
+        try:
+            rows = _sparql_query(sparql, timeout=60, endpoint=endpoint, use_post=use_post)
+        except Exception as exc:
+            print(f"  Warning: multi-adm batch {i // batch_size + 1} failed: {exc}",
+                  file=sys.stderr)
+            continue
+
+        for row in rows:
+            qid = _qid_from_uri(row.get("item", {}).get("value", ""))
+            adm = _qid_from_uri(row.get("adm",  {}).get("value", ""))
+            if qid and adm and (qid, adm) not in seen_pairs:
+                seen_pairs.add((qid, adm))
+                result[qid].append(adm)
+
+    n_multi = sum(1 for v in result.values() if len(v) > 1)
+    print(f"    Multi-adm: {len(result)} water bodies have P131/P1566+P518 data "
+          f"({n_multi} with >1 candidate).")
+    return dict(result)
+
+
 def _fetch_wikidata_adm1_for_country(alpha2, locales=None,
                                       endpoint=_WDQS_ENDPOINT, use_post=False):
     """Query Wikidata for ADM1 divisions of one country via P17 and P131.
@@ -915,7 +1454,7 @@ def _load_json(key):
 def _build_countries_yaml(key, source, data, locales=None):
     """Write sources/{key}.yaml for GeoWikiCountries scope.
 
-    Produces four separate enums, each sorted alphabetically by title:
+    Produces five separate enums, each sorted alphabetically by title:
       GeoWikiCountry         — sovereign states (P31=Q3624078 or Q15634554)
       GeoWikiCountryExtended — dependent territories/special regions that have
                                their own ISO alpha-2 code but are not sovereign
@@ -924,6 +1463,9 @@ def _build_countries_yaml(key, source, data, locales=None):
                                to inherited sovereign state entries
       GeoWikiContinent       — continents (P31=Q5107)
       GeoWikiOcean           — oceans (P31=Q9430)
+      GeoWikiWaterbody       — international water bodies (lakes/rivers with P17
+                               spanning 2+ countries; seas, gulfs, straits, bays
+                               with 30+ Wikipedia sitelinks); inherits GeoWikiOcean
 
     Code = Wikidata QID; meaning = wd:{QID};
     exact_mappings = [gnf:{gnid}, iso:{alpha2}] for countries/territories.
@@ -935,9 +1477,10 @@ def _build_countries_yaml(key, source, data, locales=None):
     locales      = locales or ["en"]
     primary_lang = "en" if "en" in locales else locales[0]
 
-    countries  = data.get("countries",  [])
-    continents = data.get("continents", [])
-    oceans     = data.get("oceans",     [])
+    countries    = data.get("countries",    [])
+    continents   = data.get("continents",   [])
+    oceans       = data.get("oceans",       [])
+    waterbodies  = data.get("waterbodies",  [])
 
     def _lbl(item): return _best_label(item, locales, "qid")
 
@@ -1221,6 +1764,62 @@ def _build_countries_yaml(key, source, data, locales=None):
                 "object_label":         "",
             })
 
+    # --- GeoWikiWaterbody enum (grouped by continent, inherits GeoWikiOcean) ---
+    # Group waterbodies by continent_qid; bodies with no continent go last.
+    wb_by_cont: defaultdict = defaultdict(list)
+    for _item in waterbodies:
+        wb_by_cont[_item.get("continent_qid", "")].append(_item)
+    _wb_unassigned = wb_by_cont.pop("", [])
+
+    # Reuse _cont_sort from the country section above (already defined).
+    continents_wb = sorted(wb_by_cont.keys(), key=_cont_sort)
+
+    def _wb_sssom(qid, gnid, lbl):
+        if gnid:
+            sssom_rows.append({
+                "subject_id":           f"wd:{qid}",
+                "predicate_id":         "skos:exactMatch",
+                "object_id":            f"gnf:{gnid}",
+                "mapping_justification": "semapv:ManualMappingCuration",
+                "subject_label":        lbl,
+                "object_label":         "",
+            })
+
+    waterbody_pvs = {}
+    for _cont_qid in continents_wb:
+        _cont = cont_by_qid.get(_cont_qid, {})
+        # Add continent header with meaning so is_a chain resolves
+        waterbody_pvs[_cont_qid] = {
+            "title":   normalize_text(_lbl(_cont)) if _cont else _cont_qid,
+            "meaning": f"wd:{_cont_qid}",
+        }
+        for _wbitem in sorted(wb_by_cont[_cont_qid],
+                               key=lambda x: _title_sort_key(_lbl(x))):
+            _qid  = _wbitem["qid"]
+            _gnid = _wbitem.get("gnid", "")
+            _lbl2 = normalize_text(_lbl(_wbitem))
+            add_permissible_value(
+                waterbody_pvs, _qid,
+                title=_lbl2,
+                meaning=f"wd:{_qid}",
+                description=normalize_text(_wbitem.get("desc", "")) or None,
+                is_a=_cont_qid,
+            )
+            _wb_sssom(_qid, _gnid, _lbl2)
+
+    # Waterbodies with no continent assignment — append flat (no is_a)
+    for _wbitem in sorted(_wb_unassigned, key=lambda x: _title_sort_key(_lbl(x))):
+        _qid  = _wbitem["qid"]
+        _gnid = _wbitem.get("gnid", "")
+        _lbl2 = normalize_text(_lbl(_wbitem))
+        add_permissible_value(
+            waterbody_pvs, _qid,
+            title=_lbl2,
+            meaning=f"wd:{_qid}",
+            description=normalize_text(_wbitem.get("desc", "")) or None,
+        )
+        _wb_sssom(_qid, _gnid, _lbl2)
+
     n_sov  = len(sovereign_states)
     n_ter  = len(territories)
     n_all  = n_sov + n_ter
@@ -1236,7 +1835,8 @@ def _build_countries_yaml(key, source, data, locales=None):
         title=source.get("title") or "Wikidata Countries, Continents, and Oceans",
         description=(
             f"{n_sov} sovereign states + {n_ter} territories, "
-            f"{len(continents)} continents, and {len(oceans)} oceans from Wikidata "
+            f"{len(continents)} continents, {len(oceans)} oceans, and "
+            f"{len(waterbodies)} international waterbodies from Wikidata "
             "(historical entities excluded via P576 filter). "
             "GeoNames P1566 and ISO alpha-2 cross-references included."
         ),
@@ -1279,6 +1879,21 @@ def _build_countries_yaml(key, source, data, locales=None):
                 "description": "Wikidata oceans and major water bodies (P31=Q9430).",
                 "permissible_values": ocean_pvs,
             },
+            "GeoWikiWaterbody": {
+                "name":        "GeoWikiWaterbody",
+                "title":       "International Waterbody",
+                "inherits":    "GeoWikiOcean",
+                "description": (
+                    f"{len(waterbody_pvs)} international water bodies (lakes, rivers, "
+                    "seas, gulfs, straits, bays) with "
+                    f"{_WD_WATERBODY_MIN_SITELINKS}+ Wikipedia sitelinks, spanning "
+                    "two or more countries, plus all oceans inherited from GeoWikiOcean. "
+                    "Lakes and rivers require Wikidata P17 to reference at least two "
+                    "countries; seas, gulfs, straits, and bays are international by "
+                    "nature and need only meet the sitelinks threshold."
+                ),
+                "permissible_values": waterbody_pvs,
+            },
         },
     )
 
@@ -1288,10 +1903,11 @@ def _build_countries_yaml(key, source, data, locales=None):
             continue
         locale_enums = {}
         for items_list, enum_key in [
-            (sovereign_states, "GeoWikiCountry"),
-            (territories,      "GeoWikiCountryExtended"),
-            (continents_sorted, "GeoWikiContinent"),
-            (oceans_sorted,     "GeoWikiOcean"),
+            (sovereign_states,   "GeoWikiCountry"),
+            (territories,        "GeoWikiCountryExtended"),
+            (continents_sorted,  "GeoWikiContinent"),
+            (oceans_sorted,      "GeoWikiOcean"),
+            (waterbodies,        "GeoWikiWaterbody"),
         ]:
             lang_pvs = {}
             for item in items_list:
@@ -1319,6 +1935,375 @@ def _build_countries_yaml(key, source, data, locales=None):
     log_extraction("GeoWikiCountryExtended", count=len(extended_pvs))
     log_extraction("GeoWikiContinent",       count=len(continent_pvs))
     log_extraction("GeoWikiOcean",           count=len(ocean_pvs))
+    log_extraction("GeoWikiWaterbody",       count=len(waterbody_pvs))
+    if sssom_rows:
+        write_sssom_mappings(
+            _GEOWIKI_SSSOM, sssom_rows, _SSSOM_PREFIXES,
+            _GEOWIKI_SSSOM_ID, _GEOWIKI_SSSOM_DESC,
+        )
+        print(f"  SSSOM: {len(sssom_rows)} mappings written to {_GEOWIKI_SSSOM}")
+
+
+def _build_country_waters_yaml(key, source, data, locales=None):
+    """Write sources/{key}.yaml for GeoWikiCountryWaters scope.
+
+    Produces a single enum GeoWikiCountryWaters{alpha2} with:
+      - Country item as the root entry (no is_a) — used as fallback for bodies
+        with no resolved ADM location.
+      - Each water body sorted alphabetically with is_a pointing to its best
+        resolved administrative location (ADM2 > ADM1 > country root).
+      - ``inherits: GeoWikiAdm2{alpha2}`` (or ADM1) when ADM cache is available,
+        so that the ADM ancestor QIDs used as is_a values are reachable.
+
+    A body shared with another country (e.g. Lake Ontario for CA and US)
+    appears in both country enums; duplication is intentional.
+    """
+    locales       = locales or ["en"]
+
+    alpha2        = data.get("alpha2", "")
+    country_qid   = data.get("country_qid", "")
+    country_name  = data.get("country_name", alpha2)
+    entries       = data.get("entries", [])
+
+    # Resolve ADM groupings from cached ADM1/ADM2 data so that this logic
+    # runs both on -f (after fetch) and on -c (from cached JSON).
+    adm1_qids, adm2_qids, _adm2_to_adm1, inherits_enum = _load_adm_sets(alpha2)
+
+    # Build ADM1 name → QID for description-based province fallback.
+    # Many water bodies have P131 pointing to a district/municipality rather than
+    # directly to a province; parsing the Wikidata description string resolves most.
+    _adm1_name_to_qid: dict = {}
+    try:
+        _adm1_payload = _load_json(f"GeoWiki_ADM1_{alpha2.upper()}")
+        for _e in (_adm1_payload.get("entries") or []):
+            _qid = _e.get("qid", "")
+            if not _qid:
+                continue
+            for _lbl_str in (_e.get("labels") or {}).values():
+                if _lbl_str:
+                    _adm1_name_to_qid[_lbl_str.lower()] = _qid
+            if _e.get("name"):
+                _adm1_name_to_qid[_e["name"].lower()] = _qid
+    except Exception:
+        pass
+
+    # Build ADM2 name → QID for a secondary description-based fallback.
+    # Handles descriptions that name a district/region (e.g. "Nord-du-Québec",
+    # "Saguenay–Lac-Saint-Jean") rather than the province itself.
+    _adm2_name_to_qid: dict = {}
+    try:
+        _adm2_payload = _load_json(f"GeoWiki_ADM2_{alpha2.upper()}")
+        for _e in (_adm2_payload.get("entries") or []):
+            _qid2 = _e.get("qid", "")
+            if not _qid2 or _qid2 not in adm2_qids:
+                continue
+            for _lbl_str in (_e.get("labels") or {}).values():
+                if _lbl_str:
+                    _adm2_name_to_qid[_lbl_str.lower()] = _qid2
+            if _e.get("name"):
+                _adm2_name_to_qid[_e["name"].lower()] = _qid2
+    except Exception:
+        pass
+
+    adm_adm2 = adm_adm1 = adm_desc = adm_override = adm_country = adm_multi = 0
+    for _entry in entries:
+        raw_adm   = _entry.get("adm_qid", "")
+        extra_adm = _entry.get("extra_adm_qids", [])
+
+        # Collect all province/territory QIDs from both the primary P131 value and
+        # the supplemental P131+P1566/P518 values, in encounter order (primary first).
+        _all_candidates = ([raw_adm] if raw_adm else []) + extra_adm
+        _seen_c: set = set()
+        _provinces: list = []
+        for _c in _all_candidates:
+            if _c in _seen_c:
+                continue
+            _seen_c.add(_c)
+            if _c in adm1_qids:
+                _provinces.append(_c)
+            elif _c in adm2_qids:
+                _provinces.append(_c)   # ADM2 as direct parent; ADM1 via inherits chain
+
+        if _provinces:
+            _entry["is_a_qid"]   = _provinces[0]
+            _entry["mixin_qids"] = _provinces[1:]
+            if _provinces[0] in adm2_qids:
+                adm_adm2 += 1
+            else:
+                adm_adm1 += 1
+            if len(_provinces) > 1:
+                adm_multi += 1
+        else:
+            # Fallback: scan the Wikidata description for known province/territory names
+            _prov = _desc_find_adm1(_entry.get("desc", "") or "", _adm1_name_to_qid)
+            if not _prov:
+                # Secondary fallback: try known ADM2 region names (e.g. "Nord-du-Québec")
+                _prov = _desc_find_adm1(_entry.get("desc", "") or "", _adm2_name_to_qid)
+            if _prov:
+                _entry["is_a_qid"]   = _prov
+                _entry["mixin_qids"] = []
+                adm_desc += 1
+            else:
+                _override = _CW_WATER_OVERRIDES.get(_entry.get("qid", ""))
+                if _override:
+                    _entry["is_a_qid"]   = _override
+                    _entry["mixin_qids"] = []
+                    adm_override += 1
+                else:
+                    _entry["is_a_qid"]   = country_qid
+                    _entry["mixin_qids"] = []
+                    adm_country += 1
+    if inherits_enum:
+        multi_note = f", {adm_multi} \u2192 multi-province (mixins)" if adm_multi else ""
+        ovr_note   = f", {adm_override} \u2192 override" if adm_override else ""
+        print(f"    ADM resolved: {adm_adm2} \u2192 ADM2, {adm_adm1} \u2192 ADM1, "
+              f"{adm_desc} \u2192 desc{ovr_note}, "
+              f"{adm_country} \u2192 country fallback{multi_note}  (inherits: {inherits_enum})")
+    else:
+        print(f"    No ADM cache found for {alpha2}; all {adm_country} entries use country root.")
+
+    # Collect the set of ADM QIDs that have at least one waterbody child.
+    _used_adm_qids: set = set()
+    for _e in entries:
+        _ia = _e.get("is_a_qid", "")
+        if _ia and _ia != country_qid:
+            _used_adm_qids.add(_ia)
+        for _mx in (_e.get("mixin_qids") or []):
+            if _mx and _mx != country_qid:
+                _used_adm_qids.add(_mx)
+
+    # Load full ADM1 and ADM2 entry details so only needed nodes are inlined.
+    _adm1_full_map: dict = {}  # qid → entry
+    _adm2_full_map: dict = {}  # qid → entry
+    try:
+        for _e in (_load_json(f"GeoWiki_ADM1_{alpha2.upper()}").get("entries") or []):
+            if _e.get("qid"):
+                _adm1_full_map[_e["qid"]] = _e
+    except Exception:
+        pass
+    try:
+        for _e in (_load_json(f"GeoWiki_ADM2_{alpha2.upper()}").get("entries") or []):
+            if _e.get("qid"):
+                _adm2_full_map[_e["qid"]] = _e
+    except Exception:
+        pass
+
+    # Determine the minimal ADM node sets; every used ADM2 also needs its ADM1 parent.
+    _needed_adm2: set = _used_adm_qids & adm2_qids
+    _needed_adm1: set = _used_adm_qids & adm1_qids
+    for _q2 in _needed_adm2:
+        _p1 = _adm2_to_adm1.get(_q2) or (_adm2_full_map.get(_q2) or {}).get("adm1_qid", "")
+        if _p1 and _p1 in adm1_qids:
+            _needed_adm1.add(_p1)
+
+    if adm1_qids or adm2_qids:
+        _pruned_a1 = len(adm1_qids) - len(_needed_adm1)
+        _pruned_a2 = len(adm2_qids) - len(_needed_adm2)
+        print(f"    Pruned {_pruned_a1} ADM1, {_pruned_a2} ADM2 entries "
+              f"with no waterbody children "
+              f"(kept {len(_needed_adm1)} ADM1, {len(_needed_adm2)} ADM2).")
+
+    def _lbl(item): return _best_label(item, locales, "qid")
+
+    enum_key = f"GeoWikiCountryWaters{alpha2}"
+
+    # Country as root/fallback; ADM nodes and waters sorted alphabetically beneath it.
+    pvs = {}
+    if country_qid:
+        pvs[country_qid] = {
+            "title":   normalize_text(country_name),
+            "meaning": f"wd:{country_qid}",
+        }
+
+    # Inline the needed ADM1 entries grouped by type label (replaces inherits directive).
+    _adm1_by_type: defaultdict = defaultdict(list)
+    for _q1 in _needed_adm1:
+        _e1 = _adm1_full_map.get(_q1, {})
+        _adm1_by_type[_e1.get("type_label", "")].append(_q1)
+
+    _has_multi_type = sum(1 for _g in _adm1_by_type.values() if len(_g) >= 2) >= 2
+
+    for _tl, _grp in sorted(_adm1_by_type.items(), key=lambda x: (-len(x[1]), x[0])):
+        _add_hdr = _has_multi_type and len(_grp) >= 2 and _tl
+        _hdr_code = (_tl[0].upper() + _tl[1:]) if _add_hdr else ""
+        if _add_hdr and _hdr_code not in pvs:
+            _tw = (_tl.split(" of ")[0].strip().capitalize()
+                   if " of " in _tl else _tl.capitalize())
+            _hdr_pv: dict = {"title": _tw + (f" of {country_name}" if country_name else "")}
+            if _hdr_code in _ADM1_TYPE_HEADER_DESCRIPTIONS:
+                _hdr_pv["description"] = _ADM1_TYPE_HEADER_DESCRIPTIONS[_hdr_code]
+            pvs[_hdr_code] = _hdr_pv
+        for _q1 in sorted(_grp, key=lambda q: _title_sort_key(
+                _best_label(_adm1_full_map.get(q, {"qid": q}), locales, "qid"))):
+            _e1 = _adm1_full_map.get(_q1, {"qid": _q1})
+            _lbl1 = normalize_text(_best_label(_e1, locales, "qid"))
+            _ia1 = _hdr_code if (_add_hdr and _hdr_code) else None
+            add_permissible_value(
+                pvs, _q1,
+                title=_lbl1,
+                meaning=f"wd:{_q1}",
+                description=normalize_text(_e1.get("desc", "")) or None,
+                is_a=_ia1,
+            )
+
+    # Inline the needed ADM2 entries.
+    for _q2 in sorted(_needed_adm2, key=lambda q: _title_sort_key(
+            _best_label(_adm2_full_map.get(q, {"qid": q}), locales, "qid"))):
+        _e2 = _adm2_full_map.get(_q2, {"qid": _q2})
+        _lbl2 = normalize_text(_best_label(_e2, locales, "qid"))
+        _ia2 = _adm2_to_adm1.get(_q2) or _e2.get("adm1_qid") or country_qid
+        if _ia2 not in pvs:
+            # Non-standard ADM1 parent (e.g. "Northern Ontario") — try description
+            _ia2 = _desc_find_adm1(_e2.get("desc", ""), _adm1_name_to_qid) or country_qid
+            if _ia2 not in pvs:
+                _ia2 = country_qid
+        add_permissible_value(
+            pvs, _q2,
+            title=_lbl2,
+            meaning=f"wd:{_q2}",
+            description=normalize_text(_e2.get("desc", "")) or None,
+            is_a=_ia2,
+        )
+
+    sssom_rows = []
+    entries_sorted = sorted(entries, key=lambda x: _title_sort_key(_lbl(x)))
+    for item in entries_sorted:
+        qid    = item["qid"]
+        gnid   = item.get("gnid", "")
+        lbl    = normalize_text(_lbl(item))
+        is_a       = item.get("is_a_qid") or (country_qid if country_qid else None)
+        mixin_qids = item.get("mixin_qids") or []
+        add_permissible_value(
+            pvs, qid,
+            title=lbl,
+            meaning=f"wd:{qid}",
+            description=normalize_text(item.get("desc", "")) or None,
+            is_a=is_a,
+            mixins=mixin_qids or None,
+        )
+        if gnid:
+            sssom_rows.append({
+                "subject_id":            f"wd:{qid}",
+                "predicate_id":          "skos:exactMatch",
+                "object_id":             f"gnf:{gnid}",
+                "mapping_justification": "semapv:ManualMappingCuration",
+                "subject_label":         lbl,
+                "object_label":          "",
+            })
+
+    # Disambiguate entries that share an identical title within the same parent group.
+    # Appends a short location hint from the Wikidata description in parentheses,
+    # e.g. "Canada - Rivière du Loup" × 3 → "… (Louiseville)", "… (Rivière-du-Loup)",
+    # "… (Saint-Georges)".
+    _parent_title_map: defaultdict = defaultdict(list)
+    for _pk, _pv in pvs.items():
+        _parent_title_map[(_pv.get("is_a", ""), _pv.get("title", ""))].append(_pk)
+    disambig_hints: dict = {}   # qid → hint string (populated for disambiguated entries)
+    for (_par, _ttl), _dqids in _parent_title_map.items():
+        if len(_dqids) <= 1:
+            continue
+        for _dq in _dqids:
+            _hint = _desc_location_hint(pvs[_dq].get("description", "") or "")
+            if _hint:
+                pvs[_dq]["title"] = f"{_ttl} ({_hint})"
+                disambig_hints[_dq] = _hint
+    if disambig_hints:
+        print(f"    Disambiguated {len(disambig_hints)} duplicate-titled water body entries.")
+
+    # Build hierarchy description for the enum
+    if _needed_adm1 or _needed_adm2:
+        hier_note = (
+            f"Water bodies are grouped by province/territory (ADM1) or "
+            f"district/county (ADM2) via Wikidata P131 when available; "
+            f"bodies with no resolved ADM location have is_a: {country_qid} (country root). "
+        )
+    else:
+        hier_note = f"Country entry ({country_qid}) is the root; each water body has is_a: {country_qid}. "
+
+    enum_def = {
+        "name":        enum_key,
+        "title":       f"Waters of {country_name}",
+        "description": (
+            f"{len(entries)} water bodies associated with {country_name}. "
+            + hier_note
+            + f"Seas, gulfs, straits, bays, lakes, and rivers "
+            f"with {_WD_COUNTRY_WATERS_MIN_SITELINKS}+ Wikipedia sitelinks."
+        ),
+        "permissible_values": pvs,
+    }
+    # Only use inherits when no ADM cache is available (ADM nodes are inlined above).
+    if inherits_enum and not (_needed_adm1 or _needed_adm2):
+        enum_def["inherits"] = inherits_enum
+
+    source_url = (source.get("reachable_from") or {}).get("source_ontology",
+                                                           "https://www.wikidata.org/")
+    schema = make_config_schema(
+        id=source_url,
+        name=key,
+        title=source.get("title") or f"Wikidata Country Waters for {alpha2}",
+        description=(
+            f"{len(entries)} water bodies (seas, gulfs, straits, bays, lakes, rivers) "
+            f"associated with {country_name} (wd:{country_qid}) from Wikidata. "
+            f"Requires {_WD_COUNTRY_WATERS_MIN_SITELINKS}+ Wikipedia sitelinks. "
+            "Bodies shared with other countries appear in each country's enum."
+        ),
+        license="CC0 1.0",
+        prefixes=_SOURCE_PREFIXES,
+        enums={enum_key: enum_def},
+    )
+
+    # Multilingual extensions
+    for lang in locales:
+        if lang == "en":
+            continue
+        lang_pvs = {}
+        # ADM1 multilingual labels
+        for _q1 in _needed_adm1:
+            _e1 = _adm1_full_map.get(_q1, {})
+            _l1 = (_e1.get("labels") or {}).get(lang, "")
+            if not _l1:
+                continue
+            _default = normalize_text(_best_label(_e1, locales, "qid"))
+            _foreign = normalize_text(_l1)
+            if _foreign != _default:
+                lang_pvs[_q1] = {"title": _foreign}
+        # ADM2 multilingual labels
+        for _q2 in _needed_adm2:
+            _e2 = _adm2_full_map.get(_q2, {})
+            _l2 = (_e2.get("labels") or {}).get(lang, "")
+            if not _l2:
+                continue
+            _default = normalize_text(_best_label(_e2, locales, "qid"))
+            _foreign = normalize_text(_l2)
+            if _foreign != _default:
+                lang_pvs[_q2] = {"title": _foreign}
+        # Waterbody multilingual labels
+        for item in entries_sorted:
+            lbl  = item.get("labels", {}).get(lang, "")
+            hint = disambig_hints.get(item["qid"], "")
+            if not lbl:
+                continue  # no translated label; EN PV (which already has hint) is used
+            fr_title = normalize_text(lbl)
+            if hint:
+                fr_title = f"{fr_title} ({hint})"
+            default = normalize_text(_lbl(item))
+            if hint:
+                default = f"{default} ({hint})"
+            if fr_title != default:
+                lang_pvs[item["qid"]] = {"title": fr_title}
+        if lang_pvs:
+            ext = _make_locale_extensions(
+                source_url, key, source.get("version") or "", lang,
+                enums={enum_key: {"permissible_values": lang_pvs}},
+            )
+            existing = schema.get("extensions", {}).get("locales", {}).get("value", {})
+            existing.update(ext.get("locales", {}).get("value", {}))
+            schema["extensions"] = {"locales": {"tag": "locales", "value": existing}}
+
+    yaml_path = f"sources/{key}.yaml"
+    with open(yaml_path, "w") as f:
+        yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
+    log_extraction(enum_key, count=len(pvs))
     if sssom_rows:
         write_sssom_mappings(
             _GEOWIKI_SSSOM, sssom_rows, _SSSOM_PREFIXES,
@@ -1338,7 +2323,23 @@ def _pluralize(label):
     return label + "s"
 
 
-def _build_adm1_yaml(key, source, data, locales=None):
+def _load_indigenous_from_adm2(alpha2, locales):
+    """Load indigenous entries from the cached GeoWiki_ADM2_{alpha2} JSON.
+
+    Returns a list of entry dicts with entity_type=="indigenous", or [] if the
+    cache is absent or contains no indigenous entries.
+    """
+    adm2_key = f"GeoWiki_ADM2_{alpha2.upper()}"
+    if not _entry_exists(adm2_key):
+        return []
+    try:
+        payload = _load_json(adm2_key)
+    except Exception:
+        return []
+    return [e for e in payload.get("entries", []) if e.get("entity_type") == "indigenous"]
+
+
+def _build_adm1_yaml(key, source, data, locales=None, include_indigenous=False):
     """Write sources/{key}.yaml for GeoWikiADM1 scope.
 
     Per-country: groups ADM1 entries by their P31 type label (e.g. "province of
@@ -1532,6 +2533,14 @@ def _build_adm1_yaml(key, source, data, locales=None):
                 })
             _adm1_sssom(qid, gnid, lbl)
 
+    # Optionally append indigenous (First Nations / Tribes / Iwi) hierarchy.
+    # In ADM1: add top node + group nodes only; individual bands live in ADM2.
+    if include_indigenous and scope != "global":
+        _indig = _load_indigenous_from_adm2(scope, locales)
+        if _indig:
+            _build_first_nations_pvs(pvs, _indig, scope, locales,
+                                     add_top_node=True, include_bands=False)
+
     n       = len(entries)
     n_match = sum(1 for e in entries if e.get("gnid"))
     pct     = 100 * n_match // n if n else 0
@@ -1541,17 +2550,20 @@ def _build_adm1_yaml(key, source, data, locales=None):
     enum_key    = f"GeoWikiAdm1{scope}" if scope != "global" else "GeoWikiAdm1"
     source_url  = (source.get("reachable_from") or {}).get("source_ontology",
                                                              "https://www.wikidata.org/")
+    enum_desc = (source.get("description") or
+                 f"{n} first-order administrative divisions {scope_label} from Wikidata.")
     schema = make_config_schema(
         id=source_url,
         name=key,
         title=source.get("title") or f"Wikidata ADM1 {scope_label}",
-        description=f"{n} first-order administrative divisions {scope_label} from Wikidata.",
+        description=enum_desc,
         license="CC0 1.0",
         prefixes=_SOURCE_PREFIXES,
         enums={
             enum_key: {
                 "name":        enum_key,
                 "title":       enum_title,
+                "description": enum_desc,
                 "permissible_values": pvs,
             },
         },
@@ -1738,7 +2750,7 @@ def _get_endpoint(source):
 
 
 def _fetch_countries_payload(locales, endpoint=_WDQS_ENDPOINT, use_post=False):
-    """Query Wikidata for sovereign states, continents, and oceans.
+    """Query Wikidata for sovereign states, continents, oceans, and waterbodies.
 
     GeoNames countryInfo.txt is used as the authoritative continent source:
     for every country in GeoNames, the continent_qid is set from the GeoNames
@@ -1749,9 +2761,69 @@ def _fetch_countries_payload(locales, endpoint=_WDQS_ENDPOINT, use_post=False):
     empty continent_qid, which _build_countries_yaml treats as sub-national
     entities and excludes from GeoWikiCountry.
     """
-    countries  = _fetch_wikidata_countries(locales, endpoint, use_post)
-    continents = _fetch_wikidata_continents(locales, endpoint, use_post)
-    oceans     = _fetch_wikidata_oceans(locales, endpoint, use_post)
+    countries    = _fetch_wikidata_countries(locales, endpoint, use_post)
+    continents   = _fetch_wikidata_continents(locales, endpoint, use_post)
+    oceans       = _fetch_wikidata_oceans(locales, endpoint, use_post)
+    waterbodies  = _fetch_wikidata_waterbodies(locales, endpoint, use_post)
+
+    # Fallback continent assignment via P17 (country) → country's continent_qid.
+    # Most rivers/lakes/seas don't have P30 set directly in Wikidata, but they
+    # have P17 (country), and the countries data already has continent_qid resolved
+    # via GeoNames.  For multi-country bodies we take the most-frequent continent
+    # among their P17 countries; ties broken by canonical continent sort order.
+    _canonical_cont = set(_GN_CONT_CODE_TO_WD_QID.values())
+    _country_to_cont = {c["qid"]: c.get("continent_qid", "")
+                        for c in countries if c.get("continent_qid")}
+
+    missing_cont = [w for w in waterbodies if not w.get("continent_qid")]
+    if missing_cont:
+        _batch = 80
+        # Map waterbody QID → list of P17 country QIDs
+        qid_to_p17_counts: dict[str, dict[str, int]] = {}
+        for _i in range(0, len(missing_cont), _batch):
+            _slice = missing_cont[_i:_i + _batch]
+            _vals  = " ".join(f"wd:{w['qid']}" for w in _slice if w.get("qid"))
+            if not _vals:
+                continue
+            _sparql = f"""
+SELECT ?item ?country WHERE {{
+  VALUES ?item {{ {_vals} }}
+  ?item wdt:P17 ?country .
+}}
+"""
+            try:
+                _rows = _sparql_query(_sparql, timeout=30, endpoint=endpoint,
+                                      use_post=use_post)
+                for _row in _rows:
+                    _qid     = _qid_from_uri(_row.get("item",    {}).get("value", ""))
+                    _country = _qid_from_uri(_row.get("country", {}).get("value", ""))
+                    if _qid and _country:
+                        qid_to_p17_counts.setdefault(_qid, {})
+                        _cont = _country_to_cont.get(_country, "")
+                        if _cont:
+                            qid_to_p17_counts[_qid][_cont] = \
+                                qid_to_p17_counts[_qid].get(_cont, 0) + 1
+            except Exception as _exc:
+                print(f"  Warning: P17 continent batch failed: {_exc}", file=sys.stderr)
+
+        filled_cont = 0
+        for w in missing_cont:
+            _qid = w.get("qid", "")
+            counts = qid_to_p17_counts.get(_qid, {})
+            if counts:
+                # Pick continent with highest count; break ties by canonical order
+                _canon_order = list(_GN_CONT_CODE_TO_WD_QID.values())
+                best = max(counts, key=lambda q: (counts[q], -_canon_order.index(q)
+                                                  if q in _canon_order else -99))
+                w["continent_qid"] = best
+                filled_cont += 1
+        if filled_cont:
+            print(f"    P17 continent fallback: filled continent for "
+                  f"{filled_cont}/{len(missing_cont)} waterbodies via country lookup.")
+        still_missing = sum(1 for w in waterbodies if not w.get("continent_qid"))
+        if still_missing:
+            print(f"    {still_missing} waterbodies have no P17 country with continent "
+                  f"(will appear ungrouped).")
 
     # Apply GeoNames countryInfo.txt as authoritative continent assignment
     # (overrides Wikidata P30 sub-regions; fills gaps for P30-less entries)
@@ -1790,10 +2862,11 @@ def _fetch_countries_payload(locales, endpoint=_WDQS_ENDPOINT, use_post=False):
         print(f"  Warning: GeoNames continent assignment failed: {exc}", file=sys.stderr)
 
     return {
-        "type":       "countries",
-        "countries":  countries,
-        "continents": continents,
-        "oceans":     oceans,
+        "type":        "countries",
+        "countries":   countries,
+        "continents":  continents,
+        "oceans":      oceans,
+        "waterbodies": waterbodies,
     }
 
 
@@ -1807,6 +2880,253 @@ def _fetch_ppl_payload(alpha2, locales, endpoint=_WDQS_ENDPOINT, use_post=False)
         "entries":     entries,
         "country_qid": country_qid,
     }
+
+
+def _load_adm_sets(alpha2):
+    """Load ADM1 and ADM2 QID sets for *alpha2* from the shared GeoWiki.zip cache.
+
+    Returns a 4-tuple:
+        adm1_qids    — set of QID strings for first-order divisions
+        adm2_qids    — set of QID strings for second-order divisions
+        adm2_to_adm1 — dict {adm2_qid: adm1_qid} from the ADM2 entries
+        inherits_enum — LinkML enum name to use in the CountryWaters enum's
+                        ``inherits`` field (e.g. "GeoWikiAdm2CA"), or "" if
+                        no ADM data is available.
+
+    Returns empty structures if neither ADM cache entry is found.
+    """
+    alpha2 = alpha2.upper()
+    adm1_qids: set  = set()
+    adm2_qids: set  = set()
+    adm2_to_adm1    = {}
+    inherits_enum   = ""
+
+    # ADM1 ----------------------------------------------------------------
+    try:
+        payload = _load_json(f"GeoWiki_ADM1_{alpha2}")
+        for e in (payload.get("entries") or []):
+            qid = e.get("qid", "")
+            if qid:
+                adm1_qids.add(qid)
+        if adm1_qids:
+            inherits_enum = f"GeoWikiAdm1{alpha2}"
+    except (FileNotFoundError, Exception):
+        pass
+
+    # ADM2 ----------------------------------------------------------------
+    try:
+        payload = _load_json(f"GeoWiki_ADM2_{alpha2}")
+        for e in (payload.get("entries") or []):
+            qid      = e.get("qid",      "")
+            adm1_qid = e.get("adm1_qid", "")
+            if qid:
+                adm2_qids.add(qid)
+                if adm1_qid:
+                    adm2_to_adm1[qid] = adm1_qid
+        if adm2_qids:
+            inherits_enum = f"GeoWikiAdm2{alpha2}"   # ADM2 inherits ADM1, so covers both
+    except (FileNotFoundError, Exception):
+        pass
+
+    return adm1_qids, adm2_qids, adm2_to_adm1, inherits_enum
+
+
+def _fetch_country_waters_payload(alpha2, locales, endpoint=_WDQS_ENDPOINT, use_post=False):
+    """Resolve alpha2 → Wikidata QID, then fetch water bodies for that country."""
+    locales = locales or ["en"]
+
+    country_sparql = f"""
+SELECT ?item ?label WHERE {{
+  ?item wdt:P297 "{alpha2.upper()}" .
+  FILTER NOT EXISTS {{ ?item wdt:P576 ?end . }}
+  OPTIONAL {{ ?item rdfs:label ?label . FILTER(LANG(?label) = "en") }}
+}}
+LIMIT 1
+"""
+    country_qid  = ""
+    country_name = alpha2.upper()
+    try:
+        rows = _sparql_query(country_sparql, timeout=15, endpoint=endpoint, use_post=use_post)
+        if rows:
+            country_qid = _qid_from_uri(rows[0].get("item", {}).get("value", ""))
+            lbl = rows[0].get("label", {}).get("value", "")
+            if lbl:
+                country_name = lbl
+    except Exception as exc:
+        print(f"  Warning: could not find country QID for {alpha2}: {exc}", file=sys.stderr)
+
+    if not country_qid:
+        print(f"  Warning: no Wikidata item found for ISO alpha-2 '{alpha2}'", file=sys.stderr)
+        return {
+            "type": "country_waters", "country_qid": "", "alpha2": alpha2.upper(),
+            "country_name": alpha2.upper(), "entries": [],
+        }
+
+    entries = _fetch_wikidata_country_waters(country_qid, locales, endpoint, use_post)
+    return {
+        "type":         "country_waters",
+        "country_qid":  country_qid,
+        "alpha2":       alpha2.upper(),
+        "country_name": country_name,
+        "entries":      entries,
+    }
+
+
+def _desc_location_hint(desc: str) -> str:
+    """Extract the most specific location phrase from a Wikidata description.
+
+    Used to disambiguate water bodies that share an identical title and parent.
+
+    Examples::
+        "watercourse in Louiseville, Quebec, Canada"          → "Louiseville"
+        "watercourse in Clearwater County, Alberta, Canada"   → "Clearwater County"
+        "watercourse in Saskatchewan and Alberta in Canada"   → "Saskatchewan and Alberta"
+        "watercourse in Capital Regional District, BC, Canada"→ "Capital Regional District"
+    """
+    if not desc:
+        return ""
+    # "in PLACE in Country" (no comma between PLACE and 'in Country')
+    m = re.search(r'\bin\s+(.+?)\s+in\s+\w[\w\s]*$', desc, re.IGNORECASE)
+    if m:
+        return m.group(1).strip()
+    # "in PLACE, [Province, Country]" — take everything before the first comma
+    m = re.search(r'\bin\s+([^,]+)', desc, re.IGNORECASE)
+    if m:
+        return m.group(1).strip()
+    return ""
+
+
+def _desc_find_adm1(desc: str, name_to_qid: dict) -> str:
+    """Scan comma-separated parts of a Wikidata description for a known ADM1 name.
+
+    Works right-to-left since the province/territory is typically the second-to-last
+    segment (before the country name).  Case-insensitive.  Returns the matching
+    QID on the first match, or "" if no match.
+
+    Handles several description styles:
+      "lake in Kenora District, Ontario, Canada"               → Q1904 (Ontario)
+      "watercourse in Alberta, Canada"                         → Q1951 (Alberta)
+      "river in Yukon Territory, British Columbia, and Alaska" → Q1973 (British Columbia)
+      "watercourse in Ontario (Canada)"                        → Q1904 (Ontario)
+      "branch of the Saguenay River (Quebec, Canada)"          → Q176  (Quebec)
+      "lake crossed by the Chensagi River, Northwestern Quebec, Canada"  → Q176
+      "lake in Kenora District, Ontario, Canada"               → Q1904
+      "marginal sea of the Arctic Ocean"                       → ""
+    """
+    if not desc or not name_to_qid:
+        return ""
+
+    def _token_search(text: str) -> str:
+        """Try all contiguous sub-sequences of cleaned tokens of *text* against name_to_qid."""
+        _toks = re.sub(r'[^a-z0-9\s]', ' ', text.lower()).split()
+        for _s in range(len(_toks)):
+            for _e in range(len(_toks), _s, -1):
+                _sub = " ".join(_toks[_s:_e])
+                if len(_sub) > 2 and _sub in name_to_qid:
+                    return name_to_qid[_sub]
+        return ""
+
+    # Protect commas inside parentheses before splitting
+    # so "River (Quebec, Canada)" stays as one part during the right-to-left scan.
+    _desc_norm = re.sub(r'\(([^)]*)\)',
+                        lambda m: '(' + m.group(1).replace(',', '\x00') + ')', desc)
+    for part in reversed(_desc_norm.split(",")):
+        part = part.replace('\x00', ',').strip()
+        part_lower = part.lower()
+        # Strip leading "in " or "and " (e.g. " and Alaska" → "alaska")
+        for prefix in ("in ", "and "):
+            if part_lower.startswith(prefix):
+                part_lower = part_lower[len(prefix):]
+                break
+        # 1. Direct match (also try with parenthetical suffix stripped,
+        #    e.g. "Nord-du-Québec (Canada)" → "nord-du-québec")
+        if part_lower in name_to_qid:
+            return name_to_qid[part_lower]
+        _pl_no_paren = re.sub(r'\s*\([^)]*\)', '', part_lower).strip()
+        if _pl_no_paren != part_lower and _pl_no_paren in name_to_qid:
+            return name_to_qid[_pl_no_paren]
+        # 2. Content inside parentheses (e.g. "River (Quebec, Canada)" → "quebec")
+        for _paren in re.findall(r'\(([^)]*)\)', part):
+            for _pk in _paren.split(','):
+                _pk = _pk.strip().lower()
+                if _pk and _pk in name_to_qid:
+                    return name_to_qid[_pk]
+        # 3. Regex: extract tail after " in " — also retry with parentheses stripped
+        _part_for_regex = part
+        m = re.search(r'\bin\s+(\S[\w\s\-]*)$', _part_for_regex, re.IGNORECASE)
+        if not m:
+            _part_no_paren = re.sub(r'\s*\([^)]*\)', '', part).strip()
+            if _part_no_paren != part:
+                m = re.search(r'\bin\s+(\S[\w\s\-]*)$', _part_no_paren, re.IGNORECASE)
+        if m:
+            candidate = m.group(1).strip().lower()
+            if candidate in name_to_qid:
+                return name_to_qid[candidate]
+            # Handle "X and Y" (e.g. "Ontario and Quebec") — try each token
+            for _tok in re.split(r'\s+and\s+', candidate, flags=re.IGNORECASE):
+                _tok = _tok.strip()
+                if _tok in name_to_qid:
+                    return name_to_qid[_tok]
+            # Token-stripping: handles "Eastern Ontario", "Northern British Columbia", etc.
+            _r = _token_search(candidate)
+            if _r:
+                return _r
+        # 4. Token-stripping on the whole part as a last resort
+        # (handles "Northwestern Quebec" as a direct comma-part with no "in" keyword)
+        _r = _token_search(part_lower)
+        if _r:
+            return _r
+    return ""
+
+
+def _entity_type_hint(desc: str) -> str:
+    """Extract the entity type (the part before 'in' or 'of') from a Wikidata description.
+
+    Used to disambiguate administrative divisions that share a name and parent.
+
+    Examples::
+        "city in Estrie, Quebec, Canada"                      → "city"
+        "parish municipality in Quebec, Canada"               → "parish municipality"
+        "township municipality in Estrie, Quebec, Canada"     → "township municipality"
+        "town of Estrie, Quebec, Canada"                      → "town"
+    """
+    if not desc:
+        return ""
+    m = re.match(r'^(.+?)\s+(?:in|of)\s+', desc.strip(), re.IGNORECASE)
+    if m:
+        return m.group(1).strip()
+    return ""
+
+
+def _fetch_geonames_adm1_rows(alpha2):
+    """Fetch GeoNames admin1CodesASCII.txt and return rows for *alpha2*.
+
+    Returns list of dicts: admin1_code (e.g. "12"), name, gnid.
+    The admin1_code is the numeric/alphabetic code that appears as the second
+    segment of compound_codes in GeoNames ADM2 data (e.g. "12" in "CA.12.xxx").
+    """
+    print(f"  Fetching GeoNames admin1CodesASCII.txt for {alpha2} ...")
+    req = urllib.request.Request(_GEONAMES_ADM1_URL, headers=BROWSER_HEADERS)
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        raw = resp.read().decode("utf-8")
+    prefix = alpha2.upper() + "."
+    rows = []
+    for line in raw.splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        parts = line.split("\t")
+        if len(parts) < 4:
+            continue
+        compound = parts[0].strip()
+        if not compound.startswith(prefix):
+            continue
+        rows.append({
+            "admin1_code": compound[len(prefix):],
+            "name":        parts[1].strip(),
+            "gnid":        parts[3].strip(),
+        })
+    print(f"    Found {len(rows)} GeoNames ADM1 rows for {alpha2}.")
+    return rows
 
 
 def _fetch_geonames_adm2_rows(alpha2):
@@ -1905,6 +3225,87 @@ SELECT ?item ?gnid {label_vars} ?desc ?adm1 WHERE {{
     return wd_by_gnid
 
 
+def _fetch_indigenous_entities(country_qid, p31_types, locales=None,
+                                endpoint=_WDQS_ENDPOINT, use_post=False):
+    """Query Wikidata for indigenous entities (e.g. First Nations) in a country.
+
+    Args:
+        country_qid: Wikidata QID for the country (e.g. "Q16" for Canada).
+        p31_types: list of Wikidata P31 type QIDs (e.g. ["Q2882257"] for Canadian First Nation bands).
+        locales: list of language codes.
+
+    Returns list of entry dicts compatible with _fetch_adm2_payload entries:
+        {qid, gnid, name, compound_code, labels, desc, adm1_qid,
+         country_qid, native_label, entity_type}
+    """
+    locales = locales or ["en"]
+    if not country_qid or not p31_types:
+        return []
+
+    label_vars      = " ".join(f"?label_{lang}" for lang in locales)
+    label_optionals = "\n".join(
+        f'  OPTIONAL {{ ?item rdfs:label ?label_{lang} .'
+        f' FILTER(LANG(?label_{lang}) = "{lang}") }}'
+        for lang in locales
+    )
+    type_values = " ".join(f"wd:{t}" for t in p31_types)
+
+    sparql = f"""
+SELECT ?item ?gnid {label_vars} ?desc ?native_label ?adm1 WHERE {{
+  ?item wdt:P17 wd:{country_qid} .
+  ?item wdt:P31 ?type .
+  VALUES ?type {{ {type_values} }}
+  FILTER NOT EXISTS {{ ?item wdt:P576 ?end . }}
+{label_optionals}
+  OPTIONAL {{
+    ?item schema:description ?desc .
+    FILTER(LANG(?desc) = "en")
+  }}
+  OPTIONAL {{ ?item wdt:P1566 ?gnid . }}
+  OPTIONAL {{ ?item wdt:P1705 ?native_label . }}
+  OPTIONAL {{ ?item wdt:P131 ?adm1 . }}
+}}
+"""
+    try:
+        rows = _sparql_query(sparql, timeout=120, endpoint=endpoint, use_post=use_post)
+    except Exception as exc:
+        print(f"  Warning: indigenous entities query failed: {exc}", file=sys.stderr)
+        return []
+
+    entries: list = []
+    seen: set = set()
+    for row in rows:
+        qid = _qid_from_uri(row.get("item", {}).get("value", ""))
+        if not qid or qid in seen:
+            continue
+        seen.add(qid)
+        gnid         = row.get("gnid", {}).get("value", "")
+        adm1_uri     = row.get("adm1", {}).get("value", "")
+        adm1_qid     = _qid_from_uri(adm1_uri) if adm1_uri else ""
+        native_label = row.get("native_label", {}).get("value", "")
+        labels       = {
+            lang: row[f"label_{lang}"]["value"]
+            for lang in locales if row.get(f"label_{lang}", {}).get("value")
+        }
+        name = labels.get("en") or labels.get(locales[0], "") or qid
+        desc = row.get("desc", {}).get("value", "")
+        entries.append({
+            "gnid":          gnid,
+            "name":          name,
+            "compound_code": "",
+            "qid":           qid,
+            "labels":        labels,
+            "desc":          desc,
+            "adm1_qid":      adm1_qid,
+            "country_qid":   country_qid,
+            "native_label":  native_label,
+            "entity_type":   "indigenous",
+        })
+
+    print(f"    Fetched {len(entries)} indigenous entities for {country_qid}.")
+    return entries
+
+
 def _fetch_adm1_payload(alpha2, locales, endpoint=_WDQS_ENDPOINT, use_post=False):
     """Query Wikidata ADM1 for a single country identified by ISO alpha-2."""
     entries = _fetch_wikidata_adm1_for_country(alpha2, locales, endpoint, use_post)
@@ -1933,7 +3334,8 @@ def _fetch_adm1_payload(alpha2, locales, endpoint=_WDQS_ENDPOINT, use_post=False
     }
 
 
-def _fetch_adm2_payload(alpha2, locales, endpoint=_WDQS_ENDPOINT, use_post=False):
+def _fetch_adm2_payload(alpha2, locales, endpoint=_WDQS_ENDPOINT, use_post=False,
+                        include_indigenous=False):
     """Build ADM2 payload for a single country.
 
     Uses GeoNames admin2Codes.txt as the authoritative county-level list, then
@@ -1950,6 +3352,17 @@ def _fetch_adm2_payload(alpha2, locales, endpoint=_WDQS_ENDPOINT, use_post=False
     except Exception as exc:
         print(f"  Error fetching GeoNames ADM2 for {alpha2}: {exc}", file=sys.stderr)
         gn_rows = []
+
+    # Fetch GeoNames ADM1 code → gnid mapping.  Stored in the payload so that
+    # _build_adm2_yaml can resolve admin1 codes for GeoNames-only entries
+    # (e.g. Yukon CA.12 / NWT CA.13) that have no Wikidata adm1_qid.
+    gn_adm1_code_map: dict = {}
+    try:
+        for _row in _fetch_geonames_adm1_rows(alpha2):
+            gn_adm1_code_map[_row["admin1_code"]] = _row["gnid"]
+    except Exception as _exc:
+        print(f"  Warning: could not fetch GeoNames ADM1 codes for {alpha2}: {_exc}",
+              file=sys.stderr)
 
     if not gn_rows:
         return {"type": "adm2", "scope": alpha2.upper(), "entries": [],
@@ -2017,17 +3430,320 @@ SELECT ?item ?label WHERE {{
         print(f"  Note: no cached {adm1_key} — province hierarchy will be flat.",
               file=sys.stderr)
 
+    # Optionally append indigenous entities (e.g. First Nations)
+    if include_indigenous and country_qid:
+        p31_types = _INDIGENOUS_P31_BY_COUNTRY.get(alpha2.upper(), [])
+        if p31_types:
+            print(f"  Fetching indigenous entities (P31 ∈ {p31_types}) for {alpha2} ...")
+            indig_entries = _fetch_indigenous_entities(
+                country_qid, p31_types, locales, endpoint, use_post
+            )
+            entries.extend(indig_entries)
+        else:
+            print(f"  Note: include_indigenous=true but no P31 types defined for {alpha2};"
+                  f" add to _INDIGENOUS_P31_BY_COUNTRY to enable.",
+                  file=sys.stderr)
+
     return {
-        "type":         "adm2",
-        "scope":        alpha2.upper(),
-        "entries":      entries,
-        "adm1_entries": saved_adm1_entries,
-        "country_name": saved_country_name,
-        "country_qid":  country_qid,
+        "type":             "adm2",
+        "scope":            alpha2.upper(),
+        "entries":          entries,
+        "adm1_entries":     saved_adm1_entries,
+        "country_name":     saved_country_name,
+        "country_qid":      country_qid,
+        "gn_adm1_code_map": gn_adm1_code_map,
     }
 
 
-def _build_adm2_yaml(key, source, data, locales=None):
+def _build_first_nations_pvs(pvs, indig_entries, alpha2, locales,
+                             add_top_node=True, include_bands=True):
+    """Populate *pvs* with a First Nations / Tribes / Iwi hierarchy.
+
+    Parameters
+    ----------
+    add_top_node : bool
+        When True (default, ADM1 case): Q392316 is added as a PV with no is_a,
+        and group nodes have is_a=top_qid.
+        When False (standalone GeoWikiFirstNations enum): Q392316 is NOT added
+        as a PV (it becomes enum_uri on the enum), and group nodes have no is_a.
+    include_bands : bool
+        When True (default, standalone enum): individual band entries are emitted
+        under each group node.
+        When False (ADM1 case): only the top node and group nodes are emitted;
+        bands are deferred to the ADM2 enum.
+
+    Structure (for CA, add_top_node=True, include_bands=False — ADM1):
+      top_qid  (Q392316 "First Nations") — no is_a
+        regional group nodes  (is_a=top_qid)  — from _INDIGENOUS_REGIONAL_NODES
+        province group nodes  (is_a=top_qid)  — from _INDIGENOUS_ADM1_GROUPS
+
+    Structure (for CA, add_top_node=False, include_bands=True — standalone enum):
+      regional group nodes  (no is_a)
+        individual bands   (is_a=grp_qid)
+      province group nodes  (no is_a)
+        individual bands   (is_a=grp_qid)
+      orphan bands          (no is_a)
+
+    For countries not in _INDIGENOUS_ADM1_GROUPS (US, NZ): group by adm1_qid
+    directly; each distinct adm1_qid becomes a node with is_a=top_qid (or no
+    is_a when add_top_node=False).
+    """
+    scope = alpha2.upper()
+    top   = _INDIGENOUS_TOP_BY_COUNTRY.get(scope)
+    if not top:
+        return
+    top_qid, top_label = top
+
+    def _lbl(entry): return _best_label(entry, locales, "name", "qid")
+
+    # Add top-level root node (only when add_top_node=True)
+    if add_top_node and top_qid not in pvs:
+        add_permissible_value(pvs, top_qid, title=top_label, meaning=f"wd:{top_qid}")
+
+    # is_a value for group nodes: top_qid when add_top_node=True, None otherwise
+    group_is_a = top_qid if add_top_node else None
+
+    indg_group_map = _INDIGENOUS_ADM1_GROUPS.get(scope, {})
+    indg_regional  = _INDIGENOUS_REGIONAL_NODES.get(scope, [])
+
+    if indg_group_map or indg_regional:
+        # CA-style: build adm1→region map, adm1→group map
+
+        # Pre-resolve each entry's adm1_qid through the full override chain.
+        # We need the set of "known" adm1 QIDs (province/territory group keys).
+        known_adm1: set[str] = set(indg_group_map.keys())
+        for r in indg_regional:
+            known_adm1.update(r.get("adm1_qids", set()))
+
+        def _resolve_adm1(qid_band: str, raw_adm1: str) -> str:
+            a1 = raw_adm1
+            # Step 1: empty → check _ADM2_NO_PARENT_OVERRIDES
+            if not a1 and qid_band in _ADM2_NO_PARENT_OVERRIDES:
+                a1 = _ADM2_NO_PARENT_OVERRIDES[qid_band]
+            # Step 2: intermediate parent one hop too deep
+            if a1 and a1 not in known_adm1 and a1 in _ADM2_INTERMEDIATE_PARENT_QIDS:
+                a1 = _ADM2_INTERMEDIATE_PARENT_QIDS[a1]
+            # Step 3: FN-specific override for remaining orphans
+            if (not a1 or a1 not in known_adm1) and qid_band in _FN_BAND_ADM1_OVERRIDES:
+                a1 = _FN_BAND_ADM1_OVERRIDES[qid_band]
+            return a1
+
+        adm1_to_region: dict = {}
+        for r in indg_regional:
+            for a1 in r.get("adm1_qids", set()):
+                adm1_to_region[a1] = r
+
+        # Group indig_entries by resolved adm1_qid
+        by_adm1: dict = defaultdict(list)
+        for e in indig_entries:
+            raw = e.get("adm1_qid", "")
+            resolved = _resolve_adm1(e.get("qid", ""), raw)
+            by_adm1[resolved].append(e)
+
+        # Determine order: regional groups first (sorted by label), then province
+        # groups (sorted by label), then orphans.
+        group_nodes = []  # (grp_qid, grp_label, adm1_key_or_set, is_regional)
+        emitted_adm1: set = set()
+
+        for a1, r in adm1_to_region.items():
+            if r["group_qid"] not in {gn[0] for gn in group_nodes}:
+                group_nodes.append((r["group_qid"], r["group_label"],
+                                    r["adm1_qids"], True))
+
+        for a1, (grp_qid, grp_label) in sorted(
+            indg_group_map.items(), key=lambda kv: kv[1][1]
+        ):
+            if grp_qid not in {gn[0] for gn in group_nodes}:
+                group_nodes.append((grp_qid, grp_label, {a1}, False))
+
+        # Sort all group nodes by label
+        group_nodes.sort(key=lambda gn: _title_sort_key(gn[1]))
+
+        for grp_qid, grp_label, adm1_set, _is_regional in group_nodes:
+            if grp_qid not in pvs:
+                add_permissible_value(pvs, grp_qid,
+                                      title=grp_label,
+                                      meaning=f"wd:{grp_qid}",
+                                      is_a=group_is_a)
+            if not include_bands:
+                for a1 in adm1_set:
+                    emitted_adm1.add(a1)
+                continue
+            bands_for_group = []
+            for a1 in adm1_set:
+                bands_for_group.extend(by_adm1.get(a1, []))
+                emitted_adm1.add(a1)
+            for entry in sorted(bands_for_group, key=lambda e: _title_sort_key(_lbl(e))):
+                qid = entry.get("qid", "")
+                if not qid:
+                    continue
+                lbl = normalize_text(_lbl(entry))
+                if lbl == qid:
+                    continue  # no Wikidata label — skip unlabelled entries
+                _desc = normalize_text(entry.get("desc", "")) or ""
+                _native = entry.get("native_label", "")
+                if _native:
+                    _native_norm = normalize_text(_native)
+                    _desc = (f"{_desc}; Native name: {_native_norm}" if _desc
+                             else f"Native name: {_native_norm}")
+                add_permissible_value(pvs, qid, title=lbl, meaning=f"wd:{qid}",
+                                      description=_desc or None, is_a=grp_qid)
+
+        if include_bands:
+            # Orphans: bands whose resolved adm1_qid was not handled above
+            orphans = []
+            for a1, entries_list in by_adm1.items():
+                if a1 not in emitted_adm1:
+                    orphans.extend(entries_list)
+            if orphans:
+                print(f"  Note: {len(orphans)} First Nations bands remain as orphans "
+                      f"for {scope}. Add their QIDs to _FN_BAND_ADM1_OVERRIDES:")
+                for entry in sorted(orphans, key=lambda e: e.get("qid", "")):
+                    print(f"    \"{entry.get('qid', '?')}\": \"Q???\",  "
+                          f"# {entry.get('name', '?')} → [province QID]")
+            for entry in sorted(orphans, key=lambda e: _title_sort_key(_lbl(e))):
+                qid = entry.get("qid", "")
+                if not qid:
+                    continue
+                lbl = normalize_text(_lbl(entry))
+                if lbl == qid:
+                    continue  # no Wikidata label — skip unlabelled entries
+                _desc = normalize_text(entry.get("desc", "")) or ""
+                _native = entry.get("native_label", "")
+                if _native:
+                    _native_norm = normalize_text(_native)
+                    _desc = (f"{_desc}; Native name: {_native_norm}" if _desc
+                             else f"Native name: {_native_norm}")
+                add_permissible_value(pvs, qid, title=lbl, meaning=f"wd:{qid}",
+                                      description=_desc or None, is_a=group_is_a)
+
+    else:
+        # US/NZ-style: group by adm1_qid; try to get labels from cached ADM1
+        adm1_labels: dict = {}
+        adm1_key = f"GeoWiki_ADM1_{scope}"
+        if _entry_exists(adm1_key):
+            try:
+                adm1_cache = _load_json(adm1_key)
+                for e in adm1_cache.get("entries", []):
+                    if e.get("qid"):
+                        adm1_labels[e["qid"]] = (
+                            _best_label(e, locales, "name", "qid") or e["qid"]
+                        )
+            except Exception:
+                pass
+
+        by_adm1: dict = defaultdict(list)
+        for e in indig_entries:
+            by_adm1[e.get("adm1_qid", "")].append(e)
+
+        # Sort groups by their label
+        sorted_adm1 = sorted(
+            ((a1, lst) for a1, lst in by_adm1.items() if a1),
+            key=lambda kv: _title_sort_key(adm1_labels.get(kv[0], kv[0])),
+        )
+        for a1_qid, entries_list in sorted_adm1:
+            grp_label = adm1_labels.get(a1_qid, a1_qid)
+            if a1_qid not in pvs:
+                add_permissible_value(pvs, a1_qid, title=grp_label,
+                                      meaning=f"wd:{a1_qid}", is_a=group_is_a)
+            if not include_bands:
+                continue
+            for entry in sorted(entries_list, key=lambda e: _title_sort_key(_lbl(e))):
+                qid = entry.get("qid", "")
+                if not qid:
+                    continue
+                lbl = normalize_text(_lbl(entry))
+                if lbl == qid:
+                    continue  # no Wikidata label — skip unlabelled entries
+                _desc = normalize_text(entry.get("desc", "")) or ""
+                _native = entry.get("native_label", "")
+                if _native:
+                    _native_norm = normalize_text(_native)
+                    _desc = (f"{_desc}; Native name: {_native_norm}" if _desc
+                             else f"Native name: {_native_norm}")
+                add_permissible_value(pvs, qid, title=lbl, meaning=f"wd:{qid}",
+                                      description=_desc or None, is_a=a1_qid)
+
+        if include_bands:
+            # Orphans: entries with no adm1_qid
+            for entry in sorted(by_adm1.get("", []), key=lambda e: _title_sort_key(_lbl(e))):
+                qid = entry.get("qid", "")
+                if not qid:
+                    continue
+                lbl = normalize_text(_lbl(entry))
+                if lbl == qid:
+                    continue  # no Wikidata label — skip unlabelled entries
+                _desc = normalize_text(entry.get("desc", "")) or ""
+                _native = entry.get("native_label", "")
+                if _native:
+                    _native_norm = normalize_text(_native)
+                    _desc = (f"{_desc}; Native name: {_native_norm}" if _desc
+                             else f"Native name: {_native_norm}")
+                add_permissible_value(pvs, qid, title=lbl, meaning=f"wd:{qid}",
+                                      description=_desc or None, is_a=group_is_a)
+
+
+def _build_first_nations_yaml(key, source, adm2_data, locales=None):
+    """Write sources/{key}.yaml for GeoWikiFirstNations scope.
+
+    Builds a standalone First Nations / Tribes / Iwi hierarchy enum, reusing
+    the indigenous entries already cached in the ADM2 JSON payload.
+    """
+    locales = locales or ["en"]
+    alpha2  = source.get("country", "")
+    scope   = alpha2.upper()
+
+    indig_entries = [e for e in adm2_data.get("entries", [])
+                     if e.get("entity_type") == "indigenous"]
+    if not indig_entries:
+        print(f"  Warning: no indigenous entries in ADM2 cache for {scope}.",
+              file=sys.stderr)
+        return
+
+    top = _INDIGENOUS_TOP_BY_COUNTRY.get(scope)
+    if not top:
+        print(f"  Warning: no _INDIGENOUS_TOP_BY_COUNTRY entry for {scope}.",
+              file=sys.stderr)
+        return
+    top_qid, top_label = top
+
+    pvs: dict = {}
+    # Standalone enum: top node becomes enum_uri, not a PV; include individual bands.
+    _build_first_nations_pvs(pvs, indig_entries, scope, locales,
+                              add_top_node=False, include_bands=True)
+
+    n        = len(indig_entries)
+    enum_key = f"GeoWikiFirstNations{scope}"
+    enum_desc = _INDIGENOUS_ENUM_DESC_BY_COUNTRY.get(scope, "")
+    source_url = (source.get("reachable_from") or {}).get("source_ontology",
+                                                           "https://www.wikidata.org/")
+    enum_dict: dict = {
+        "name":               enum_key,
+        "title":              top_label,
+        "enum_uri":           f"wd:{top_qid}",
+        "permissible_values": pvs,
+    }
+    if enum_desc:
+        enum_dict["description"] = enum_desc
+    schema = make_config_schema(
+        id=source_url,
+        name=key,
+        title=source.get("title") or f"Wikidata First Nations for {scope}",
+        description=(
+            f"{n} indigenous entities (First Nations, Tribes, Iwi) for {scope} "
+            "from Wikidata."
+        ),
+        license="CC0 1.0",
+        prefixes=_SOURCE_PREFIXES,
+        enums={enum_key: enum_dict},
+    )
+    yaml_path = f"sources/{key}.yaml"
+    with open(yaml_path, "w") as f:
+        yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
+    log_extraction(enum_key, count=len(pvs))
+
+
+def _build_adm2_yaml(key, source, data, locales=None, include_indigenous=False):
     """Write sources/{key}.yaml for GeoWikiADM2 scope (per-country only).
 
     Produces a 3-level hierarchy that reuses the GeoWikiADM1 structure:
@@ -2183,6 +3899,90 @@ def _build_adm2_yaml(key, source, data, locales=None):
                 })
             _adm1_sssom_embed(qid, gnid, lbl)
 
+    # Identify ADM2 entries that are "subsumed" by ADM3.  Two patterns:
+    #
+    # (a) GeoNames-only ADM2 entries whose 3rd compound segment (the admin2 code)
+    #     also appears as the final segment of a 4-part GeoNames-only ADM3
+    #     compound_code.  These entities that GeoNames classifies as both ADM2
+    #     and ADM3 (e.g. NWT communities appear as ADM2 leaves AND ADM3 leaves
+    #     under their region).
+    #
+    # (b) GeoNames-only ADM2 entries whose full compound_code is used as the
+    #     parent_compound by a Wikidata-enriched ADM3 entry with the same name.
+    #     This covers single-tier municipalities like Haldimand County (ON) that
+    #     GeoNames records at both ADM2 (the county container, one gnid) and ADM3
+    #     (the municipality proper, a different gnid matched by Wikidata P1566).
+    #     Including both would create a self-parenting entry in the ADM3 picklist.
+    adm3_leaf_admin_codes: set = set()
+    adm3_wikidata_parent_names: defaultdict = defaultdict(set)
+    _adm3_key = f"GeoWiki_ADM3_{scope}"
+    if _entry_exists(_adm3_key):
+        try:
+            _adm3_payload = _load_json(_adm3_key)
+            for _ae in (_adm3_payload.get("entries") or []):
+                _cc3 = _ae.get("compound_code", "")
+                _p3 = _cc3.split(".")
+                if len(_p3) == 4:                      # CC.admin1.admin2.admin3
+                    adm3_leaf_admin_codes.add(_p3[3])
+                    if _ae.get("qid"):                 # pattern (b): Wikidata-enriched
+                        _parent_cc = ".".join(_p3[:3])
+                        _ae_name = _ae.get("name", "")
+                        if _ae_name:
+                            adm3_wikidata_parent_names[_parent_cc].add(_ae_name.lower())
+        except Exception:
+            pass
+
+    _subsumed_count = 0
+    if adm3_leaf_admin_codes or adm3_wikidata_parent_names:
+        filtered = []
+        for _e in entries:
+            _cc = _e.get("compound_code", "")
+            _parts = _cc.split(".")
+            _e_name = _e.get("name", "").lower()
+            if (not _e.get("qid")                     # GeoNames-only
+                    and len(_parts) == 3               # 3-part ADM2 compound
+                    and (_parts[2] in adm3_leaf_admin_codes                    # pattern (a)
+                         or _e_name in adm3_wikidata_parent_names.get(         # pattern (b)
+                             _cc, set()))):
+                _subsumed_count += 1
+            else:
+                filtered.append(_e)
+        entries = filtered
+    if _subsumed_count:
+        print(f"    Excluded {_subsumed_count} ADM2 GeoNames-only entries subsumed by ADM3.")
+
+    # Build a mapping from GeoNames admin1 code (from compound_code) → ADM1 QID.
+    # This is derived from entries that are already correctly resolved to a known
+    # province QID, and used as a fallback for two classes of problematic entries:
+    #   (a) GeoNames-only entries (no Wikidata QID) with an empty adm1_qid
+    #   (b) Wikidata entries whose P131 points to an intermediate entity that is
+    #       not itself a first-level province/territory (e.g. "Northern Ontario").
+    gn_adm1_code_to_qid: dict[str, str] = {}
+    for _e in entries:
+        _cc  = _e.get("compound_code", "")
+        _a1q = _e.get("adm1_qid", "")
+        if _a1q and _a1q in adm1_pvs and _cc:
+            _parts = _cc.split(".")
+            if len(_parts) >= 2:
+                gn_adm1_code_to_qid.setdefault(_parts[1], _a1q)
+
+    # Supplement with GeoNames ADM1 code map (stored in payload by _fetch_adm2_payload).
+    # This covers territories like Yukon (CA.12) and NWT (CA.13) whose ADM2 entries
+    # are GeoNames-only (no Wikidata QID, no adm1_qid), so the dynamic seeding above
+    # yields nothing for those admin1 code numbers.
+    _gn_adm1_code_map = data.get("gn_adm1_code_map", {})
+    if _gn_adm1_code_map and adm1_entries:
+        _adm1_gnid_to_qid = {
+            _e.get("gnid", ""): _e.get("qid", "")
+            for _e in adm1_entries
+            if _e.get("gnid") and _e.get("qid")
+        }
+        for _code, _gnid in _gn_adm1_code_map.items():
+            if _code not in gn_adm1_code_to_qid:
+                _qid = _adm1_gnid_to_qid.get(_gnid, "")
+                if _qid and _qid in adm1_pvs:
+                    gn_adm1_code_to_qid[_code] = _qid
+
     # Group ADM2 entries by parent ADM1 QID
     adm2_by_adm1 = defaultdict(list)
     adm2_orphans = []
@@ -2195,6 +3995,15 @@ def _build_adm2_yaml(key, source, data, locales=None):
         # Resolve intermediate parent (one P131 hop too deep)
         if adm1_qid and adm1_qid not in adm1_pvs and adm1_qid in _ADM2_INTERMEDIATE_PARENT_QIDS:
             adm1_qid = _ADM2_INTERMEDIATE_PARENT_QIDS[adm1_qid]
+        # Fallback: derive province from GeoNames compound_code when adm1_qid is
+        # still empty or points to an intermediate entity not in adm1_pvs.
+        if not adm1_qid or adm1_qid not in adm1_pvs:
+            _cc    = e.get("compound_code", "")
+            _parts = _cc.split(".")
+            if len(_parts) >= 2:
+                _fallback = gn_adm1_code_to_qid.get(_parts[1], "")
+                if _fallback and _fallback in adm1_pvs:
+                    adm1_qid = _fallback
         if adm1_qid and adm1_qid in adm1_pvs:
             adm2_by_adm1[adm1_qid].append(e)
         else:
@@ -2221,11 +4030,17 @@ def _build_adm2_yaml(key, source, data, locales=None):
         else:
             return   # nothing to key on
         lbl = normalize_text(_lbl(entry))
+        _desc = normalize_text(entry.get("desc", "")) or ""
+        _native = entry.get("native_label", "")
+        if _native:
+            _native_norm = normalize_text(_native)
+            _desc = (f"{_desc}; Native name: {_native_norm}" if _desc
+                     else f"Native name: {_native_norm}")
         add_permissible_value(
             pvs, pv_code,
             title=lbl,
             meaning=meaning,
-            description=normalize_text(entry.get("desc", "")) or None,
+            description=_desc or None,
             is_a=is_a,
         )
         if qid:
@@ -2260,26 +4075,114 @@ def _build_adm2_yaml(key, source, data, locales=None):
     # combined schema — only ADM2 entries go in pvs; province entries come via inherits.
     has_adm1 = bool(adm1_entries)
 
+    # When both ADM1 is available AND include_indigenous is True AND this country has a
+    # First Nations top node, the group nodes (Q5453437, Q5453438, etc.) are defined in
+    # the ADM1 enum via _build_adm1_yaml + include_indigenous and come into this enum
+    # via inherits.  In that case we skip re-emitting group nodes here (but still emit
+    # the bands with is_a=grp_qid so they reference the inherited nodes).
+    first_nations_in_adm1 = (
+        has_adm1
+        and include_indigenous
+        and bool(_INDIGENOUS_TOP_BY_COUNTRY.get(scope.upper() if scope else ""))
+    )
+
+    # Per-scope indigenous grouping nodes (e.g. "First Nations in Ontario").
+    _indg_group_map = _INDIGENOUS_ADM1_GROUPS.get(scope, {})
+    # Per-scope supra-provincial regional grouping nodes (e.g. Atlantic Canada).
+    _indg_regional = _INDIGENOUS_REGIONAL_NODES.get(scope, [])
+    _adm1_to_region: dict = {}   # adm1_qid → regional spec dict
+    for _r in _indg_regional:
+        for _a1 in _r.get("adm1_qids", set()):
+            _adm1_to_region[_a1] = _r
+    _added_regional_qids: set = set()   # tracks which regional nodes are in pvs
+
     # Interleave: each ADM1 entry immediately followed by its ADM2 children.
     # When has_adm1, skip copying adm1_pvs into pvs (they come via inherits).
+    # Regular ADM2 entries are listed first under each province; then:
+    #  - provinces in _INDIGENOUS_REGIONAL_NODES get a supra-provincial region
+    #    node (e.g. "Atlantic Canada") with a "First Nations in [Region]" child;
+    #  - provinces in _INDIGENOUS_ADM1_GROUPS get a "First Nations in [Province]"
+    #    node directly;
+    #  - provinces in neither dict receive their bands directly.
     pvs = {}
     for code, pv_data in adm1_pvs.items():
         if not has_adm1:
             pvs[code] = pv_data   # embed province/type headers (fallback mode)
         if "meaning" in pv_data:      # province entry (not type-category header)
-            for entry in sorted(adm2_by_adm1.get(code, []),
-                                 key=lambda e: _title_sort_key(_lbl(e))):
+            all_adm2  = adm2_by_adm1.get(code, [])
+            regular   = [e for e in all_adm2 if e.get("entity_type") != "indigenous"]
+            indig     = [e for e in all_adm2 if e.get("entity_type") == "indigenous"]
+            for entry in sorted(regular, key=lambda e: _title_sort_key(_lbl(e))):
                 _adm2_pv(pvs, entry, is_a=code)
+            if indig:
+                region = _adm1_to_region.get(code)
+                if region:
+                    grp_qid = region["group_qid"]
+                    if not first_nations_in_adm1:
+                        if region.get("top_level"):
+                            # Top-level grouping: group_qid appears at enum root (no is_a),
+                            # as a sibling of "Province of Canada".  Insert it once.
+                            if grp_qid not in _added_regional_qids:
+                                add_permissible_value(pvs, grp_qid,
+                                                      title=region["group_label"],
+                                                      meaning=f"wd:{grp_qid}")
+                                _added_regional_qids.add(grp_qid)
+                        else:
+                            # Legacy: supra-provincial hierarchy
+                            #   regional_node (is_a=primary_adm1) → group_node → bands
+                            reg_qid = region["regional_qid"]
+                            if reg_qid not in _added_regional_qids:
+                                _primary = region.get("primary_adm1", code)
+                                _mixins  = sorted(
+                                    a for a in region.get("adm1_qids", set())
+                                    if a != _primary
+                                )
+                                add_permissible_value(pvs, reg_qid,
+                                                      title=region["regional_label"],
+                                                      meaning=f"wd:{reg_qid}",
+                                                      is_a=_primary,
+                                                      mixins=_mixins or None)
+                                add_permissible_value(pvs, grp_qid,
+                                                      title=region["group_label"],
+                                                      meaning=f"wd:{grp_qid}",
+                                                      is_a=reg_qid)
+                                _added_regional_qids.add(reg_qid)
+                    for entry in sorted(indig, key=lambda e: _title_sort_key(_lbl(e))):
+                        _adm2_pv(pvs, entry, is_a=grp_qid)
+                else:
+                    grouping = _indg_group_map.get(code)
+                    if grouping:
+                        grp_qid, grp_label = grouping
+                        if not first_nations_in_adm1:
+                            add_permissible_value(pvs, grp_qid,
+                                                  title=grp_label,
+                                                  meaning=f"wd:{grp_qid}",
+                                                  is_a=code)
+                        for entry in sorted(indig, key=lambda e: _title_sort_key(_lbl(e))):
+                            _adm2_pv(pvs, entry, is_a=grp_qid)
+                    else:
+                        for entry in sorted(indig, key=lambda e: _title_sort_key(_lbl(e))):
+                            _adm2_pv(pvs, entry, is_a=code)
 
-    # Orphaned ADM2 (parent ADM1 not in adm1_pvs): append sorted
-    for entry in sorted(adm2_orphans, key=lambda e: _title_sort_key(_lbl(e))):
+    # Orphaned ADM2 (parent ADM1 not in adm1_pvs): separate indigenous from regular
+    _indig_orphans   = [e for e in adm2_orphans if e.get("entity_type") == "indigenous"]
+    _regular_orphans = [e for e in adm2_orphans if e.get("entity_type") != "indigenous"]
+    for entry in sorted(_regular_orphans, key=lambda e: _title_sort_key(_lbl(e))):
+        _adm2_pv(pvs, entry)
+    for entry in sorted(_indig_orphans, key=lambda e: _title_sort_key(_lbl(e))):
         _adm2_pv(pvs, entry)
 
     n       = len(entries)
     n_match = sum(1 for e in entries if e.get("qid"))
     pct     = 100 * n_match // n if n else 0
-    if adm2_orphans:
-        print(f"  Note: {len(adm2_orphans)} ADM2 entries had no matching ADM1 parent.")
+    if _regular_orphans:
+        print(f"  Note: {len(_regular_orphans)} non-indigenous ADM2 entries had no matching ADM1 parent.")
+    if _indig_orphans:
+        print(f"  Note: {len(_indig_orphans)} indigenous entities remain at top level "
+              f"(province not resolved). Add their P131 intermediary to _ADM2_INTERMEDIATE_PARENT_QIDS:")
+        for e in sorted(_indig_orphans, key=lambda e2: e2.get("name", "")):
+            print(f"    {e.get('qid', '?')}: {e.get('name', '?')}"
+                  f"  (adm1_qid from P131: {e.get('adm1_qid', 'none')})")
     print(f"  Crosswalk: {n_match}/{n} ADM2 entries ({pct}%) have Wikidata QID links")
 
     type_words  = []
@@ -2293,7 +4196,9 @@ def _build_adm2_yaml(key, source, data, locales=None):
     enum_key   = f"GeoWikiAdm2{scope}"
     source_url = (source.get("reachable_from") or {}).get("source_ontology",
                                                             "https://www.wikidata.org/")
-    enum_dict  = {"name": enum_key, "title": enum_title}
+    adm2_desc  = (source.get("description") or
+                  f"{n} second-order administrative divisions for {scope} from Wikidata.")
+    enum_dict  = {"name": enum_key, "title": enum_title, "description": adm2_desc}
     if has_adm1:
         enum_dict["inherits"] = f"GeoWikiAdm1{scope}"
     enum_dict["permissible_values"] = pvs
@@ -2301,7 +4206,7 @@ def _build_adm2_yaml(key, source, data, locales=None):
         id=source_url,
         name=key,
         title=source.get("title") or f"Wikidata ADM2 for {scope}",
-        description=f"{n} second-order administrative divisions for {scope} from Wikidata.",
+        description=adm2_desc,
         license="CC0 1.0",
         prefixes=_SOURCE_PREFIXES,
         enums={enum_key: enum_dict},
@@ -2328,7 +4233,8 @@ def _build_adm2_yaml(key, source, data, locales=None):
                 "country_qid":  data.get("country_qid", ""),
             }
             print(f"  Companion {companion1_path}: building from cache ...")
-            _build_adm1_yaml(f"GeoWiki_ADM1_{scope}", {}, adm1_data, locales)
+            _build_adm1_yaml(f"GeoWiki_ADM1_{scope}", {}, adm1_data, locales,
+                             include_indigenous=include_indigenous)
         else:
             print(f"  Companion {companion1_path} already exists; skipping.")
 
@@ -2914,12 +4820,53 @@ def _build_adm34_yaml(key, source, data, locales=None, only_levels=None):
             continue
         adm2_compound_to_code[cc_code] = e.get("qid") or e.get("gnid", "")
 
+    # Build admin1 code → ADM1 QID so we can promote orphaned ADM3 entries to province.
+    adm1_code_to_qid: dict = {}
+    for _e in adm2_entries:
+        _cc = _e.get("compound_code", "")
+        _a1q = _e.get("adm1_qid", "")
+        if _cc and _a1q:
+            _parts = _cc.split(".")
+            if len(_parts) >= 2:
+                adm1_code_to_qid.setdefault(_parts[1], _a1q)
+
     has_adm2      = bool(adm2_entries)
     adm2_enum_key = f"GeoWikiAdm2{scope}"
 
     # Separate ADM3 and ADM4 entries
     adm3_entries = [e for e in entries if e.get("feat_code") == "ADM3"]
     adm4_entries = [e for e in entries if e.get("feat_code") == "ADM4"]
+
+    # Identify GeoNames-only ADM2 entries that are "subsumed by ADM3" (pattern b
+    # from _build_adm2_yaml): a GeoNames-only ADM2 entry whose compound_code is
+    # claimed as parent_compound by a Wikidata-enriched ADM3 entry with the same
+    # name.  E.g. the old Haldimand-Norfolk region (gnid 5969093, labelled
+    # "Haldimand County" in GeoNames) is subsumed by Q385346 (Haldimand County ADM3).
+    # Both Q385346 and its sibling Q385229 (Norfolk County) reference 5969093 as
+    # is_a; after 5969093 is removed from ADM2 that reference would be dangling.
+    # We replicate the pattern-b detection here so those ADM3 entries can be
+    # reparented directly to the province.
+    _adm3_wd_parent_names: defaultdict = defaultdict(set)
+    for _ae in adm3_entries:
+        if not _ae.get("qid"):
+            continue
+        _cc3 = _ae.get("compound_code", "")
+        _p3 = _cc3.split(".")
+        if len(_p3) == 4:
+            _par_cc = ".".join(_p3[:3])
+            _ae_nm = _ae.get("name", "")
+            if _ae_nm:
+                _adm3_wd_parent_names[_par_cc].add(_ae_nm.lower())
+
+    _subsumed_adm2_gnids: set = set()
+    for _e in adm2_entries:
+        if _e.get("qid"):
+            continue
+        _gnid = _e.get("gnid", "")
+        _cc_e = _e.get("compound_code", "")
+        _nm_e = _e.get("name", "").lower()
+        if _gnid and _nm_e in _adm3_wd_parent_names.get(_cc_e, set()):
+            _subsumed_adm2_gnids.add(_gnid)
 
     sssom_rows: list = []
 
@@ -2979,6 +4926,16 @@ def _build_adm34_yaml(key, source, data, locales=None, only_levels=None):
     for entry in sorted(adm3_entries, key=lambda e: _title_sort_key(_lbl(e))):
         parent_compound = entry.get("parent_compound", "")
         is_a = adm2_compound_to_code.get(parent_compound, "")
+        # If is_a points to a GeoNames-only ADM2 entry that is "subsumed by ADM3"
+        # (pattern b: removed from ADM2 because a Wikidata ADM3 entry claims it
+        # as parent with the same name), promote is_a to the province level so
+        # the reference is not dangling.  Siblings sharing the same obsolete ADM2
+        # container (e.g. Norfolk County alongside Haldimand County under the old
+        # Haldimand-Norfolk region) are promoted the same way.
+        if is_a and not is_a.startswith("Q") and is_a in _subsumed_adm2_gnids:
+            _a1_code = (parent_compound.split(".")[1]
+                        if parent_compound.count(".") >= 1 else "")
+            is_a = adm1_code_to_qid.get(_a1_code, "") or is_a
         code = _emit_pv(adm3_pvs, entry, "ADM3", is_a)
         if code:
             adm3_compound_to_code[entry.get("compound_code", "")] = code
@@ -3010,6 +4967,43 @@ def _build_adm34_yaml(key, source, data, locales=None, only_levels=None):
         print(f"  Crosswalk: {n4_wd}/{n4} ADM4 entries ({pct4}%) have Wikidata QIDs")
         if n4_skipped:
             print(f"  Skipped {n4_skipped} ADM4 entries with no Wikidata QID (not in output).")
+
+    # Disambiguate ADM3 entries that share an identical (is_a, title) pair.
+    # Tries in order: (1) location hint, (2) entity-type hint, (3) QID suffix.
+    _adm3_pt_map: defaultdict = defaultdict(list)
+    for _pk, _pv in adm3_pvs.items():
+        if isinstance(_pv, dict):
+            _adm3_pt_map[(_pv.get("is_a", ""), _pv.get("title", ""))].append(_pk)
+    _adm3_disambig_count = 0
+    for (_par, _ttl), _dqids in _adm3_pt_map.items():
+        if len(_dqids) <= 1:
+            continue
+        loc_hints = {
+            _dq: _desc_location_hint(adm3_pvs[_dq].get("description", "") or "")
+            for _dq in _dqids
+        }
+        if (all(loc_hints.values())
+                and len(set(loc_hints.values())) == len(_dqids)):
+            for _dq, _hint in loc_hints.items():
+                adm3_pvs[_dq]["title"] = f"{_ttl} ({_hint})"
+            _adm3_disambig_count += len(_dqids)
+            continue
+        type_hints = {
+            _dq: _entity_type_hint(adm3_pvs[_dq].get("description", "") or "")
+            for _dq in _dqids
+        }
+        if (all(type_hints.values())
+                and len(set(type_hints.values())) == len(_dqids)):
+            for _dq, _hint in type_hints.items():
+                adm3_pvs[_dq]["title"] = f"{_ttl} ({_hint})"
+            _adm3_disambig_count += len(_dqids)
+            continue
+        # Fallback: QID suffix
+        for _dq in _dqids:
+            adm3_pvs[_dq]["title"] = f"{_ttl} ({_dq})"
+        _adm3_disambig_count += len(_dqids)
+    if _adm3_disambig_count:
+        print(f"    Disambiguated {_adm3_disambig_count} ADM3 entries sharing a (parent, title) pair.")
 
     source_url = (source.get("reachable_from") or {}).get(
         "source_ontology",
@@ -3103,7 +5097,9 @@ def _build_adm34_yaml(key, source, data, locales=None, only_levels=None):
                 try:
                     adm2_payload = _load_json(f"GeoWiki_ADM2_{scope}")
                     print(f"  Companion {companion2_path}: building from cache ...")
-                    _build_adm2_yaml(f"GeoWiki_ADM2_{scope}", {}, adm2_payload, locales)
+                    _inc_indig = bool(_load_config(MENU_CONFIG).get("include_indigenous"))
+                    _build_adm2_yaml(f"GeoWiki_ADM2_{scope}", {}, adm2_payload, locales,
+                                     include_indigenous=_inc_indig)
                 except Exception as exc:
                     print(f"  Note: could not load GeoWiki_ADM2_{scope} from cache: {exc}",
                           file=sys.stderr)
@@ -3168,7 +5164,7 @@ def _register_countries(config_file):
     use_qlvr = bool(config.get("apis", {}).get("qlever"))
     endpoint, use_post = (_QLEVER_ENDPOINT, True) if use_qlvr else (_WDQS_ENDPOINT, True)
 
-    print(f"  Querying Wikidata for countries, continents, oceans (locales: {locales}) ...")
+    print(f"  Querying Wikidata for countries, continents, oceans, waterbodies (locales: {locales}) ...")
     payload = _fetch_countries_payload(locales, endpoint, use_post)
     if not payload.get("countries"):
         print("  Error: no countries returned from Wikidata.", file=sys.stderr)
@@ -3179,10 +5175,12 @@ def _register_countries(config_file):
     entry = make_source_entry(
         key, "https://www.wikidata.org/wiki/Wikidata:Main_Page",
         "GeoWikiCountries", "zip",
-        title="Wikidata Countries, Continents, and Oceans",
+        title="Wikidata Countries, Continents, Oceans, and Waterbodies",
         description=(
-            "Current sovereign states (P297), continents (P31=Q5107), and oceans "
-            "(P31=Q9430) from Wikidata with GeoNames P1566 cross-references."
+            "Current sovereign states (P297), continents (P31=Q5107), oceans "
+            "(P31=Q9430), and international waterbodies (lakes/rivers with P17 "
+            "spanning 2+ countries; seas, gulfs, straits, bays with 30+ sitelinks) "
+            "from Wikidata with GeoNames P1566 cross-references."
         ),
     )
     entry["prefixes"] = dict(_SOURCE_PREFIXES)
@@ -3202,8 +5200,9 @@ def _register_adm1(alpha2, config_file):
         print(f"  Skipping: '{key}' already in {config_file}", file=sys.stderr)
         return True
 
-    locales  = config.get("locales") or ["en"]
-    use_qlvr = bool(config.get("apis", {}).get("qlever"))
+    locales   = config.get("locales") or ["en"]
+    inc_indig = bool(config.get("include_indigenous"))
+    use_qlvr  = bool(config.get("apis", {}).get("qlever"))
     endpoint, use_post = (_QLEVER_ENDPOINT, True) if use_qlvr else (_WDQS_ENDPOINT, True)
 
     if not alpha2:
@@ -3235,7 +5234,8 @@ def _register_adm1(alpha2, config_file):
     write_config(config, config_file)
     print(f"  Added source '{key}' to {config_file}")
 
-    _build_adm1_yaml(key, config["sources"][key], payload, locales=locales)
+    _build_adm1_yaml(key, config["sources"][key], payload, locales=locales,
+                     include_indigenous=inc_indig)
     return True
 
 
@@ -3251,8 +5251,10 @@ def _register_adm2(alpha2, config_file):
     use_qlvr = bool(config.get("apis", {}).get("qlever"))
     endpoint, use_post = (_QLEVER_ENDPOINT, True) if use_qlvr else (_WDQS_ENDPOINT, True)
 
+    inc_indig = bool(config.get("include_indigenous"))
     print(f"  Querying Wikidata ADM2 for {alpha2} ...")
-    payload = _fetch_adm2_payload(alpha2, locales, endpoint, use_post)
+    payload = _fetch_adm2_payload(alpha2, locales, endpoint, use_post,
+                                  include_indigenous=inc_indig)
     if not payload.get("entries"):
         print(f"  Error: no ADM2 entries returned for {alpha2}.", file=sys.stderr)
         return True
@@ -3272,7 +5274,13 @@ def _register_adm2(alpha2, config_file):
     write_config(config, config_file)
     print(f"  Added source '{key}' to {config_file}")
 
-    _build_adm2_yaml(key, config["sources"][key], payload, locales=locales)
+    _build_adm2_yaml(key, config["sources"][key], payload, locales=locales,
+                     include_indigenous=inc_indig)
+
+    # Auto-register GeoWikiFirstNations when include_indigenous and country is supported
+    if inc_indig and alpha2.upper() in _INDIGENOUS_P31_BY_COUNTRY:
+        _register_first_nations(alpha2.upper(), config_file, adm2_data=payload)
+
     return True
 
 
@@ -3455,6 +5463,101 @@ def _register_ppl(alpha2, config_file):
     return True
 
 
+def _register_country_waters(alpha2, config_file):
+    """Register GeoWikiCountryWaters for a single country identified by ISO alpha-2."""
+    key    = f"GeoWiki_CountryWaters_{alpha2}"
+    config = _load_config(config_file)
+    if key in config.get("sources", {}):
+        print(f"  Skipping: '{key}' already in {config_file}", file=sys.stderr)
+        return True
+
+    locales  = config.get("locales") or ["en"]
+    use_qlvr = bool(config.get("apis", {}).get("qlever"))
+    endpoint, use_post = (_QLEVER_ENDPOINT, True) if use_qlvr else (_WDQS_ENDPOINT, True)
+
+    print(f"  Querying Wikidata country waters for {alpha2} ...")
+    payload = _fetch_country_waters_payload(alpha2, locales, endpoint, use_post)
+    if not payload.get("entries"):
+        print(f"  Warning: no water body entries returned for {alpha2}.", file=sys.stderr)
+
+    _save_json(key, payload)
+
+    entry = make_source_entry(
+        key, "https://www.wikidata.org/",
+        "GeoWikiCountryWaters", "zip",
+        title=f"Wikidata Country Waters for {alpha2}",
+        description=(
+            f"Water bodies (seas, gulfs, straits, bays, lakes, rivers) "
+            f"associated with {alpha2} from Wikidata."
+        ),
+    )
+    entry["country"]  = alpha2.upper()
+    entry["prefixes"] = dict(_SOURCE_PREFIXES)
+    entry["license"]  = "CC0 1.0"
+    config.setdefault("sources", {})[key] = entry
+    write_config(config, config_file)
+    print(f"  Added source '{key}' to {config_file}")
+
+    _build_country_waters_yaml(key, config["sources"][key], payload, locales=locales)
+    return True
+
+
+def _register_first_nations(alpha2, config_file, adm2_data=None):
+    """Register GeoWikiFirstNations for a single country (ISO alpha-2).
+
+    Reuses the cached GeoWiki_ADM2_{alpha2} JSON (no new SPARQL query).  When
+    *adm2_data* is provided (e.g. called from _register_adm2 immediately after
+    fetching), the in-memory payload is used directly to avoid re-loading.
+
+    Returns True if the source was registered (or was already present).
+    """
+    key    = f"GeoWiki_FirstNations_{alpha2.upper()}"
+    config = _load_config(config_file)
+    if key in config.get("sources", {}):
+        print(f"  Skipping: '{key}' already in {config_file}", file=sys.stderr)
+        return True
+
+    # Country must have a First Nations top node
+    if not _INDIGENOUS_TOP_BY_COUNTRY.get(alpha2.upper()):
+        print(f"  Warning: no _INDIGENOUS_TOP_BY_COUNTRY entry for {alpha2.upper()}; "
+              f"skipping GeoWikiFirstNations registration.", file=sys.stderr)
+        return False
+
+    locales = config.get("locales") or ["en"]
+
+    if adm2_data is None:
+        adm2_key = f"GeoWiki_ADM2_{alpha2.upper()}"
+        if not _entry_exists(adm2_key):
+            print(f"  Error: {adm2_key} not cached — run '-a GeoWiki_ADM2_{alpha2.upper()}' first",
+                  file=sys.stderr)
+            return False
+        try:
+            adm2_data = _load_json(adm2_key)
+        except Exception as exc:
+            print(f"  Error loading {adm2_key}: {exc}", file=sys.stderr)
+            return False
+
+    _top_qid, top_label = _INDIGENOUS_TOP_BY_COUNTRY[alpha2.upper()]
+    entry = make_source_entry(
+        key, "https://www.wikidata.org/",
+        "GeoWikiFirstNations", "zip",
+        title=f"Wikidata First Nations for {alpha2.upper()}",
+        description=(
+            f"Indigenous entities (First Nations, Tribes, Iwi) for {alpha2.upper()} "
+            "from Wikidata."
+        ),
+    )
+    entry["country"]  = alpha2.upper()
+    entry["prefixes"] = dict(_SOURCE_PREFIXES)
+    entry["license"]  = "CC0 1.0"
+    config.setdefault("sources", {})[key] = entry
+    write_config(config, config_file)
+    print(f"  Added source '{key}' to {config_file}")
+
+    _build_first_nations_yaml(key, config["sources"][key], adm2_data, locales=locales)
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -3463,12 +5566,14 @@ def match_geowiki_code(url, config_file=MENU_CONFIG):
     """Pre-download handler for GeoWiki_* shorthands.
 
     Matches:
-      GeoWiki_countries        → register GeoWikiCountries
-      GeoWiki_ADM1             → global GeoWikiAdm1 (QLever recommended)
-      GeoWiki_ADM1_{CC}        → per-country GeoWikiAdm1
-      GeoWiki_ADM2_{CC}        → per-country GeoWikiAdm2
-      GeoWiki_ADM3_{CC}        → per-country GeoWikiAdm3 (municipalities)
-      GeoWiki_ADM3ADM4_{CC}    → per-country GeoWikiAdm3 + Adm4
+      GeoWiki_countries              → register GeoWikiCountries
+      GeoWiki_ADM1                   → global GeoWikiAdm1 (QLever recommended)
+      GeoWiki_ADM1_{CC}              → per-country GeoWikiAdm1
+      GeoWiki_ADM2_{CC}              → per-country GeoWikiAdm2
+      GeoWiki_ADM3_{CC}              → per-country GeoWikiAdm3 (municipalities)
+      GeoWiki_ADM3ADM4_{CC}          → per-country GeoWikiAdm3 + Adm4
+      GeoWiki_CountryWaters_{CC}     → per-country water bodies (seas, bays, lakes …)
+      GeoWiki_FirstNations_{CC}      → indigenous entities (First Nations, Tribes, Iwi)
 
     ADM3/ADM4 use GeoNames {CC}.zip as the authoritative entity list with Wikidata
     QIDs added via P1566 reverse-lookup.  Requires GeoWiki_ADM2_{CC} to be cached
@@ -3509,6 +5614,10 @@ def match_geowiki_code(url, config_file=MENU_CONFIG):
             # Backward-compat: register both as separate sources
             _register_adm3(cc.upper(), config_file)
             return _register_adm4(cc.upper(), config_file)
+        if level == "COUNTRYWATERS":
+            return _register_country_waters(cc.upper(), config_file)
+        if level == "FIRSTNATIONS":
+            return _register_first_nations(cc.upper(), config_file)
 
     return False
 
@@ -3520,7 +5629,7 @@ def fetch_geowiki_source(key, source, config_file=MENU_CONFIG):
     endpoint, use_p = _get_endpoint(source)
 
     if content_type == "GeoWikiCountries":
-        print(f"  Re-querying Wikidata for countries, continents, oceans ...")
+        print(f"  Re-querying Wikidata for countries, continents, oceans, and waterbodies ...")
         payload = _fetch_countries_payload(locales, endpoint, use_p)
         _save_json(key, payload, config_file=config_file)
 
@@ -3538,8 +5647,11 @@ def fetch_geowiki_source(key, source, config_file=MENU_CONFIG):
         if not alpha2:
             print(f"  Error: GeoWikiADM2 source '{key}' has no country field.", file=sys.stderr)
             return
+        _top_config  = _load_config(config_file) if config_file else {}
+        inc_indig    = bool(_top_config.get("include_indigenous"))
         print(f"  Re-querying Wikidata ADM2 for {alpha2} ...")
-        payload = _fetch_adm2_payload(alpha2, locales, endpoint, use_p)
+        payload = _fetch_adm2_payload(alpha2, locales, endpoint, use_p,
+                                      include_indigenous=inc_indig)
         _save_json(key, payload, config_file=config_file)
 
     elif content_type == "GeoWikiADM34":
@@ -3591,6 +5703,31 @@ def fetch_geowiki_source(key, source, config_file=MENU_CONFIG):
         payload = _fetch_ppl_payload(alpha2, locales, endpoint, use_p)
         _save_json(key, payload, config_file=config_file)
 
+    elif content_type == "GeoWikiCountryWaters":
+        alpha2 = source.get("country", "")
+        if not alpha2:
+            print(f"  Error: GeoWikiCountryWaters source '{key}' has no country field.",
+                  file=sys.stderr)
+            return
+        print(f"  Re-querying Wikidata country waters for {alpha2} ...")
+        payload = _fetch_country_waters_payload(alpha2, locales, endpoint, use_p)
+        _save_json(key, payload, config_file=config_file)
+
+    elif content_type == "GeoWikiFirstNations":
+        alpha2 = source.get("country", "")
+        if not alpha2:
+            print(f"  Error: GeoWikiFirstNations source '{key}' has no country field.",
+                  file=sys.stderr)
+            return
+        adm2_key = f"GeoWiki_ADM2_{alpha2}"
+        if not _entry_exists(adm2_key):
+            print(f"  Error: {adm2_key} not cached — run '-f {adm2_key}' first",
+                  file=sys.stderr)
+            return
+        _build_first_nations_yaml(key, source, _load_json(adm2_key), locales=locales)
+        update_source_config(key, {"download_date": datetime.date.today().isoformat()},
+                             config_file)
+
     else:
         print(f"  Warning: unknown GeoWiki content_type '{content_type}' for '{key}'",
               file=sys.stderr)
@@ -3600,6 +5737,26 @@ def process_geowiki_source(key, source, config_file=MENU_CONFIG, locales=None):
     """Build sources/{key}.yaml from the cached GeoWiki zip for *key*."""
     content_type = source.get("content_type", "")
     actual_key   = key
+
+    locales = locales or _get_project_locales(config_file)
+
+    _top_config = _load_config(config_file) if config_file else {}
+    inc_indig   = bool(_top_config.get("include_indigenous"))
+
+    # GeoWikiFirstNations reuses the ADM2 cache; it has no own zip entry.
+    if content_type == "GeoWikiFirstNations":
+        alpha2 = source.get("country", "")
+        if not alpha2:
+            print(f"  Error: GeoWikiFirstNations source '{key}' has no country field.",
+                  file=sys.stderr)
+            return
+        adm2_key = f"GeoWiki_ADM2_{alpha2}"
+        if not _entry_exists(adm2_key):
+            print(f"  Error: {adm2_key} not cached — run '-f {adm2_key}' first",
+                  file=sys.stderr)
+            return
+        _build_first_nations_yaml(key, source, _load_json(adm2_key), locales=locales)
+        return
 
     if not _entry_exists(key):
         # Migration fallback: new split keys can reuse old combined ADM3ADM4 cache
@@ -3619,15 +5776,16 @@ def process_geowiki_source(key, source, config_file=MENU_CONFIG, locales=None):
             return
 
     data    = _load_json(actual_key)
-    locales = locales or _get_project_locales(config_file)
     dtype   = data.get("type", "")
 
     if dtype == "countries":
         _build_countries_yaml(key, source, data, locales=locales)
     elif dtype == "adm1":
-        _build_adm1_yaml(key, source, data, locales=locales)
+        _build_adm1_yaml(key, source, data, locales=locales,
+                         include_indigenous=inc_indig)
     elif dtype == "adm2":
-        _build_adm2_yaml(key, source, data, locales=locales)
+        _build_adm2_yaml(key, source, data, locales=locales,
+                         include_indigenous=inc_indig)
     elif dtype == "adm34":
         if content_type == "GeoWikiADM3":
             _build_adm34_yaml(key, source, data, locales=locales, only_levels={"ADM3"})
@@ -3637,5 +5795,7 @@ def process_geowiki_source(key, source, config_file=MENU_CONFIG, locales=None):
             _build_adm34_yaml(key, source, data, locales=locales)
     elif dtype == "ppl":
         _build_ppl_yaml(key, source, data, locales=locales)
+    elif dtype == "country_waters":
+        _build_country_waters_yaml(key, source, data, locales=locales)
     else:
         print(f"  Warning: unknown data type '{dtype}' in {_SHARED_ZIP}", file=sys.stderr)
