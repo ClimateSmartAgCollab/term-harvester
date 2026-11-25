@@ -1,0 +1,53 @@
+# See docs on "reachable_from": https://linkml.io/linkml-model/latest/docs/reachable_from/
+# Config below doesn't support LinkML dynamic enumeration "inherits", and is limited custom version of LinkML dynamic enumerations, not quite in context of LinkML schema.
+# Note that "minus" list is implemented before "includes" list, which restores subordinate items that would otherwise have been eliminated by minus list items and their underlying items.
+# See https://linkml.io/linkml-model/latest/docs/EnumExpression/
+# Here 'reachable_from' is acted on via 'term_harvester.py -c' configuration to generate the LinkML .yaml schema file for the given source.  Over in schema.yaml, 'reachable_from' is acted on via 'term_harvester.py -l' for lookup function to populate schema.yaml enums.
+# The optional top-level 'apis' object configures API endpoints for the -l lookup function.
+# Each key is a service name (e.g. 'ols', 'bioportal', 'agrovoc') with a 'type' sub-object
+# containing protocol-keyed configs (e.g. 'rest', 'sparql'), each with 'uri' and optional 'apikey',
+# plus an 'ontologies' list.  The -l lookup routes each CURIE prefix to the first api whose
+# 'ontologies' list contains it; falls back to OLS4.
+# Example apis block:
+#   apis:
+#     ols:
+#       type:
+#         rest:
+#           uri: http://www.ebi.ac.uk/ols4/api/ontologies/{ontology}/terms/{double_encoded}/graph
+#       ontologies: [ENVO, GO, UBERON]
+#     bioportal:
+#       type:
+#         rest:
+#           uri: https://data.bioontology.org
+#           apikey: YOUR_BIOPORTAL_KEY
+#       ontologies: [MESH, NCIT, SNOMEDCT]
+#     agrovoc:
+#       type:
+#         sparql:
+#           uri: https://agrovoc.fao.org/sparql/
+#       ontologies: [agrovoc]
+
+output: schema.yaml
+slots: all
+locales:
+  - en
+  - fr
+sources:
+  TDWG_DWC_Simple:
+    title: Darwin Core Simple Record
+    name: TDWG_DWC_Simple
+    version: '2023-09-14'
+    content_type: TDWG_DWC_Simple
+    file_format: xsd
+    reachable_from:
+      source_ontology: https://dwc.tdwg.org/xml/tdwg_dwc_simple.xsd
+    download_date: '2026-11-21'
+    description: Simple Darwin Core field definitions for biodiversity data exchange
+    key_slot: digital_specimen_id
+    prefixes:
+      dc: http://purl.org/dc/elements/1.1/
+      dcterms: http://purl.org/dc/terms/
+      dwc: http://rs.tdwg.org/dwc/terms/
+      dwcdoe: http://rs.tdwg.org/dwcdoe/values/
+      dwcem: http://rs.tdwg.org/dwcem/values/
+      dwcpw: http://rs.tdwg.org/dwcpw/values/
