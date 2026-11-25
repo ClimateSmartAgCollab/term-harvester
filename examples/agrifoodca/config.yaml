@@ -11,10 +11,12 @@
 #            standards_stages superseded by FreeText StandardsMaturityLevel
 #   NSDBSNTv2 — NSDB Soil Name Table v2; include-filtered to the 4 enums with NSDB authority
 #   StandardsMaturityLevel — LinkML computing/maturity_levels.yaml; include-filtered to one enum
-#   STATSCAN_1313722 — Statistics Canada "Highest level of education" (TVD 1313722)
+#   STATSCAN_HighestLevelEducation — Statistics Canada "Highest level of education" (TVD 1313722)
 #   NRCSSoilFieldBook — USDA NRCS Field Book Ver. 4; include-filtered to ReactionPH
 
 output: agrifoodca_schema.yaml
+slots: all
+include_indigenous: true
 locales:
   - en
   - fr
@@ -63,15 +65,15 @@ sources:
         - AgriFoodCA_SoilPh
         - AgriFoodCA_SoilSalinity
         - AgriFoodCA_SoilStructure
-  CRediT:
+  CREDIT:
     title: CRediT Contributor Roles Taxonomy
-    name: CRediT
+    name: CREDIT
     version: '2022'
-    content_type: CRediT
+    content_type: CREDIT
     file_format: pdf
     reachable_from:
       source_ontology: https://zenodo.org/records/18421449
-    download_date: '2026-06-18'
+    download_date: '2026-11-20'
     description: The Contributor Roles Taxonomy (CRediT) is a high-level taxonomy
       representing the 14 roles typically played by contributors to scientific scholarly
       output. Each role describes a specific contribution to the scholarly output.
@@ -92,15 +94,119 @@ sources:
       distinct morphological and chemical horizon properties that express major differences
       in pedogenesis.
     see_also: https://sis.agr.gc.ca/cansis/taxa/cssc3/index.html
-  ISO_COUNTRY_CA:
-    title: Canada
-    name: ISO_COUNTRY_CA
+  GeoWiki_ADM1_CA:
+    title: Wikidata ADM1 for CA
+    name: GeoWiki_ADM1_CA
+    version: null
+    content_type: GeoWikiADM1
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/
+    download_date: '2026-11-17'
+    description: First-order administrative divisions of Canada from Wikidata.
+    country: CA
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+  GeoWiki_ADM2_CA:
+    title: Wikidata ADM2 for CA
+    name: GeoWiki_ADM2_CA
+    version: null
+    content_type: GeoWikiADM2
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/
+    download_date: '2026-11-20'
+    description: Second-order administrative divisions of CA from Wikidata.
+    country: CA
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+  GeoWiki_ADM3_CA:
+    title: Wikidata ADM3 for CA
+    name: GeoWiki_ADM3_CA
+    version: null
+    content_type: GeoWikiADM3
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/
+    download_date: '2026-11-18'
+    description: Third-order administrative divisions of CA from GeoNames with Wikidata
+      QIDs.
+    country: CA
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+  GeoWiki_countries:
+    title: Wikidata Countries, Continents, and Oceans
+    name: GeoWiki_countries
+    version: null
+    content_type: GeoWikiCountries
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/wiki/Wikidata:Main_Page
+    download_date: '2026-11-18'
+    description: Sovereign states, territories, continents, oceans, and international
+      waterbodies from Wikidata with GeoNames P1566 cross-references.
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+  GeoWiki_CountryWaters_CA:
+    title: Wikidata Country Waters for CA
+    name: GeoWiki_CountryWaters_CA
+    version: null
+    content_type: GeoWikiCountryWaters
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/
+    download_date: '2026-11-20'
+    description: Water bodies (seas, gulfs, straits, bays, lakes, rivers) associated
+      with Canada from Wikidata.
+    country: CA
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+  GeoWiki_FirstNations_CA:
+    title: Wikidata First Nations for CA
+    name: GeoWiki_FirstNations_CA
+    version: null
+    content_type: GeoWikiFirstNations
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/
+    download_date: '2026-11-20'
+    description: Indigenous entities (First Nations, Tribes, Iwi) for CA from Wikidata.
+    country: CA
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+      gno: http://www.geonames.org/ontology#
+      iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
+    license: CC0 1.0
+  ISO_COUNTRY_ADM1_CA:
+    title: Canada (ISO 3166-2)
+    name: ISO_COUNTRY_ADM1_CA
     version: null
     content_type: ISO_COUNTRY
     file_format: zip
+    description: ISO 3166-2 first-order administrative divisions of Canada.
     reachable_from:
       source_ontology: https://www.iso.org/obp/ui/#iso:code:3166:CA
-    download_date: '2026-06-18'
+    download_date: '2026-11-19'
     prefixes:
       iso: https://www.iso.org/iso-3166-country-codes/
       wd: http://www.wikidata.org/entity/
@@ -177,9 +283,9 @@ sources:
     include:
       concepts:
         - StandardsMaturityLevel
-  STATSCAN_1313722:
+  STATSCAN_HighestLevelEducation:
     title: Highest level of education
-    name: STATSCAN_1313722
+    name: STATSCAN_HighestLevelEducation
     version: null
     content_type: STATSCAN
     file_format: zip
@@ -199,7 +305,7 @@ sources:
       source_nodes:
         - TAXRANK:0000000
       include_self: true
-    download_date: '2026-09-10'
+    download_date: '2026-11-18'
     description: A level of depth of a taxon in a taxonomic hierarchy.
     prefixes:
       TAXRANK: http://purl.obolibrary.org/obo/TAXRANK_

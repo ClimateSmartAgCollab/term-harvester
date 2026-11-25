@@ -85,8 +85,11 @@ def process_linkml_source(key, source, config_file=MENU_CONFIG):
                 if pfx in existing_pfx and pfx not in meanings_pfx:
                     meanings_pfx[pfx] = existing_pfx[pfx]
 
-    config_additions = dict(source.get("prefixes") or {})
-    merged           = sort_prefixes({**meanings_pfx, **config_additions})
+    # Use only the prefixes actually referenced in CURIE meanings.
+    # We deliberately do NOT merge the config entry's existing prefixes back in —
+    # doing so would create circular feedback where a large prefix block written by
+    # an initial fetch persists indefinitely regardless of what the enums actually use.
+    merged = sort_prefixes(meanings_pfx)
     if list(merged.items()) != list(sort_prefixes(existing_pfx).items()):
         source_data["prefixes"] = merged
         with open(source_path, "w") as f:

@@ -15,7 +15,7 @@ prefixes:
   CHMO: http://purl.obolibrary.org/obo/CHMO_
   CIO: http://purl.obolibrary.org/obo/CIO_
   COB: http://purl.obolibrary.org/obo/COB_
-  CRediT: https://credit.niso.org/contributor-roles/
+  CREDIT: https://credit.niso.org/contributor-roles/
   damlpt: http://www.daml.org/2003/01/periodictable/PeriodicTable#
   DataCite: https://datacite.org/schema/kernel-4/
   DCMITYPE: http://purl.org/dc/dcmitype/
@@ -851,8 +851,8 @@ enums:
     annotations:
       imported_from: AgriFoodCA_Picklists
       source_file: sources/AgriFoodCA_Picklists.yaml
-  Canada:
-    name: Canada
+  ISO_Canada_ADM1:
+    name: ISO_Canada_ADM1
     title: Canada
     permissible_values:
       CA-AB:
@@ -899,7 +899,7 @@ enums:
     annotations:
       imported_from: ISO_COUNTRY_CA
       source_file: sources/ISO_COUNTRY_CA.yaml
-  CRediT:
+  CREDIT:
     permissible_values:
       conceptualization:
         description: Ideas; formulation or evolution of overarching research goals
@@ -969,8 +969,8 @@ enums:
         meaning: https://credit.niso.org/contributor-roles/writing-review-editing/
     see_also: https://credit.niso.org/
     annotations:
-      imported_from: CRediT
-      source_file: sources/CRediT.yaml
+      imported_from: CREDIT
+      source_file: sources/CREDIT.yaml
   GenderIdentity:
     title: Gender Identity
     description: "Gender identity codes indicating an individual's personal sense\
@@ -2499,7 +2499,7 @@ extensions:
                 title: Nord-Nord-Ouest
               N by W:
                 title: Nord quart Ouest
-          Canada:
+          ISO_Canada_ADM1:
             permissible_values:
               CA-AB:
                 title: Alberta
