@@ -88,7 +88,8 @@ def _alpha2_from_url(url):
 
 
 def _alpha2_from_key(key):
-    m = re.match(r'ISO_COUNTRY_([A-Z]{2})$', key, re.IGNORECASE)
+    # Accepts both old-style ISO_COUNTRY_XX and new-style ISO_COUNTRY_ADM1_XX
+    m = re.match(r'ISO_COUNTRY(?:_ADM1)?_([A-Z]{2})$', key, re.IGNORECASE)
     return m.group(1).upper() if m else None
 
 
@@ -214,15 +215,20 @@ def _json_name(key):
 def _fetch_wikidata(alpha2, locales=None):
     """Query Wikidata for one country's name, description, and ISO 3166-2 subdivisions.
 
-    Returns (country_name, country_desc, subdivisions).
+    Returns (country_name, country_desc, country_qid, subdivisions, country_names)
+    where country_names is a dict of {lang: name} for all requested locales.
     """
     locales = locales or ["en"]
 
+    _c_label_vars = " ".join(f"?label_{lang}" for lang in locales)
+    _c_label_opts = "\n".join(
+        f'  OPTIONAL {{ ?item rdfs:label ?label_{lang} . FILTER(LANG(?label_{lang}) = "{lang}") }}'
+        for lang in locales
+    )
     country_sparql = f"""
-SELECT ?item ?label ?desc WHERE {{
+SELECT ?item {_c_label_vars} ?desc WHERE {{
   ?item wdt:P297 "{alpha2}" .
-  ?item rdfs:label ?label .
-  FILTER(LANG(?label) = "en")
+{_c_label_opts}
   OPTIONAL {{
     ?item schema:description ?desc .
     FILTER(LANG(?desc) = "en")
@@ -230,13 +236,19 @@ SELECT ?item ?label ?desc WHERE {{
 }}
 LIMIT 1
 """
+    country_names: dict = {}
     country_name = country_desc = country_qid = ""
     try:
         bindings = _sparql_query(country_sparql)
         if bindings:
-            country_name = bindings[0].get("label", {}).get("value", "")
-            country_desc = bindings[0].get("desc",  {}).get("value", "")
-            country_qid  = _qid_from_uri(bindings[0].get("item", {}).get("value", ""))
+            row = bindings[0]
+            for lang in locales:
+                lbl = row.get(f"label_{lang}", {}).get("value", "")
+                if lbl:
+                    country_names[lang] = lbl
+            country_name = country_names.get("en", "")
+            country_desc = row.get("desc", {}).get("value", "")
+            country_qid  = _qid_from_uri(row.get("item", {}).get("value", ""))
     except Exception as e:
         print(f"  Warning: could not get country name for {alpha2}: {e}", file=sys.stderr)
 
@@ -289,7 +301,7 @@ ORDER BY ?iso_code
                     sub["type_qid"]   = best[0]
                     sub["type_label"] = best[1]
 
-    return country_name, country_desc, country_qid, subdivisions
+    return country_name, country_desc, country_qid, subdivisions, country_names
 
 
 # ---------------------------------------------------------------------------
@@ -386,12 +398,13 @@ ORDER BY ?iso_code
 # ---------------------------------------------------------------------------
 
 def _save_single_json(key, alpha2, country_name, country_desc, country_qid, subdivisions,
-                      config_file=None):
+                      config_file=None, country_names=None):
     today = datetime.date.today().isoformat()
     payload = {
         "type": "single",
         "alpha2": alpha2,
         "country_name": country_name,
+        "country_names": country_names or {"en": country_name} if country_name else {},
         "country_desc": country_desc,
         "country_qid": country_qid,
         "download_date": today,
@@ -494,15 +507,18 @@ def _build_single_yaml(key, source, data, locales=None):
         else:
             type_desc = "Includes " + ", ".join(parts[:-1]) + " and " + parts[-1] + "."
 
-    enum_key = _country_name_to_key(country_name) if country_name else key
+    _cn_key  = _country_name_to_key(country_name) if country_name else ""
+    enum_key = f"ISO_{_cn_key}_ADM1" if _cn_key else key
     pv_en: dict = {}
     pv_fr: dict = {}
 
     # Subdivision PVs helper
     def _add_sub(sub, is_a=None):
-        code = sub.get("code", "")
-        if not code:
+        full_code = sub.get("code", "")
+        if not full_code:
             return
+        # Strip country prefix: "CA-AB" → "AB", "US-NY" → "NY"
+        code    = full_code.split("-", 1)[1] if "-" in full_code else full_code
         labels  = sub.get("labels", {})
         qid     = sub.get("qid", "")
         title   = labels.get(primary_lang) or labels.get("en") or code
@@ -542,7 +558,10 @@ def _build_single_yaml(key, source, data, locales=None):
             full_desc += "."
         full_desc = (full_desc + " " + type_desc).strip() if full_desc else type_desc
 
-    enum_entry = {"name": enum_key, "title": normalize_text(country_name), "permissible_values": pv_en}
+    _enum_title = normalize_text(
+        f"{country_name} (ISO 3166-2)" if country_name else key
+    )
+    enum_entry = {"name": enum_key, "title": _enum_title, "permissible_values": pv_en}
     if full_desc:
         enum_entry["description"] = full_desc
     if country_qid:
@@ -554,11 +573,24 @@ def _build_single_yaml(key, source, data, locales=None):
         prefixes=_SOURCE_PREFIXES,
         enums={enum_key: enum_entry},
     )
-    if pv_fr:
-        schema["extensions"] = _make_locale_extensions(
-            source_url, key, source.get("version") or "", "fr",
-            enums={enum_key: {"permissible_values": pv_fr}},
-        )
+    if pv_fr or request_fr:
+        country_names = data.get("country_names", {"en": country_name})
+        country_name_fr = country_names.get("fr") or country_name
+        _fr_enum: dict = {}
+        if country_name_fr:
+            _fr_enum_title = normalize_text(f"{country_name_fr} (ISO 3166-2)")
+            if _fr_enum_title != _enum_title:
+                _fr_enum["title"] = _fr_enum_title
+            _fr_enum["description"] = (
+                f"Divisions administratives de premier ordre de {country_name_fr} (ISO 3166-2)."
+            )
+        if pv_fr:
+            _fr_enum["permissible_values"] = pv_fr
+        if _fr_enum:
+            schema["extensions"] = _make_locale_extensions(
+                source_url, key, source.get("version") or "", "fr",
+                enums={enum_key: _fr_enum},
+            )
 
     yaml_path = f"sources/{key}.yaml"
     with open(yaml_path, "w") as f:
@@ -664,11 +696,12 @@ def fetch_iso_country_source(key, source, config_file=MENU_CONFIG):
         return
     locales = _get_project_locales(config_file)
     print(f"  Querying Wikidata for ISO 3166-2:{alpha2} (locales: {locales}) ...")
-    country_name, country_desc, country_qid, subdivisions = _fetch_wikidata(alpha2, locales=locales)
+    country_name, country_desc, country_qid, subdivisions, country_names = _fetch_wikidata(alpha2, locales=locales)
     if not subdivisions:
         print(f"  Warning: no subdivisions found for {alpha2}", file=sys.stderr)
         return
-    _save_single_json(key, alpha2, country_name, country_desc, country_qid, subdivisions, config_file)
+    _save_single_json(key, alpha2, country_name, country_desc, country_qid, subdivisions,
+                      config_file, country_names=country_names)
 
 
 def process_iso_country_source(key, source, config_file=MENU_CONFIG, locales=None):
@@ -695,29 +728,35 @@ def _add_single_country(alpha2, url, config_file, tmp_path=None):
     if tmp_path:
         os.unlink(tmp_path)
 
-    key = f"ISO_COUNTRY_{alpha2}"
+    key = f"ISO_COUNTRY_ADM1_{alpha2}"
     try:
         with open(config_file) as f:
             config = yaml.safe_load(f) or {}
     except FileNotFoundError:
         config = {}
 
-    if key in config.get("sources", {}):
-        print(f"  Skipping: source key '{key}' already exists in {config_file}",
-              file=sys.stderr)
+    # Also skip if the old-style key exists (avoid duplicates after rename)
+    old_key = f"ISO_COUNTRY_{alpha2}"
+    if key in config.get("sources", {}) or old_key in config.get("sources", {}):
+        print(f"  Skipping: source key '{key}' (or legacy '{old_key}') already exists "
+              f"in {config_file}", file=sys.stderr)
         return True
 
     locales = config.get("locales") or ["en", "fr"]
     print(f"  Querying Wikidata for ISO 3166-2:{alpha2} (locales: {locales}) ...")
-    country_name, country_desc, country_qid, subdivisions = _fetch_wikidata(alpha2, locales=locales)
+    country_name, country_desc, country_qid, subdivisions, country_names = _fetch_wikidata(alpha2, locales=locales)
     if not subdivisions:
         print(f"  Error: no subdivisions found for ISO 3166-2:{alpha2}", file=sys.stderr)
         return True
 
-    title = country_name or f"ISO 3166-2:{alpha2}"
-    _save_single_json(key, alpha2, country_name, country_desc, country_qid, subdivisions)
+    title = (f"{country_name} (ISO 3166-2)") if country_name else f"ISO 3166-2:{alpha2}"
+    description = (f"ISO 3166-2 first-order administrative divisions of {country_name}."
+                   if country_name else None)
+    _save_single_json(key, alpha2, country_name, country_desc, country_qid, subdivisions,
+                      country_names=country_names)
 
-    entry = make_source_entry(key, url, "ISO_COUNTRY", "zip", title=title)
+    entry = make_source_entry(key, url, "ISO_COUNTRY", "zip", title=title,
+                              description=description)
     entry["prefixes"] = dict(_SOURCE_PREFIXES)
     config.setdefault("sources", {})[key] = entry
     write_config(config, config_file)
@@ -735,17 +774,19 @@ def match_iso_country(url, tmp_path, config_file=MENU_CONFIG):
     return _add_single_country(alpha2, url, config_file, tmp_path=tmp_path)
 
 
-# Matches ISO_COUNTRY_XX (single country) or bare ISO_COUNTRY (all countries)
-_SHORTHAND_RE = re.compile(r'^ISO_COUNTRY(?:_([A-Za-z]{2}))?$', re.IGNORECASE)
+# Matches ISO_COUNTRY_ADM1_XX (new) or ISO_COUNTRY_XX (legacy) single-country
+# shorthands, or bare ISO_COUNTRY (all-countries).
+_SHORTHAND_RE = re.compile(r'^ISO_COUNTRY(?:_ADM1)?(?:_([A-Za-z]{2}))?$', re.IGNORECASE)
 
 
 def match_iso_country_code(url, config_file=MENU_CONFIG):
-    """Pre-download handler for ISO_COUNTRY_XX / ISO_COUNTRY shorthands.
+    """Pre-download handler for ISO_COUNTRY_ADM1_XX / ISO_COUNTRY_XX shorthands.
 
     Accepts:
-      ISO_COUNTRY_CA   →  sources/ISO_COUNTRY_CA.zip/.yaml  (single country)
-      ISO_COUNTRY_US   →  sources/ISO_COUNTRY_US.zip/.yaml
-      ISO_COUNTRY      →  sources/ISO_COUNTRY.zip/.yaml     (all countries)
+      ISO_COUNTRY_ADM1_CA  →  sources/ISO_COUNTRY_ADM1_CA.zip/.yaml  (single country)
+      ISO_COUNTRY_ADM1_US  →  sources/ISO_COUNTRY_ADM1_US.zip/.yaml
+      ISO_COUNTRY_CA       →  legacy alias, same result
+      ISO_COUNTRY          →  sources/ISO_COUNTRY.zip/.yaml  (all countries)
 
     The shorthand mirrors the source key produced by the tool, so users
     never need to look up the ISO OBP URL.  The canonical OBP URL is still
