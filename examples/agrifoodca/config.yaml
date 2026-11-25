@@ -65,6 +65,7 @@ sources:
         - AgriFoodCA_SoilPh
         - AgriFoodCA_SoilSalinity
         - AgriFoodCA_SoilStructure
+    prefixes: {}
   CREDIT:
     title: CRediT Contributor Roles Taxonomy
     name: CREDIT
@@ -78,6 +79,7 @@ sources:
       representing the 14 roles typically played by contributors to scientific scholarly
       output. Each role describes a specific contribution to the scholarly output.
     see_also: https://credit.niso.org/
+    prefixes: {}
   CSSCv3_SoilOrder:
     title: CSSC Soil Order
     name: CSSCv3_SoilOrder
@@ -94,6 +96,7 @@ sources:
       distinct morphological and chemical horizon properties that express major differences
       in pedogenesis.
     see_also: https://sis.agr.gc.ca/cansis/taxa/cssc3/index.html
+    prefixes: {}
   GeoWiki_ADM1_CA:
     title: Wikidata ADM1 for CA
     name: GeoWiki_ADM1_CA
@@ -222,6 +225,7 @@ sources:
     download_date: '2026-06-12'
     description: lodging
     section_format: 2
+    prefixes: {}
   NRCSSoilFieldBook:
     title: NRCS Field Book for Describing and Sampling Soils Ver. 4
     name: NRCSSoilFieldBook
@@ -234,6 +238,7 @@ sources:
     include:
       concepts:
         - NRCSSoilFieldBook_ReactionPH
+    prefixes: {}
   NSDBSNTv2:
     title: NSDB Soil Name Table
     name: NSDBSNTv2
@@ -249,6 +254,7 @@ sources:
         - NSDB_PMCHEM1
         - NSDB_PMTEX1
         - NSDB_WATERTBL
+    prefixes: {}
   SoilSalinity:
     title: Soil Salinity Classification
     name: SoilSalinity
@@ -261,6 +267,7 @@ sources:
     download_date: '2026-06-11'
     description: soil salinity
     section_format: 2
+    prefixes: {}
   SoilStructuralShape:
     title: Soil Structural Shape
     name: SoilStructuralShape
@@ -271,6 +278,7 @@ sources:
       source_ontology: https://iastate.pressbooks.pub/introsoilscience/chapter/soilstructure/
     download_date: '2026-06-18'
     description: Soil structural shape
+    prefixes: {}
   StandardsMaturityLevel:
     title: Standards Maturity Level
     name: StandardsMaturityLevel
@@ -283,6 +291,7 @@ sources:
     include:
       concepts:
         - StandardsMaturityLevel
+    prefixes: {}
   STATSCAN_HighestLevelEducation:
     title: Highest level of education
     name: STATSCAN_HighestLevelEducation
@@ -292,6 +301,7 @@ sources:
     reachable_from:
       source_ontology: https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=1313722
     download_date: '2026-06-19'
+    prefixes: {}
   TAXRANK_0000000:
     title: taxonomic_rank
     name: TAXRANK_0000000
@@ -321,3 +331,87 @@ sources:
     include:
       concepts:
         - GenderIdentity
+    prefixes:
+      adms: http://www.w3.org/ns/adms#
+      AFO: http://purl.allotrope.org/ontologies/quality#
+      AGRO: http://purl.obolibrary.org/obo/AGRO_
+      BAO: http://www.bioassayontology.org/bao#BAO_
+      BSPO: http://purl.obolibrary.org/obo/BSPO_
+      CHEBI: http://purl.obolibrary.org/obo/CHEBI_
+      CHMO: http://purl.obolibrary.org/obo/CHMO_
+      CIO: http://purl.obolibrary.org/obo/CIO_
+      COB: http://purl.obolibrary.org/obo/COB_
+      CRediT: https://credit.niso.org/contributor-roles/
+      damlpt: http://www.daml.org/2003/01/periodictable/PeriodicTable#
+      DataCite: https://datacite.org/schema/kernel-4/
+      DCMITYPE: http://purl.org/dc/dcmitype/
+      dcterms: http://purl.org/dc/terms/
+      DUO: http://purl.obolibrary.org/obo/DUO_
+      EC: https://enzyme.expasy.org/EC/
+      ECO: http://purl.obolibrary.org/obo/ECO_
+      ECOCORE: http://purl.obolibrary.org/obo/ECOCORE_
+      ECTO: http://purl.obolibrary.org/obo/ECTO_
+      EDAM: http://edamontology.org/
+      EFO: http://www.ebi.ac.uk/efo/EFO_
+      ENM: http://purl.enanomapper.org/onto/ENM_
+      ENVO: http://purl.obolibrary.org/obo/ENVO_
+      euvoc: http://publications.europa.eu/resource/authority/
+      ExO: http://purl.obolibrary.org/obo/ExO_
+      FABIO: http://purl.org/spar/fabio/
+      FBbi: http://purl.obolibrary.org/obo/FBbi_
+      fhir_data_absent_reason: http://terminology.hl7.org/CodeSystem/data-absent-reason
+      FOODON: http://purl.obolibrary.org/obo/FOODON_
+      gc: http://purl.org/gc/
+      GENO: http://purl.obolibrary.org/obo/GENO_
+      geonames: http://sws.geonames.org/
+      GO: http://purl.obolibrary.org/obo/GO_
+      GO_REF: http://purl.obolibrary.org/obo/GO_REF_
+      greg: http://www.w3.org/ns/time/gregorian#
+      GSSO: http://purl.obolibrary.org/obo/GSSO_
+      HEX: https://www.color-hex.com/color/
+      HL7: http://terminology.hl7.org/CodeSystem/
+      HP: http://purl.obolibrary.org/obo/HP_
+      HsapDv: http://purl.obolibrary.org/obo/HsapDv_
+      iana: https://www.iana.org/assignments/media-types/
+      IAO: http://purl.obolibrary.org/obo/IAO_
+      iso3166loc: http://id.loc.gov/vocabulary/countries/
+      LOINC: https://loinc.org/
+      MESH: http://id.nlm.nih.gov/mesh/
+      mesh: http://id.nlm.nih.gov/mesh/
+      MFOEM: http://purl.obolibrary.org/obo/MFOEM_
+      MI: http://purl.obolibrary.org/obo/MI_
+      MICRO: http://purl.obolibrary.org/obo/MICRO_
+      mixs: http://purl.obolibrary.org/obo/MIXS_
+      MMO: http://purl.obolibrary.org/obo/MMO_
+      MmusDv: http://purl.obolibrary.org/obo/MmusDv_
+      MOD: http://purl.obolibrary.org/obo/MOD_
+      MOP: http://purl.obolibrary.org/obo/MOP_
+      MS: http://purl.obolibrary.org/obo/MS_
+      MSIO: http://purl.obolibrary.org/obo/MSIO_
+      NCBITaxon: http://purl.obolibrary.org/obo/NCBITaxon_
+      NCIT: http://purl.obolibrary.org/obo/NCIT_
+      OBCS: http://purl.obolibrary.org/obo/OBCS_
+      OBI: http://purl.obolibrary.org/obo/OBI_
+      OEO: http://openenergy-platform.org/ontology/oeo/OEO_
+      PATO: http://purl.obolibrary.org/obo/PATO_
+      PECO: http://purl.obolibrary.org/obo/PECO_
+      PO: http://purl.obolibrary.org/obo/PO_
+      premis: http://id.loc.gov/vocabulary/preservation/
+      quantitykind: http://qudt.org/vocab/quantitykind/
+      QUDT: http://qudt.org/vocab/unit/
+      RO: http://purl.obolibrary.org/obo/RO_
+      ROR: https://ror.org/
+      RXNO: http://purl.obolibrary.org/obo/RXNO_
+      SIO: http://semanticscience.org/resource/SIO_
+      SNOMED: http://snomed.info/id/
+      SO: http://purl.obolibrary.org/obo/SO_
+      SPDX: https://spdx.org/licenses/
+      spdx: https://spdx.org/licenses/
+      STATO: http://purl.obolibrary.org/obo/STATO_
+      SWO: http://purl.obolibrary.org/obo/SWO_
+      TAXRANK: http://purl.obolibrary.org/obo/TAXRANK_
+      TIME: http://www.w3.org/2006/time#
+      UBERON: http://purl.obolibrary.org/obo/UBERON_
+      UO: http://purl.obolibrary.org/obo/UO_
+      VO: http://purl.obolibrary.org/obo/VO_
+      xsd: http://www.w3.org/2001/XMLSchema#

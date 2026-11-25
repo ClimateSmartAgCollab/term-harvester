@@ -50,12 +50,12 @@ def apply_sorted_prefixes(key, new_prefixes, config_file, *,
 
 
 def process_linkml_source(key, source, config_file=MENU_CONFIG):
-    """Update a LinkML YAML source file's prefix dict.
+    """Update a LinkML YAML source file's prefix dict and config entry.
 
     Reads sources/{key}.yaml, collects only the prefixes actually referenced
-    in permissible_value meanings (as CURIEs), merges with any prefixes
-    declared in the config entry, and rewrites the file if the prefix set
-    has changed.
+    in permissible_value meanings (as CURIEs), rewrites the file when the
+    prefix set has changed, and updates the config entry via
+    apply_sorted_prefixes.
 
     Silently skips sources whose file_format is not 'yaml'.
     """
@@ -90,11 +90,11 @@ def process_linkml_source(key, source, config_file=MENU_CONFIG):
     # doing so would create circular feedback where a large prefix block written by
     # an initial fetch persists indefinitely regardless of what the enums actually use.
     merged = sort_prefixes(meanings_pfx)
-    if list(merged.items()) != list(sort_prefixes(existing_pfx).items()):
-        source_data["prefixes"] = merged
-        with open(source_path, "w") as f:
-            yaml.dump(source_data, f, Dumper=IndentedDumper,
-                      default_flow_style=False, sort_keys=False)
+    _yaml_changed = list(merged.items()) != list(sort_prefixes(existing_pfx).items())
+    apply_sorted_prefixes(key, merged, config_file,
+                          yaml_path=source_path if _yaml_changed else None,
+                          schema_data=source_data if _yaml_changed else None,
+                          source=source)
     print(f"{key}: prefixes up to date ({len(merged)} entries)")
 
 
