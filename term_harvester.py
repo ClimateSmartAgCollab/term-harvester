@@ -918,7 +918,11 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
         action = "Created"
 
     # Sync enums and prefixes from harvester_config.yaml sources
-    _schema_class_enabled = False  # set inside config block below when slots: automatic
+    _schema_class_enabled = False  # set below when any slots: all/enums is active
+    # key_slot: slot to place first in schema.slots; its slot_group section also sorts first.
+    _key_slot_name  = ""   # resolved below after slots are merged
+    _key_slot_group = ""   # slot_group of the key slot (lowercase for comparison)
+    _key_slot_entries: dict = {}   # {source_key: slot_name} from sources with key_slot
     prefix_conflicts = []      # collected at end for stdout summary
     # Track which source registered each prefix key so conflicts can name both parties.
     # Pre-populate with "schema.yaml" for prefixes already present in the loaded file.
@@ -930,11 +934,22 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
         with open(config_file, "r") as f:
             config = yaml.safe_load(f) or {}
         all_sources = config.get("sources", {})
+        _key_slot_entries = {
+            k: v["key_slot"]
+            for k, v in all_sources.items()
+            if isinstance(v, dict) and v.get("key_slot")
+        }
 
-        _auto_slots_enabled = config.get("slots") == "automatic"
+        # Global slots mode: "all" = include every source slot; "enums" = only slots
+        # whose range is a known enum.  Absent = no SlotLibrary unless a per-source
+        # entry carries its own slots: directive.  "automatic" accepted as legacy alias.
+        _global_slots_mode = config.get("slots")
+        if _global_slots_mode == "automatic":
+            _global_slots_mode = "all"
+        _auto_slots_enabled = _global_slots_mode in ("all", "enums")
         _schema_class_enabled = _auto_slots_enabled and config.get("schema_class", True)
 
-        # Sync enums (and slots when slots: automatic) from each source's yaml file into schema
+        # Sync enums (and slots when slots: all/enums) from each source's yaml file into schema
         sources_to_build = {k: v for k, v in all_sources.items() if keys is None or k in keys}
         _build_rows = []  # (key, added, updated, reported, excl, deleted, empty_names, conflicts, concepts, pvs)
         if keys:
@@ -950,16 +965,42 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
             with open(source_path, "r") as f:
                 source_data = yaml.safe_load(f)
 
-            # Merge slots from source YAML into schema when slots: automatic
-            if _auto_slots_enabled:
+            # Merge slots from source YAML into schema.
+            # Effective mode = per-source slots: directive, falling back to global.
+            # "all"   — include every slot from this source regardless of range type.
+            # "enums" — include only slots whose range references an enum.
+            # absent  — skip slot merging for this source.
+            # A per-source directive also activates SlotLibrary when no global is set.
+            _src_slots_mode = source.get("slots") or _global_slots_mode
+            if _src_slots_mode:
+                if not _auto_slots_enabled:
+                    # Per-source directive with no global setting: activate SlotLibrary.
+                    _auto_slots_enabled = True
+                    if config.get("schema_class", True):
+                        _schema_class_enabled = True
                 for slot_name, slot_def in (source_data.get("slots") or {}).items():
+                    # "enums" mode: skip slots with no range (they don't reference an enum).
+                    if _src_slots_mode == "enums":
+                        _rng = slot_def.get("range") if isinstance(slot_def, dict) else None
+                        if not _rng:
+                            continue
                     if slot_name not in schema["slots"]:
                         if isinstance(slot_def, dict):
                             slot_def = dict(slot_def)  # shallow copy — don't mutate source_data
-                            slot_def["slot_group"] = key
+                            # Only set slot_group when the slot doesn't already carry one
+                            # (source-defined slot_group, e.g. DWC category, takes precedence).
+                            if not slot_def.get("slot_group"):
+                                slot_def["slot_group"] = key
                         schema["slots"][slot_name] = slot_def
                     elif isinstance(schema["slots"].get(slot_name), dict):
-                        schema["slots"][slot_name]["slot_group"] = key
+                        existing = schema["slots"][slot_name]
+                        if not existing.get("slot_group"):
+                            existing["slot_group"] = key
+                        # Propagate description from source when the existing slot has none.
+                        if (not existing.get("description")
+                                and isinstance(slot_def, dict)
+                                and slot_def.get("description")):
+                            existing["description"] = slot_def["description"]
 
             # Merge slot locale translations from source YAML extensions block
             _src_locale_value = (
@@ -1076,6 +1117,11 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
                     if ann.get("source_file") == source_path:
                         del schema["enums"][enum_key]
                         enum_deleted += 1
+                        # Remove any auto-generated slot whose range pointed to this enum.
+                        for slot_name in list(schema.get("slots") or {}):
+                            slot_def = schema["slots"][slot_name]
+                            if isinstance(slot_def, dict) and slot_def.get("range") == enum_key:
+                                del schema["slots"][slot_name]
 
             for enum_key, enum_def in source_enums.items():
                 if (enum_in_minus(enum_key, enum_def, minus_concepts)
@@ -1163,6 +1209,20 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
                                     pv["is_a"] = ancestor
                                 else:
                                     pv.pop("is_a", None)
+                            # Clean up stale mixins refs that point to dropped PVs
+                            if pv.get("mixins"):
+                                new_mixins = []
+                                for m in pv["mixins"]:
+                                    if m not in dropped:
+                                        new_mixins.append(m)
+                                    else:
+                                        anc = _resolve_ancestor(m)
+                                        if anc:
+                                            new_mixins.append(anc)
+                                if new_mixins:
+                                    pv["mixins"] = new_mixins
+                                else:
+                                    pv.pop("mixins", None)
                             new_pvs[code] = pv
                         enum_def["permissible_values"] = new_pvs
                         print(f"  concise: dropped {len(dropped)} redundant pv(s) from {enum_key}")
@@ -1264,6 +1324,7 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
                         annotations["imported_from"] = key
                         annotations["source_file"] = source_path
                         enum_def["annotations"] = annotations
+                        _normalize_enum_def(enum_def)
                         schema["enums"][enum_key] = enum_def
                         enum_concepts_included += 1
 
@@ -1286,54 +1347,90 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
                 enum_conflicts, enum_concepts_included, enum_pvs_included,
             ))
 
-        # --- Per-source columnar build report ---
+        # Remove slots whose range references a custom enum that was excluded from the
+        # schema (e.g. by a minus filter).  Slots whose range is a LinkML built-in type
+        # (string, datetime, uri, integer, etc.) are kept — those always start with a
+        # lowercase letter, whereas custom enum names are CamelCase (uppercase first).
+        _slots_rm_by_src: defaultdict = defaultdict(int)
+        if schema.get("slots") and schema.get("enums") is not None:
+            _known_enums = set(schema["enums"])
+            for _sn in list(schema["slots"]):
+                _sd = schema["slots"][_sn]
+                if isinstance(_sd, dict):
+                    _rng = _sd.get("range")
+                    if _rng and _rng[0].isupper() and _rng not in _known_enums:
+                        _slots_rm_by_src[_sd.get("slot_group") or "(unknown)"] += 1
+                        del schema["slots"][_sn]
+
+        # Resolve key_slot: use the first source entry that has key_slot and whose
+        # named slot is present in the merged schema.  Warn if none can be found.
+        for _ks_src_key, _ks_name in _key_slot_entries.items():
+            _ks_def = schema.get("slots", {}).get(_ks_name)
+            if _ks_def:
+                _key_slot_name  = _ks_name
+                _key_slot_group = (
+                    (_ks_def.get("slot_group") or "").lower()
+                    if isinstance(_ks_def, dict) else ""
+                )
+                break
+        if _key_slot_entries and not _key_slot_name:
+            _first_ks = next(iter(_key_slot_entries.values()))
+            print(
+                f"Warning: key_slot '{_first_ks}' not found in schema slots — ignoring.",
+                file=sys.stderr,
+            )
+
+        # --- Per-source columnar build report (data built here; printed after prefix sync) ---
+        _report_table: list = []
+        _report_headers: list = []
+        _report_totals: list = []
+        _has_excl = _has_del = _has_empty = _has_conf = _has_concepts = _has_pvs = False
+        _has_slots_rm = _has_pfx_col = False
+
         if _build_rows:
-            has_excl     = any(r[4] for r in _build_rows)
-            has_del      = any(r[5] for r in _build_rows)
-            has_empty    = any(r[6] for r in _build_rows)
-            has_conf     = any(r[7] for r in _build_rows)
-            has_concepts = any(r[8] for r in _build_rows)
-            has_pvs      = any(r[9] for r in _build_rows)
+            _has_excl     = any(r[4] for r in _build_rows)
+            _has_del      = any(r[5] for r in _build_rows)
+            _has_empty    = any(r[6] for r in _build_rows)
+            _has_conf     = any(r[7] for r in _build_rows)
+            _has_concepts = any(r[8] for r in _build_rows)
+            _has_pvs      = any(r[9] for r in _build_rows)
+            _has_slots_rm = bool(_slots_rm_by_src)
 
-            headers = ["Source", "Added", "Updated", "To review"]
-            if has_excl:     headers.append("Excluded")
-            if has_del:      headers.append("Del")
-            if has_empty:    headers.append("Empty")
-            if has_conf:     headers.append("Conf")
-            if has_concepts: headers.append("Restored")
-            if has_pvs:      headers.append("PVs+")
+            _report_headers = ["Source", "Added", "Updated", "To review"]
+            if _has_excl:     _report_headers.append("Excluded")
+            if _has_del:      _report_headers.append("Del")
+            if _has_empty:    _report_headers.append("Empty")
+            if _has_conf:     _report_headers.append("Conf")
+            if _has_concepts: _report_headers.append("Restored")
+            if _has_pvs:      _report_headers.append("PVs+")
+            if _has_slots_rm: _report_headers.append("Slots")
+            # Prefixes column appended below after prefix sync
 
-            table = []
+            _report_totals = [0] * (len(_report_headers) - 1)
             for r in _build_rows:
                 key_r, added, updated, reported, excl, deleted, empty_names, conf, concepts, pvs = r
-                row = [key_r, str(added), str(updated), str(reported)]
-                if has_excl:     row.append(str(excl))
-                if has_del:      row.append(str(deleted))
-                if has_empty:    row.append(str(len(empty_names)))
-                if has_conf:     row.append(str(conf))
-                if has_concepts: row.append(str(concepts))
-                if has_pvs:      row.append(str(pvs))
-                table.append((row, empty_names))
+                slots_rm = _slots_rm_by_src.get(key_r, 0)
+                row  = [key_r, str(added), str(updated), str(reported)]
+                nums = [added, updated, reported]
+                if _has_excl:     row.append(str(excl));             nums.append(excl)
+                if _has_del:      row.append(str(deleted));          nums.append(deleted)
+                if _has_empty:    row.append(str(len(empty_names))); nums.append(len(empty_names))
+                if _has_conf:     row.append(str(conf));             nums.append(conf)
+                if _has_concepts: row.append(str(concepts));         nums.append(concepts)
+                if _has_pvs:      row.append(str(pvs));              nums.append(pvs)
+                if _has_slots_rm: row.append(str(slots_rm));         nums.append(slots_rm)
+                for i, n in enumerate(nums):
+                    _report_totals[i] += n
+                _report_table.append((row, empty_names))
 
-            widths = [max(len(headers[i]), max(len(r[0][i]) for r in table))
-                      for i in range(len(headers))]
-
-            def _fmt_row(cells):
-                return "  ".join(
-                    cells[i].ljust(widths[i]) if i == 0 else cells[i].rjust(widths[i])
-                    for i in range(len(cells))
-                )
-
-            print(_fmt_row(headers))
-            print("-" * len(_fmt_row(headers)))
-            for row, empty_names in table:
-                print(_fmt_row(row))
-                if empty_names:
-                    print(f"  Skipped — no permissible_values or reachable_from: "
-                          f"{', '.join(sorted(empty_names))}")
-            print()
-
-        sources_missing = [k for k, v in all_sources.items() if "prefixes" not in v]
+        # A source is "unprocessed" only if it has no prefixes key AND its source YAML
+        # doesn't exist yet.  Sources with an existing YAML but no prefixes key in config
+        # are treated as having no prefixes to contribute (empty dict) — this lets users
+        # omit the "prefixes: {}" placeholder from config without breaking prefix sync.
+        sources_missing = [
+            k for k, v in all_sources.items()
+            if "prefixes" not in v and not os.path.exists(f"sources/{k}.yaml")
+        ]
         if sources_missing:
             print(
                 f"Warning: prefix lists not stored for: {', '.join(sources_missing)}. "
@@ -1362,6 +1459,50 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
 
             print(f"Prefixes: {prefix_added} added, {prefix_updated} updated")
 
+        # Print the per-source report table now that schema["prefixes"] is populated,
+        # so the Prefixes column reflects the final set of prefixes in the schema.
+        if _report_table:
+            _has_pfx_col = any(
+                (all_sources.get(r[0]) or {}).get("prefixes")
+                for r in _build_rows
+            )
+            if _has_pfx_col:
+                _report_headers.append("Prefixes")
+                _report_totals.append(0)
+                _schema_pfxs = set(schema.get("prefixes") or {})
+                _new_table = []
+                for row, empty_names in _report_table:
+                    pfx_count = sum(
+                        1 for k in (all_sources.get(row[0]) or {}).get("prefixes", {})
+                        if k in _schema_pfxs
+                    )
+                    _report_totals[-1] += pfx_count
+                    _new_table.append((row + [str(pfx_count)], empty_names))
+                _report_table = _new_table
+
+            _totals_row = ["TOTAL"] + [str(t) for t in _report_totals]
+            _widths = [max(len(_report_headers[i]), len(_totals_row[i]),
+                           max(len(r[0][i]) for r in _report_table))
+                       for i in range(len(_report_headers))]
+
+            def _fmt_row(cells):
+                return "  ".join(
+                    cells[i].ljust(_widths[i]) if i == 0 else cells[i].rjust(_widths[i])
+                    for i in range(len(cells))
+                )
+
+            _rule = "-" * len(_fmt_row(_report_headers))
+            print(_fmt_row(_report_headers))
+            print(_rule)
+            for row, empty_names in _report_table:
+                print(_fmt_row(row))
+                if empty_names:
+                    print(f"  Skipped — no permissible_values or reachable_from: "
+                          f"{', '.join(sorted(empty_names))}")
+            print(_rule)
+            print(_fmt_row(_totals_row))
+            print()
+
     # Report enums in schema.yaml not attributed to any current harvester_config.yaml source
     if os.path.exists(config_file):
         known_sources = set(all_sources.keys())
@@ -1381,11 +1522,16 @@ def build_schema(schema_file="schema.yaml", config_file=MENU_CONFIG, keys=None):
 
     # Build SlotLibrary class when auto-slots + schema_class are enabled
     # Slots are ordered by slot_group first, then alphabetically within each group.
+    # When a key_slot is configured, that slot sorts first and its section sorts first.
     def _slot_item_key(item):
-        """Sort key for schema slots items: (slot_group, slot_name), case-insensitive."""
+        """Sort key: key_slot first, then its section, then all others by (group, name)."""
         slot_name, slot_def = item
         grp = (slot_def.get("slot_group") or "").lower() if isinstance(slot_def, dict) else ""
-        return (grp, slot_name.lower())
+        if _key_slot_name and slot_name == _key_slot_name:
+            return (0, 0, grp, slot_name.lower())
+        if _key_slot_group and grp == _key_slot_group:
+            return (0, 1, grp, slot_name.lower())
+        return (1, 0, grp, slot_name.lower())
 
     if _schema_class_enabled and schema.get("slots"):
         slot_items_sorted = sorted(schema["slots"].items(), key=_slot_item_key)
@@ -1902,6 +2048,7 @@ _GEO_CONTENT_TYPES_GN = frozenset({
 _GEO_CONTENT_TYPES_GW = frozenset({
     "GeoWikiCountries", "GeoWikiADM1", "GeoWikiADM2",
     "GeoWikiADM34", "GeoWikiADM3", "GeoWikiADM4", "GeoWikiSettlement",
+    "GeoWikiCountryWaters", "GeoWikiFirstNations",
 })
 
 
@@ -2281,8 +2428,8 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
             process_enumber_source(key, source, locales=locales)
             continue
 
-        if content_type == "CRediT":
-            process_credit_source(key, source, locales=locales)
+        if content_type in {"CREDIT", "CRediT"}:
+            process_credit_source(key, source, config_file=config_file, locales=locales)
             continue
 
         if content_type == "LOC_CLASSIFICATION":
@@ -2307,12 +2454,54 @@ def process_sources(source_keys=None, config_file=MENU_CONFIG, debug=False):
 
         process_linkml_source(key, source, config_file)
 
-    # Auto-slot generation: add slot entries to source YAMLs when slots: automatic
+    # Backfill missing prefix dicts for source processors that don't store them
+    # themselves (e.g. AgriFoodCA, NSDB, STATSCAN, FreeText, NRCSSoilFieldBook).
+    # Reads each processed source's YAML, collects the prefixes actually used in
+    # CURIE meanings, and stores the result in harvester_config.yaml so -b can
+    # run prefix sync without skipping.
+    with open(config_file) as _f:
+        _bf_cfg = yaml.safe_load(_f) or {}
+    for _bfkey in keys_to_process:
+        _bfsrc = (_bf_cfg.get("sources") or {}).get(_bfkey)
+        if not _bfsrc or "prefixes" in _bfsrc:
+            continue
+        _bfyaml = f"sources/{_bfkey}.yaml"
+        if not os.path.exists(_bfyaml):
+            continue
+        with open(_bfyaml) as _f:
+            _bfdata = yaml.safe_load(_f) or {}
+        _bfexisting = _bfdata.get("prefixes") or {}
+        _bfused: dict = {}
+        for _bfenum in (_bfdata.get("enums") or {}).values():
+            for _bfpv in ((_bfenum or {}).get("permissible_values") or {}).values():
+                _bfm = (_bfpv or {}).get("meaning", "")
+                if is_curie(_bfm):
+                    _bfpfx = _bfm.split(":")[0]
+                    if _bfpfx in _bfexisting and _bfpfx not in _bfused:
+                        _bfused[_bfpfx] = _bfexisting[_bfpfx]
+        if _bfused:
+            apply_sorted_prefixes(_bfkey, _bfused, config_file, source=_bfsrc)
+
+    # Auto-slot generation: add slot entries to source YAMLs when slots: all/enums.
+    # Applies globally (all processed keys) or per-source when only individual
+    # entries carry a slots: directive.
     with open(config_file) as _f:
         _top_cfg = yaml.safe_load(_f) or {}
-    if _top_cfg.get("slots") == "automatic":
+    _top_slots_mode = _top_cfg.get("slots")
+    if _top_slots_mode == "automatic":
+        _top_slots_mode = "all"
+    if _top_slots_mode in ("all", "enums"):
+        # Global: apply to all processed keys + geo dependency keys
         extra_dep_keys = sorted(_geo_dep_keys - set(keys_to_process))
         _apply_auto_slots(keys_to_process + extra_dep_keys, config_file)
+    else:
+        # Per-source: apply only to sources whose entry has slots: all/enums
+        _per_src_slot_keys = [
+            k for k in keys_to_process
+            if (_top_cfg.get("sources") or {}).get(k, {}).get("slots") in ("all", "enums")
+        ]
+        if _per_src_slot_keys:
+            _apply_auto_slots(_per_src_slot_keys, config_file)
 
     # Skip index rebuild only when every explicitly-run source was FreeText and none wrote a YAML
     _index_total = None
@@ -2393,6 +2582,17 @@ def _apply_auto_slots(keys_to_process: list, config_file: str) -> int:
         new   = make_auto_slots(enums, slots)
         slots.update(new)
 
+        # Also update description on existing slots whose enum description changed.
+        desc_updated = 0
+        for enum_name, enum_data in (enums or {}).items():
+            slot_name = camel_to_snake(enum_name)
+            if slot_name not in slots or slot_name in new:
+                continue  # new slot already has description from make_auto_slots
+            new_desc = ((enum_data or {}).get("description") or "").strip()
+            if new_desc and slots[slot_name].get("description") != new_desc:
+                slots[slot_name]["description"] = new_desc
+                desc_updated += 1
+
         if not slots:
             continue
 
@@ -2400,17 +2600,35 @@ def _apply_auto_slots(keys_to_process: list, config_file: str) -> int:
 
         # Auto-class: one class per source that lists all its slots, giving
         # downstream tools (DataHarmonizer, validators) a concrete template.
-        class_name    = _key_to_class_name(key)
+        derived_name  = _key_to_class_name(key)
         description   = data.get("description", "")
         slot_list     = list(slots.keys())
         classes       = data.get("classes") or {}
+
+        # If the source YAML already has an explicit tree_root class (e.g.
+        # DarwinCoreSimpleRecord written by process_dwc_simple_source), update
+        # that class rather than creating a second derived-name class.
+        existing_root = next(
+            (cname for cname, cdef in classes.items()
+             if isinstance(cdef, dict) and cdef.get("tree_root")
+             and cname != derived_name),
+            None
+        )
+        stale_derived = existing_root and derived_name in classes  # check before pop
+        if existing_root:
+            # Remove any stale derived-name class left by a prior run.
+            classes.pop(derived_name, None)
+        class_name = existing_root or derived_name
+
         updated_class = {
             "name":        class_name,
             "description": description,
             "tree_root":   True,
             "slots":       slot_list,
         }
-        changed = bool(new) or (classes.get(class_name) != updated_class)
+        changed = (bool(new) or bool(desc_updated)
+                   or (classes.get(class_name) != updated_class)
+                   or stale_derived)
         if not changed:
             continue
 
@@ -2422,6 +2640,8 @@ def _apply_auto_slots(keys_to_process: list, config_file: str) -> int:
         total += len(new)
         if new:
             print(f"  Auto-slots: added {len(new)} slot(s) to sources/{key}.yaml")
+        if desc_updated:
+            print(f"  Auto-slots: updated description on {desc_updated} slot(s) in sources/{key}.yaml")
         print(f"  Auto-class: {class_name} ({len(slot_list)} slots) → sources/{key}.yaml")
     return total
 
@@ -3489,7 +3709,8 @@ def _get_local_children(source_yaml, id_, type_):
     """Return list of {id, label, uri} children from an already-loaded source YAML dict.
 
     For enums: returns the permissible values.
-    For terms: returns sibling PVs whose is_a equals this term's id.
+    For terms: returns sibling PVs whose is_a equals this term's id, plus
+    any PVs that list this term's id in their mixins list.
     CURIE meanings (e.g. wd:Q1234) are resolved to full URIs via the source's
     prefix map so that the markdown report can hyperlink them correctly.
     """
@@ -3515,6 +3736,7 @@ def _get_local_children(source_yaml, id_, type_):
                 return [
                     _child(code, pv_def) for code, pv_def in pvs.items()
                     if (pv_def or {}).get("is_a") == id_
+                    or id_ in ((pv_def or {}).get("mixins") or [])
                 ]
     return []
 
@@ -4489,7 +4711,7 @@ def main():
                 refetch_agrifood_dir(key, source, config_file=config_file, locales=locales_cfg)
                 continue
             # CRediT: Zenodo direct download returns 403; use API content endpoint instead.
-            if content_type == "CRediT":
+            if content_type in {"CREDIT", "CRediT"}:
                 fetch_credit_source(key, source, config_file)
                 continue
             if content_type == "LOC_CLASSIFICATION":
