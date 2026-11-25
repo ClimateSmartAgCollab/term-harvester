@@ -714,8 +714,25 @@ queried from Wikidata via P31 = Q9430):
 
 ```bash
 python term_harvester.py -a GeoWiki_countries
-# Produces GeoWikiCountry, GeoWikiCountryExtended, GeoWikiContinent, GeoWikiOcean
+# Produces GeoWikiCountry, GeoWikiCountryExtended, GeoWikiContinent, GeoWikiOcean,
+# GeoWikiWaterbody
 ```
+
+**International waterbodies — use GeoWikiWaterbody:**
+`GeoWiki_countries` also produces a `GeoWikiWaterbody` enum that inherits `GeoWikiOcean`
+and adds lakes, rivers, seas, gulfs, straits, and bays that cross national borders.
+This is useful when a sample location is better described by its nearest international
+waterbody than by a single country (e.g. a sample taken from Lake Erie or the
+Mediterranean Sea).  Items with 30+ Wikipedia sitelinks are included; lakes and rivers
+additionally require Wikidata P17 (country) to reference at least two distinct countries.
+
+**ADM2-shared waterbodies are sparsely available in Wikidata:**
+Waterbodies that straddle administrative level 2 boundaries (counties, districts,
+municipalities) cannot be reliably enumerated from Wikidata because the P131
+(located in administrative territorial entity) property is sparsely populated — most
+lakes and rivers do not have P131 set, and even those that do often record only the
+top-level country rather than the county or district.  `GeoWikiWaterbody` therefore
+operates at the national level (P17), not at ADM2.
 
 **ADM levels vs. PPL — choosing the right picklist:**
 
@@ -1185,6 +1202,11 @@ locales:
 
 The resulting `schema.yaml` gains an `extensions.locales.value.fr` block containing
 189 translated slots and 71 translated permissible value titles.
+
+> **Note:** Enum value descriptions are English-only in all non-English locales. The TDWG/GBIF
+> vocabulary XML files provide multilingual `dc:title` labels but only a single English
+> `dc:description` per concept, with no per-language variants. Slot-level translations
+> (titles, descriptions, and comments) are fully multilingual.
 
 #### Diagram
 
