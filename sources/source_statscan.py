@@ -88,6 +88,38 @@ CLASSIFICATIONS_SEARCH_URL_FR = (
 
 _DEFAULT_CATALOG_PATH = "sources/sources_statscan_terms.yaml"
 
+_STATSCAN_STOP_WORDS = frozenset({
+    "a", "an", "the", "of", "in", "on", "at", "by", "for", "to", "and",
+    "or", "with", "from", "as", "is", "are", "was", "were", "be", "been",
+    "its", "it", "that", "this", "these", "those", "which", "not", "no",
+    "per", "do", "does", "did", "have", "has", "had",
+})
+
+
+def _title_to_enum_key(title, tvd_id, existing_keys=()):
+    """Convert a human-readable title to a STATSCAN_... enum key.
+
+    Removes common stop words, title-cases remaining tokens, joins them into
+    CamelCase, and prefixes with "STATSCAN_".  Appends "_{tvd_id}" only when
+    the generated name collides with an entry already in *existing_keys*.
+
+    Examples::
+        "Highest level of education"  → "STATSCAN_HighestLevelEducation"
+        "Type of dwelling"            → "STATSCAN_TypeDwelling"
+        "Legal marital status"        → "STATSCAN_LegalMaritalStatus"
+    """
+    tokens = re.split(r'[\s\-/,;:()\[\]\'\"&+#@.]+', title)
+    significant = [
+        t.capitalize()
+        for t in tokens
+        if t and t.lower() not in _STATSCAN_STOP_WORDS
+    ]
+    stem = re.sub(r'[^A-Za-z0-9]', '', "".join(significant)) or f"Var{tvd_id}"
+    candidate = f"STATSCAN_{stem}"
+    if candidate in existing_keys:
+        candidate = f"STATSCAN_{stem}_{tvd_id}"
+    return candidate
+
 
 def parse_classification_catalog(html_text):
     """Parse the StatsCan concepts search page (?show=all).
@@ -138,12 +170,19 @@ def parse_classification_catalog(html_text):
 
         entries.append({
             "tvd_id":     numeric_id,
-            "key":        f"STATSCAN_{numeric_id}",
+            "key":        f"STATSCAN_{numeric_id}",  # replaced below
             "title":      title,
             "subject":    subject,
             "entry_type": entry_type,
             "url":        url,
         })
+
+    # Assign human-readable keys; append _{tvd_id} only for within-catalog collisions
+    used_keys: set = set()
+    for entry in entries:
+        k = _title_to_enum_key(entry["title"], entry["tvd_id"], used_keys)
+        entry["key"] = k
+        used_keys.add(k)
 
     return sorted(entries, key=lambda e: e["title"].lower())
 
@@ -870,15 +909,17 @@ def match_statscan(url, tmp_path, config_file=MENU_CONFIG):
 
     tvd_m = re.search(r'[?&]TVD=(\d+)', url)
     tvd_id = tvd_m.group(1) if tvd_m else "unknown"
-    key = f"STATSCAN_{tvd_id}"
 
     with open(config_file) as f:
         config = yaml.safe_load(f) or {}
-    if key in config.get("sources", {}):
-        print(f"  Skipping {url}: source key '{key}' already exists in {config_file}",
-              file=sys.stderr)
-        os.unlink(tmp_path)
-        return True
+
+    # Duplicate check by URL (handles both old numeric and new human-readable keys)
+    for _existing_key, _existing_src in config.get("sources", {}).items():
+        if ((_existing_src.get("reachable_from") or {}).get("source_ontology", "") == url):
+            print(f"  Skipping {url}: already added as '{_existing_key}' in {config_file}",
+                  file=sys.stderr)
+            os.unlink(tmp_path)
+            return True
 
     # Read the main page from the temp file, then discard it (goes into the zip)
     with open(tmp_path, encoding="utf-8", errors="replace") as f:
@@ -896,6 +937,9 @@ def match_statscan(url, tmp_path, config_file=MENU_CONFIG):
                 break
     if not title:
         title = f"StatsCan Variable {tvd_id}"
+
+    # Generate a human-readable enum key; fall back to _{tvd_id} suffix on collision
+    key = _title_to_enum_key(title, tvd_id, set(config.get("sources", {}).keys()))
 
     # Extract description from the first <p> inside the panel-body (status/scope line)
     description = None
