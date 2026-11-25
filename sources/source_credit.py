@@ -20,6 +20,7 @@ from source_utils import (
     MENU_CONFIG,
     IndentedDumper,
     add_permissible_value,
+    camel_to_snake,
     log_extraction,
     make_config_schema,
     make_source_entry,
@@ -119,7 +120,7 @@ def _parse_credit_pdf(pdf_path):
     return results
 
 
-def process_credit_source(key, source, locales=None):
+def process_credit_source(key, source, config_file=MENU_CONFIG, locales=None):
     """Build a LinkML enum YAML from the CRediT PDF."""
     pdf_path = f"sources/{key}.pdf"
     if not os.path.exists(pdf_path):
@@ -142,16 +143,31 @@ def process_credit_source(key, source, locales=None):
             meaning=_NISO_BASE + _role_slug(title) + "/",
         )
 
+    _title = source.get("title") or "CRediT Contributor Roles Taxonomy"
+    _description = source.get("description") or (
+        "The Contributor Roles Taxonomy (CRediT) represents the roles "
+        "typically played by contributors to scientific scholarly output."
+    )
+    _slot_name = camel_to_snake(key)   # "CREDIT" → "credit"
     schema = make_config_schema(
         id=source_url,
         name=key,
-        title=source.get("title") or "CRediT Contributor Roles Taxonomy",
-        description=source.get("description") or (
-            "The Contributor Roles Taxonomy (CRediT) represents the roles "
-            "typically played by contributors to scientific scholarly output."
-        ),
+        title=_title,
+        description=_description,
         version=source.get("version") or "",
-        enums={key: {"permissible_values": permissible_values}},
+        enums={key: {
+            "name": key,
+            "title": _title,
+            "description": _description,
+            "permissible_values": permissible_values,
+        }},
+        slots={_slot_name: {
+            "name":        _slot_name,
+            "title":       f"{key} menu",
+            "description": _description,
+            "range":       key,
+            "multivalued": False,
+        }},
     )
 
     yaml_path = f"sources/{key}.yaml"
@@ -159,6 +175,8 @@ def process_credit_source(key, source, locales=None):
         yaml.dump(schema, f, Dumper=IndentedDumper,
                   default_flow_style=False, sort_keys=False)
     log_extraction(key, count=len(permissible_values))
+    # Store empty prefixes dict so -b prefix sync doesn't skip on CREDIT's behalf.
+    update_source_config(key, {"prefixes": {}}, config_file)
 
 
 # Matches bare Zenodo record URLs and file URLs containing "credit" and ".pdf".
@@ -198,7 +216,7 @@ def fetch_credit_source(key, source, config_file=MENU_CONFIG):
     update_source_config(
         key, {"download_date": datetime.date.today().isoformat()}, config_file
     )
-    process_credit_source(key, source)
+    process_credit_source(key, source, config_file=config_file)
 
 
 def match_credit(url, config_file=MENU_CONFIG):
@@ -223,7 +241,7 @@ def match_credit(url, config_file=MENU_CONFIG):
     if '/files/' not in decoded.lower() and 'credit' not in decoded.lower():
         return False
 
-    key = "CRediT"
+    key = "CREDIT"
 
     with open(config_file) as f:
         config = yaml.safe_load(f) or {}
@@ -265,5 +283,5 @@ def match_credit(url, config_file=MENU_CONFIG):
     write_config(config, config_file)
     print(f"Added source '{key}' to {config_file}")
 
-    process_credit_source(key, entry)
+    process_credit_source(key, entry, config_file=config_file)
     return True
