@@ -1,0 +1,462 @@
+DwCDegreeOfEstablishment:
+  cs:
+    http://rs.tdwg.org/dwcdoe/values/d001: původní (kategorie A)
+    http://rs.tdwg.org/dwcdoe/values/d002: v zajetí (kategorie B1)
+    http://rs.tdwg.org/dwcdoe/values/d003: pěstované (kategorie B2)
+    http://rs.tdwg.org/dwcdoe/values/d004: vypuštěn (kategorie B3)
+    http://rs.tdwg.org/dwcdoe/values/d005: neúspěšný (kategorie C0)
+    http://rs.tdwg.org/dwcdoe/values/d006: běžný (kategorie C1)
+    http://rs.tdwg.org/dwcdoe/values/d007: rozmnožující se (kategorie C2)
+    http://rs.tdwg.org/dwcdoe/values/d008: zaveden (kategorie C3)
+    http://rs.tdwg.org/dwcdoe/values/d009: kolonizující (kategorie D1)
+    http://rs.tdwg.org/dwcdoe/values/d010: invazívní (kategorie D2)
+    http://rs.tdwg.org/dwcdoe/values/d011: rozšířená invazivní (kategorie E)
+  de:
+    http://rs.tdwg.org/dwcdoe/values/d001: einheimisch
+    http://rs.tdwg.org/dwcdoe/values/d002: gefangen
+    http://rs.tdwg.org/dwcdoe/values/d003: gezüchtet
+    http://rs.tdwg.org/dwcdoe/values/d004: ausgesetzt
+    http://rs.tdwg.org/dwcdoe/values/d005: erfolglos
+    http://rs.tdwg.org/dwcdoe/values/d006: unbeständig
+    http://rs.tdwg.org/dwcdoe/values/d007: fortpflanzend
+    http://rs.tdwg.org/dwcdoe/values/d008: etabliert
+    http://rs.tdwg.org/dwcdoe/values/d009: kolonisierend
+    http://rs.tdwg.org/dwcdoe/values/d010: invasiv
+    http://rs.tdwg.org/dwcdoe/values/d011: verbreitet invasiv
+  en:
+    http://rs.tdwg.org/dwcdoe/values/d001: native (category A)
+    http://rs.tdwg.org/dwcdoe/values/d002: captive (category B1)
+    http://rs.tdwg.org/dwcdoe/values/d003: cultivated (category B2)
+    http://rs.tdwg.org/dwcdoe/values/d004: released (category B3)
+    http://rs.tdwg.org/dwcdoe/values/d005: failing (category C0)
+    http://rs.tdwg.org/dwcdoe/values/d006: casual (category C1)
+    http://rs.tdwg.org/dwcdoe/values/d007: reproducing (category C2)
+    http://rs.tdwg.org/dwcdoe/values/d008: established (category C3)
+    http://rs.tdwg.org/dwcdoe/values/d009: colonising (category D1)
+    http://rs.tdwg.org/dwcdoe/values/d010: invasive (category D2)
+    http://rs.tdwg.org/dwcdoe/values/d011: widespread invasive (category E)
+  es:
+    http://rs.tdwg.org/dwcdoe/values/d001: nativo (categoría A)
+    http://rs.tdwg.org/dwcdoe/values/d002: en cautividad (categoría B1)
+    http://rs.tdwg.org/dwcdoe/values/d003: cultivado (categoría B2)
+    http://rs.tdwg.org/dwcdoe/values/d004: liberado (categoría B3)
+    http://rs.tdwg.org/dwcdoe/values/d005: en peligro (categoría C0)
+    http://rs.tdwg.org/dwcdoe/values/d006: ocasional (categoría C1)
+    http://rs.tdwg.org/dwcdoe/values/d007: en reprodución (categoría C2)
+    http://rs.tdwg.org/dwcdoe/values/d008: establecida (categoría C3)
+    http://rs.tdwg.org/dwcdoe/values/d009: colonizadora (categoría D1)
+    http://rs.tdwg.org/dwcdoe/values/d010: invasivo (categoría D2)
+    http://rs.tdwg.org/dwcdoe/values/d011: invasivo generalizado (categoría E)
+  fr:
+    http://rs.tdwg.org/dwcdoe/values/d001: indigène (catégorie A)
+    http://rs.tdwg.org/dwcdoe/values/d002: captif (catégorie B1)
+    http://rs.tdwg.org/dwcdoe/values/d003: cultivé (catégorie B2)
+    http://rs.tdwg.org/dwcdoe/values/d004: relâché (catégorie B3)
+    http://rs.tdwg.org/dwcdoe/values/d005: échec (catégorie C0)
+    http://rs.tdwg.org/dwcdoe/values/d006: moyen (catégorie C1)
+    http://rs.tdwg.org/dwcdoe/values/d007: reproduction (catégorie C2)
+    http://rs.tdwg.org/dwcdoe/values/d008: implanté (catégorie C3)
+    http://rs.tdwg.org/dwcdoe/values/d009: colonisant (catégorie D1)
+    http://rs.tdwg.org/dwcdoe/values/d010: envahissant (catégorie D2)
+    http://rs.tdwg.org/dwcdoe/values/d011: largement envahissant (catégorie E)
+  ko:
+    http://rs.tdwg.org/dwcdoe/values/d001: 토착
+    http://rs.tdwg.org/dwcdoe/values/d002: 포획
+    http://rs.tdwg.org/dwcdoe/values/d003: 경작
+    http://rs.tdwg.org/dwcdoe/values/d004: 방출
+    http://rs.tdwg.org/dwcdoe/values/d005: 실패
+    http://rs.tdwg.org/dwcdoe/values/d006: 임시
+    http://rs.tdwg.org/dwcdoe/values/d007: 재생산
+    http://rs.tdwg.org/dwcdoe/values/d008: 정착
+    http://rs.tdwg.org/dwcdoe/values/d009: 서식
+    http://rs.tdwg.org/dwcdoe/values/d010: 침입
+    http://rs.tdwg.org/dwcdoe/values/d011: 광범위한 침입
+  zh:
+    http://rs.tdwg.org/dwcdoe/values/d001: 原生（類別 A）
+    http://rs.tdwg.org/dwcdoe/values/d002: 收容（類別 B1）
+    http://rs.tdwg.org/dwcdoe/values/d003: 栽培
+    http://rs.tdwg.org/dwcdoe/values/d004: 野放
+    http://rs.tdwg.org/dwcdoe/values/d005: 衰退中
+    http://rs.tdwg.org/dwcdoe/values/d006: 偶然出現的
+    http://rs.tdwg.org/dwcdoe/values/d007: 繁殖中
+    http://rs.tdwg.org/dwcdoe/values/d008: 歸化
+    http://rs.tdwg.org/dwcdoe/values/d009: 拓殖中
+    http://rs.tdwg.org/dwcdoe/values/d010: 入侵
+    http://rs.tdwg.org/dwcdoe/values/d011: 廣泛入侵
+DwCEstablishmentMeans:
+  cs:
+    http://rs.tdwg.org/dwcem/values/e001: nativní (původní)
+    http://rs.tdwg.org/dwcem/values/e002: 'nativní: reintrodukovaný'
+    http://rs.tdwg.org/dwcem/values/e003: zavlečený (introdukovaný, cizí, exotický,
+      nepůvodní)
+    http://rs.tdwg.org/dwcem/values/e004: 'zaveden: asistovaná kolonizace'
+    http://rs.tdwg.org/dwcem/values/e005: kočovný (příležitostný)
+    http://rs.tdwg.org/dwcem/values/e006: nejistý (neznámý, kryptogenní)
+    http://rs.tdwg.org/dwcem/values/e007: 'původní: endemický'
+  en:
+    http://rs.tdwg.org/dwcem/values/e001: native (indigenous)
+    http://rs.tdwg.org/dwcem/values/e002: 'native: reintroduced'
+    http://rs.tdwg.org/dwcem/values/e003: introduced (alien, exotic, non-native, nonindigenous)
+    http://rs.tdwg.org/dwcem/values/e004: 'introduced: assisted colonisation'
+    http://rs.tdwg.org/dwcem/values/e005: vagrant (casual)
+    http://rs.tdwg.org/dwcem/values/e006: uncertain (unknown, cryptogenic)
+    http://rs.tdwg.org/dwcem/values/e007: 'native: endemic'
+  es:
+    http://rs.tdwg.org/dwcem/values/e001: nativo (autóctono)
+    http://rs.tdwg.org/dwcem/values/e002: 'nativo: reintroducido'
+    http://rs.tdwg.org/dwcem/values/e003: introducido (exótico, no-nativo, no-autóctono)
+    http://rs.tdwg.org/dwcem/values/e004: 'introducido: colonización asistida'
+    http://rs.tdwg.org/dwcem/values/e005: vagabundo (incidental)
+    http://rs.tdwg.org/dwcem/values/e006: incierto (desconocido, criptogénico)
+    http://rs.tdwg.org/dwcem/values/e007: 'nativo: endémico'
+  fr:
+    http://rs.tdwg.org/dwcem/values/e001: natif (indigène)
+    http://rs.tdwg.org/dwcem/values/e002: 'natif : réintroduit'
+    http://rs.tdwg.org/dwcem/values/e003: introduit (exotique, non-natif, non-indigène)
+    http://rs.tdwg.org/dwcem/values/e004: 'introduit : colonisation assistée'
+    http://rs.tdwg.org/dwcem/values/e005: erratique (occasionnel)
+    http://rs.tdwg.org/dwcem/values/e006: incertain (inconnu, cryptogénique)
+    http://rs.tdwg.org/dwcem/values/e007: 'natif : endémique'
+  ru:
+    http://rs.tdwg.org/dwcem/values/e001: естественный (нативный)
+    http://rs.tdwg.org/dwcem/values/e002: 'естественный: реинтродуцированный'
+    http://rs.tdwg.org/dwcem/values/e003: интродуцирован (чужеродный, экзотичный,
+      не местный, не свойствен для данной территории)
+    http://rs.tdwg.org/dwcem/values/e004: 'интродуцирован: преднамеренная интродукция'
+    http://rs.tdwg.org/dwcem/values/e005: бродячий (случайная интродукция)
+    http://rs.tdwg.org/dwcem/values/e006: неопределенный (неизвестный, криптический)
+    http://rs.tdwg.org/dwcem/values/e007: 'аборигенный: эндемичный'
+  zh:
+    http://rs.tdwg.org/dwcem/values/e001: 原生
+    http://rs.tdwg.org/dwcem/values/e002: 原生：再引進
+    http://rs.tdwg.org/dwcem/values/e003: 引進（外來、非原生、非原住）
+    http://rs.tdwg.org/dwcem/values/e004: 引進（協助拓殖）
+    http://rs.tdwg.org/dwcem/values/e005: 流浪的
+    http://rs.tdwg.org/dwcem/values/e006: 不確定的（未知、隱源性）
+DwCPathway:
+  cs:
+    http://rs.tdwg.org/dwcpw/values/p001: biologická ochrana
+    http://rs.tdwg.org/dwcpw/values/p002: ochrana proti erozi
+    http://rs.tdwg.org/dwcpw/values/p003: rybolov ve volné přírodě
+    http://rs.tdwg.org/dwcpw/values/p004: lov
+    http://rs.tdwg.org/dwcpw/values/p005: úprava krajiny
+    http://rs.tdwg.org/dwcpw/values/p006: ochrana přírody nebo správa volně žijících
+      živočichů
+    http://rs.tdwg.org/dwcpw/values/p007: uvolněno k užití
+    http://rs.tdwg.org/dwcpw/values/p008: jiné záměrné uvolnění
+    http://rs.tdwg.org/dwcpw/values/p009: zemědělství (včetně surovin pro biopaliva)
+    http://rs.tdwg.org/dwcpw/values/p010: akvakultura/marikultura
+    http://rs.tdwg.org/dwcpw/values/p011: botanická zahrada/zoologická zahrada/akvárium
+      (kromě domácích akvárií)
+    http://rs.tdwg.org/dwcpw/values/p012: druhy v zájmovém chovu/akváriích/teráriích
+      (včetně živé potravy pro tyto druhy)
+    http://rs.tdwg.org/dwcpw/values/p013: hospodářská zvířata (včetně zvířat ponechaných
+      pod omezenou kontrolou)
+    http://rs.tdwg.org/dwcpw/values/p014: lesnictví (včetně zalesňování)
+    http://rs.tdwg.org/dwcpw/values/p015: kožešinové farmy
+    http://rs.tdwg.org/dwcpw/values/p016: zahradnictví
+    http://rs.tdwg.org/dwcpw/values/p017: okrasné účely jiné než zahradnické
+    http://rs.tdwg.org/dwcpw/values/p018: výzkum a chov ex-situ (v zařízeních)
+    http://rs.tdwg.org/dwcpw/values/p019: živá krmiva a živé návnady
+    http://rs.tdwg.org/dwcpw/values/p020: jiný únik z uzavřeného prostoru
+    http://rs.tdwg.org/dwcpw/values/p021: kontaminovaný školkařský materiál
+    http://rs.tdwg.org/dwcpw/values/p022: kontaminovaná návnada
+    http://rs.tdwg.org/dwcpw/values/p023: kontaminant potravin (včetně živých potravin)
+    http://rs.tdwg.org/dwcpw/values/p024: kontaminant na zvířatech (kromě parazitů,
+      organismů přenášených hostitelem/vektorem)
+    http://rs.tdwg.org/dwcpw/values/p025: parazité na zvířatech (včetně organismů
+      přenášených hostitelem a přenašečem)
+    http://rs.tdwg.org/dwcpw/values/p026: kontaminant na rostlinách (kromě parazitů,
+      druhů přenášených hostitelem/vektorem)
+    http://rs.tdwg.org/dwcpw/values/p027: parazité na rostlinách (včetně druhů přenášených
+      hostitelem a přenašečem)
+    http://rs.tdwg.org/dwcpw/values/p028: kontaminant osiva
+    http://rs.tdwg.org/dwcpw/values/p029: obchod se dřevem
+    http://rs.tdwg.org/dwcpw/values/p030: přeprava materiálu stanoviště (půda, vegetace,
+      dřevo atd.)
+    http://rs.tdwg.org/dwcpw/values/p031: rybářské vybavení
+    http://rs.tdwg.org/dwcpw/values/p032: kontejner/lodní kontejner
+    http://rs.tdwg.org/dwcpw/values/p033: černí pasažéři v letadle nebo na palubě
+      letadla
+    http://rs.tdwg.org/dwcpw/values/p034: černí pasažéři na lodi/člunu (kromě balastní
+      vody a znečištění trupu)
+    http://rs.tdwg.org/dwcpw/values/p035: stroje/zařízení
+    http://rs.tdwg.org/dwcpw/values/p036: lidé a jejich zavazadla/vybavení (zejména
+      v cestovním ruchu)
+    http://rs.tdwg.org/dwcpw/values/p037: organický obalový materiál, zejména dřevěné
+      obaly
+    http://rs.tdwg.org/dwcpw/values/p038: balastní voda z lodí/člunů
+    http://rs.tdwg.org/dwcpw/values/p039: zanášení trupu lodi/člunu
+    http://rs.tdwg.org/dwcpw/values/p040: vozidla (auto, vlak atd.)
+    http://rs.tdwg.org/dwcpw/values/p041: jiné dopravní prostředky
+    http://rs.tdwg.org/dwcpw/values/p042: propojené vodní cesty/povodí/moře
+    http://rs.tdwg.org/dwcpw/values/p043: tunely a pozemní mosty
+    http://rs.tdwg.org/dwcpw/values/p044: přirozené šíření invazních cizích organismů
+      přes hranice
+    http://rs.tdwg.org/dwcpw/values/p045: vypuštění do přírody
+    http://rs.tdwg.org/dwcpw/values/p046: útěk ze zajetí
+    http://rs.tdwg.org/dwcpw/values/p047: transport-contaminant
+    http://rs.tdwg.org/dwcpw/values/p048: transport-stowaway
+    http://rs.tdwg.org/dwcpw/values/p049: koridor
+    http://rs.tdwg.org/dwcpw/values/p050: bez lidské pomoci
+    http://rs.tdwg.org/dwcpw/values/p051: záměrný
+    http://rs.tdwg.org/dwcpw/values/p052: neúmyslné
+    http://rs.tdwg.org/dwcpw/values/p053: koridor a šíření
+  en:
+    http://rs.tdwg.org/dwcpw/values/p001: biological control
+    http://rs.tdwg.org/dwcpw/values/p002: erosion control
+    http://rs.tdwg.org/dwcpw/values/p003: fishery in the wild
+    http://rs.tdwg.org/dwcpw/values/p004: hunting
+    http://rs.tdwg.org/dwcpw/values/p005: landscape improvement
+    http://rs.tdwg.org/dwcpw/values/p006: conservation or wildlife management
+    http://rs.tdwg.org/dwcpw/values/p007: released for use
+    http://rs.tdwg.org/dwcpw/values/p008: other intentional release
+    http://rs.tdwg.org/dwcpw/values/p009: agriculture (including biofuel feedstocks)
+    http://rs.tdwg.org/dwcpw/values/p010: aquaculture/mariculture
+    http://rs.tdwg.org/dwcpw/values/p011: botanic garden/zoo/aquaria (excluding domestic
+      aquaria)
+    http://rs.tdwg.org/dwcpw/values/p012: pet/aquarium/terrarium species (including
+      live food for such species)
+    http://rs.tdwg.org/dwcpw/values/p013: farmed animals (including animals left under
+      limited control)
+    http://rs.tdwg.org/dwcpw/values/p014: forestry (including reforestation)
+    http://rs.tdwg.org/dwcpw/values/p015: fur farms
+    http://rs.tdwg.org/dwcpw/values/p016: horticulture
+    http://rs.tdwg.org/dwcpw/values/p017: ornamental purpose other than horticulture
+    http://rs.tdwg.org/dwcpw/values/p018: research and ex-situ breeding (in facilities)
+    http://rs.tdwg.org/dwcpw/values/p019: live food and live bait
+    http://rs.tdwg.org/dwcpw/values/p020: other escape from confinement
+    http://rs.tdwg.org/dwcpw/values/p021: contaminant nursery material
+    http://rs.tdwg.org/dwcpw/values/p022: contaminated bait
+    http://rs.tdwg.org/dwcpw/values/p023: food contaminant (including of live food)
+    http://rs.tdwg.org/dwcpw/values/p024: contaminant on animals (except parasites,
+      organisms transported by host/vector)
+    http://rs.tdwg.org/dwcpw/values/p025: parasites on animals (including organisms
+      transported by host and vector)
+    http://rs.tdwg.org/dwcpw/values/p026: contaminant on plants (except parasites,
+      species transported by host/vector)
+    http://rs.tdwg.org/dwcpw/values/p027: parasites on plants (including species transported
+      by host and vector)
+    http://rs.tdwg.org/dwcpw/values/p028: seed contaminant
+    http://rs.tdwg.org/dwcpw/values/p029: timber trade
+    http://rs.tdwg.org/dwcpw/values/p030: transportation of habitat material (soil,
+      vegetation, wood etc)
+    http://rs.tdwg.org/dwcpw/values/p031: angling/fishing equipment
+    http://rs.tdwg.org/dwcpw/values/p032: container/bulk
+    http://rs.tdwg.org/dwcpw/values/p033: hitchhikers in or on airplane
+    http://rs.tdwg.org/dwcpw/values/p034: hitchhikers on ship/boat (excluding ballast
+      water and hull fouling)
+    http://rs.tdwg.org/dwcpw/values/p035: machinery/equipment
+    http://rs.tdwg.org/dwcpw/values/p036: people and their luggage/equipment (in particular
+      tourism)
+    http://rs.tdwg.org/dwcpw/values/p037: organic packing material, in particular
+      wood packaging
+    http://rs.tdwg.org/dwcpw/values/p038: ship/boat ballast water
+    http://rs.tdwg.org/dwcpw/values/p039: ship/boat hull fouling
+    http://rs.tdwg.org/dwcpw/values/p040: vehicles (car, train, etc.)
+    http://rs.tdwg.org/dwcpw/values/p041: other means of transport
+    http://rs.tdwg.org/dwcpw/values/p042: interconnected waterways/basins/seas
+    http://rs.tdwg.org/dwcpw/values/p043: tunnels and land bridges
+    http://rs.tdwg.org/dwcpw/values/p044: natural dispersal across borders of invasive
+      alien organisms
+    http://rs.tdwg.org/dwcpw/values/p045: release in nature
+    http://rs.tdwg.org/dwcpw/values/p046: escape from confinement
+    http://rs.tdwg.org/dwcpw/values/p047: transport-contaminant
+    http://rs.tdwg.org/dwcpw/values/p048: transport-stowaway
+    http://rs.tdwg.org/dwcpw/values/p049: corridor
+    http://rs.tdwg.org/dwcpw/values/p050: unaided
+    http://rs.tdwg.org/dwcpw/values/p051: intentional
+    http://rs.tdwg.org/dwcpw/values/p052: unintentional
+    http://rs.tdwg.org/dwcpw/values/p053: corridor and dispersal
+  es:
+    http://rs.tdwg.org/dwcpw/values/p001: control biológico
+    http://rs.tdwg.org/dwcpw/values/p002: control de erosión
+    http://rs.tdwg.org/dwcpw/values/p003: pesca silvestre
+    http://rs.tdwg.org/dwcpw/values/p004: caza
+    http://rs.tdwg.org/dwcpw/values/p005: mejoramiento de paisaje
+    http://rs.tdwg.org/dwcpw/values/p006: conservación o manejo de vida silvestre
+    http://rs.tdwg.org/dwcpw/values/p007: liberado para uso
+    http://rs.tdwg.org/dwcpw/values/p008: otra liberación intencional
+    http://rs.tdwg.org/dwcpw/values/p009: agricultura (incluyendo materia prima para
+      biocombustibles)
+    http://rs.tdwg.org/dwcpw/values/p010: acuicultura/maricultura
+    http://rs.tdwg.org/dwcpw/values/p011: jardín botánico/zoológico/acuarios (excluyendo
+      acuarios domésticos)
+    http://rs.tdwg.org/dwcpw/values/p012: especies mascota/de acuario/de terrario
+      (incluyendo comida viva para esas especies)
+    http://rs.tdwg.org/dwcpw/values/p013: animales de granja (incluyendo animales
+      dejados bajo control limitado)
+    http://rs.tdwg.org/dwcpw/values/p014: silvicultura (incluyendo reforestación)
+    http://rs.tdwg.org/dwcpw/values/p015: granjas de pieles
+    http://rs.tdwg.org/dwcpw/values/p016: horticultura
+    http://rs.tdwg.org/dwcpw/values/p017: con fin ornamental distinto a horticultura
+    http://rs.tdwg.org/dwcpw/values/p018: investigación y cría ex-situ (en instalaciones)
+    http://rs.tdwg.org/dwcpw/values/p019: alimento vivo y cebo vivo
+    http://rs.tdwg.org/dwcpw/values/p020: otros escapes de confinamiento
+    http://rs.tdwg.org/dwcpw/values/p021: material de vivero contaminante
+    http://rs.tdwg.org/dwcpw/values/p022: cebo contaminado
+    http://rs.tdwg.org/dwcpw/values/p023: contaminante de alimentos (incluyendo alimento
+      vivo)
+    http://rs.tdwg.org/dwcpw/values/p024: contaminante de animales (excepto parásitos,
+      organismos transportados por hospedador/vector)
+    http://rs.tdwg.org/dwcpw/values/p025: parásitos de animales (incluyendo organismos
+      transportados por hospedador y vector)
+    http://rs.tdwg.org/dwcpw/values/p026: contaminante de plantas (excepto parásitos,
+      especies transportadas por hospedador/vector)
+    http://rs.tdwg.org/dwcpw/values/p027: parásitos de plantas (incluyendo especies
+      transportadas por hospedador y vector)
+    http://rs.tdwg.org/dwcpw/values/p028: contaminante de semillas
+    http://rs.tdwg.org/dwcpw/values/p029: comercio maderero
+    http://rs.tdwg.org/dwcpw/values/p030: transporte de material del hábitat (suelo,
+      vegetación, madera, etc.)
+    http://rs.tdwg.org/dwcpw/values/p031: equipamiento de pesca
+    http://rs.tdwg.org/dwcpw/values/p032: contenedores de carga
+    http://rs.tdwg.org/dwcpw/values/p033: autostopista sobre o dentro de aeronave
+    http://rs.tdwg.org/dwcpw/values/p034: autostopista sobre embarcación (excluyendo
+      agua de lastre y organismos adheridos al casco)
+    http://rs.tdwg.org/dwcpw/values/p035: maquinaria/equipamiento
+    http://rs.tdwg.org/dwcpw/values/p036: personas y su equipaje/equipamiento (en
+      particular turismo)
+    http://rs.tdwg.org/dwcpw/values/p037: material orgánico de embalaje, en particular
+      embalaje de madera
+    http://rs.tdwg.org/dwcpw/values/p038: agua de lastre de embarcación
+    http://rs.tdwg.org/dwcpw/values/p039: organismos adheridos a casco de embarcación
+    http://rs.tdwg.org/dwcpw/values/p040: vehículos (automóvil, tren, etc.)
+    http://rs.tdwg.org/dwcpw/values/p041: otros medios de transporte
+    http://rs.tdwg.org/dwcpw/values/p042: vías navegables/cuencas/mares interconectados
+    http://rs.tdwg.org/dwcpw/values/p043: túneles y puentes terrestres
+    http://rs.tdwg.org/dwcpw/values/p044: dispersión natural a través de fronteras
+      de organismos exóticos invasores
+    http://rs.tdwg.org/dwcpw/values/p045: liberado en la naturaleza
+    http://rs.tdwg.org/dwcpw/values/p046: escape de confinamiento
+    http://rs.tdwg.org/dwcpw/values/p047: transporte contaminante
+    http://rs.tdwg.org/dwcpw/values/p048: polizón en transporte
+    http://rs.tdwg.org/dwcpw/values/p049: corredor
+    http://rs.tdwg.org/dwcpw/values/p051: intencional
+    http://rs.tdwg.org/dwcpw/values/p052: no intencional
+    http://rs.tdwg.org/dwcpw/values/p053: corredor y dispersión
+  fr:
+    http://rs.tdwg.org/dwcpw/values/p001: contrôle biologique
+    http://rs.tdwg.org/dwcpw/values/p002: contrôle de l’érosion
+    http://rs.tdwg.org/dwcpw/values/p003: pêche en milieu naturel
+    http://rs.tdwg.org/dwcpw/values/p004: chasse
+    http://rs.tdwg.org/dwcpw/values/p005: aménagement paysager
+    http://rs.tdwg.org/dwcpw/values/p006: conservation ou gestion de la vie sauvage
+    http://rs.tdwg.org/dwcpw/values/p007: libération pour usage
+    http://rs.tdwg.org/dwcpw/values/p008: autre libération volontaire
+    http://rs.tdwg.org/dwcpw/values/p009: agriculture (y compris les matières premières
+      des biocarburants)
+    http://rs.tdwg.org/dwcpw/values/p010: aquaculture/mariculture
+    http://rs.tdwg.org/dwcpw/values/p011: "jardin botanique/zoo/aquarium (à l'exclusion\
+      \ des aquariums domestiques)"
+    http://rs.tdwg.org/dwcpw/values/p012: plantes ornementales, animaux de compagnie,
+      organismes d’aquarium ainsi que leurs aliments vivants
+    http://rs.tdwg.org/dwcpw/values/p013: "animaux d'élevage (y compris les animaux\
+      \ laissés sous contrôle limité)"
+    http://rs.tdwg.org/dwcpw/values/p014: foresterie (y compris la reforestation)
+    http://rs.tdwg.org/dwcpw/values/p015: ferme à fourrure
+    http://rs.tdwg.org/dwcpw/values/p016: horticulture
+    http://rs.tdwg.org/dwcpw/values/p017: "usage ornemental autre que l'horticulture"
+    http://rs.tdwg.org/dwcpw/values/p018: recherche et élevage ex-situ
+    http://rs.tdwg.org/dwcpw/values/p019: nourriture et appât vivant
+    http://rs.tdwg.org/dwcpw/values/p020: autre evasion de confinement
+    http://rs.tdwg.org/dwcpw/values/p021: contaminant de matériel de pépinière
+    http://rs.tdwg.org/dwcpw/values/p022: appât contaminé
+    http://rs.tdwg.org/dwcpw/values/p023: contamination alimentaire (y compris de
+      la nourriture vivante)
+    http://rs.tdwg.org/dwcpw/values/p024: contamination des animaux (sauf les parasites
+      et les organismes transportés par un hôte/vecteur)
+    http://rs.tdwg.org/dwcpw/values/p025: "parasites d'animaux (y compris les organismes\
+      \ transportés par un hôte/vecteur)"
+    http://rs.tdwg.org/dwcpw/values/p026: contaminateur de végétaux (sauf les parasites
+      et les organismes transportés par un hôte/vecteur)
+    http://rs.tdwg.org/dwcpw/values/p027: parasites de végétaux (y compris les organismes
+      transportés par un hôte/vecteur)
+    http://rs.tdwg.org/dwcpw/values/p028: contaminant de semences
+    http://rs.tdwg.org/dwcpw/values/p029: commerce du bois
+    http://rs.tdwg.org/dwcpw/values/p030: "transport des matériaux de l'habitat (terre,\
+      \ végétation, bois, etc.)"
+    http://rs.tdwg.org/dwcpw/values/p031: équipement de pêche/pêche à la ligne
+    http://rs.tdwg.org/dwcpw/values/p032: conteneur/transport en masse de marchandises
+    http://rs.tdwg.org/dwcpw/values/p033: passager clandestin sur ou dans un avion
+    http://rs.tdwg.org/dwcpw/values/p034: "passager clandestin sur un navire/bateau\
+      \ (à l'exclusion des eaux de ballast et de la contamination de la coque)"
+    http://rs.tdwg.org/dwcpw/values/p035: machinerie/équipement
+    http://rs.tdwg.org/dwcpw/values/p036: personnes et leurs bagages/équipements (en
+      particulier les touristes)
+    http://rs.tdwg.org/dwcpw/values/p037: "matériau d'emballage organique, notamment\
+      \ en bois"
+    http://rs.tdwg.org/dwcpw/values/p038: eau de ballast des bateaux/navires
+    http://rs.tdwg.org/dwcpw/values/p039: encrassement de coque de bateau
+    http://rs.tdwg.org/dwcpw/values/p040: véhicules (voiture, train, etc.)
+    http://rs.tdwg.org/dwcpw/values/p041: autre moyen de transport
+    http://rs.tdwg.org/dwcpw/values/p042: voies navigables/bassins/mers interconnectés
+    http://rs.tdwg.org/dwcpw/values/p043: tunnels et ponts terrestres
+    http://rs.tdwg.org/dwcpw/values/p044: "dispersion naturelle d'organismes exotiques\
+      \ envahissants à travers les frontières"
+    http://rs.tdwg.org/dwcpw/values/p045: relâchement dans la nature
+    http://rs.tdwg.org/dwcpw/values/p046: fuite de confinement
+    http://rs.tdwg.org/dwcpw/values/p047: contamination lors du transport
+    http://rs.tdwg.org/dwcpw/values/p048: passager clandestin
+    http://rs.tdwg.org/dwcpw/values/p049: couloir
+    http://rs.tdwg.org/dwcpw/values/p050: sans assistance
+    http://rs.tdwg.org/dwcpw/values/p051: volontaire
+    http://rs.tdwg.org/dwcpw/values/p052: involontaire
+    http://rs.tdwg.org/dwcpw/values/p053: couloir et dispersion
+  ko:
+    http://rs.tdwg.org/dwcpw/values/p001: 생물학적 방제
+    http://rs.tdwg.org/dwcpw/values/p002: 침식 조절
+    http://rs.tdwg.org/dwcpw/values/p003: 어장
+    http://rs.tdwg.org/dwcpw/values/p004: 사냥
+    http://rs.tdwg.org/dwcpw/values/p005: 경관개선
+    http://rs.tdwg.org/dwcpw/values/p006: 보존 및 관리
+    http://rs.tdwg.org/dwcpw/values/p007: 용도를 위한 방출
+    http://rs.tdwg.org/dwcpw/values/p008: 기타 의도적 방출
+    http://rs.tdwg.org/dwcpw/values/p009: 경작(바이오에너지, 사료작물 포함)
+    http://rs.tdwg.org/dwcpw/values/p010: 수경재배/양식
+    http://rs.tdwg.org/dwcpw/values/p011: 식물원/동물원/수족관(국내용 수족관제외)
+    http://rs.tdwg.org/dwcpw/values/p012: 반려동물/수조/테라리움 사육종(생식먹이 포함)
+    http://rs.tdwg.org/dwcpw/values/p013: 사육된동물(통제되고 있는 동물 포함)
+    http://rs.tdwg.org/dwcpw/values/p014: 산림관리(조림포함)
+    http://rs.tdwg.org/dwcpw/values/p015: 모피 농장
+    http://rs.tdwg.org/dwcpw/values/p016: 원예
+    http://rs.tdwg.org/dwcpw/values/p017: 원예 이외의 장식 목적
+    http://rs.tdwg.org/dwcpw/values/p018: 연구 및 현지 외 교배(시설 내)
+    http://rs.tdwg.org/dwcpw/values/p019: 식용생물 및 생미끼
+    http://rs.tdwg.org/dwcpw/values/p020: 탈출
+    http://rs.tdwg.org/dwcpw/values/p021: 묘목재료
+    http://rs.tdwg.org/dwcpw/values/p022: 오염된 미끼
+    http://rs.tdwg.org/dwcpw/values/p023: 식품을 통한 오염물질
+    http://rs.tdwg.org/dwcpw/values/p024: 동물을 통한 감염물질
+    http://rs.tdwg.org/dwcpw/values/p025: 동물기생충(숙주를 통해 옮겨진 유기체 포함)
+    http://rs.tdwg.org/dwcpw/values/p026: 식물틀 통한 오염물질(기생동물, 숙주를 통해 옮겨진 종 제외)
+    http://rs.tdwg.org/dwcpw/values/p027: 식물 기생충
+    http://rs.tdwg.org/dwcpw/values/p028: 종자 오염물
+    http://rs.tdwg.org/dwcpw/values/p029: 목재 교역
+    http://rs.tdwg.org/dwcpw/values/p030: 서식지물질이동
+    http://rs.tdwg.org/dwcpw/values/p031: 낚시 장비
+    http://rs.tdwg.org/dwcpw/values/p032: 컨테이너/벌크
+    http://rs.tdwg.org/dwcpw/values/p033: 항공기 편승
+    http://rs.tdwg.org/dwcpw/values/p034: 배/선박 편승
+    http://rs.tdwg.org/dwcpw/values/p035: 중장비/장비류
+    http://rs.tdwg.org/dwcpw/values/p036: 인간/수화물(관광)
+    http://rs.tdwg.org/dwcpw/values/p037: 유기적 포장재료, 특히 목재 포장
+    http://rs.tdwg.org/dwcpw/values/p038: 배/선박 평형수
+    http://rs.tdwg.org/dwcpw/values/p039: 배/선박 선체 부착물
+    http://rs.tdwg.org/dwcpw/values/p040: 이동수단
+    http://rs.tdwg.org/dwcpw/values/p041: 기타이동수단
+    http://rs.tdwg.org/dwcpw/values/p042: 연결된 수로/유역/바다
+    http://rs.tdwg.org/dwcpw/values/p043: 터널 및 교량
+    http://rs.tdwg.org/dwcpw/values/p044: 침입외래생물의 국외 확산
+    http://rs.tdwg.org/dwcpw/values/p045: 방출
+    http://rs.tdwg.org/dwcpw/values/p046: 탈출
+    http://rs.tdwg.org/dwcpw/values/p047: 수송중오염물
+    http://rs.tdwg.org/dwcpw/values/p048: 수송중밀반입
+    http://rs.tdwg.org/dwcpw/values/p049: 통로
+    http://rs.tdwg.org/dwcpw/values/p050: 자력
+    http://rs.tdwg.org/dwcpw/values/p051: 의도적
+    http://rs.tdwg.org/dwcpw/values/p052: 비의도적
+    http://rs.tdwg.org/dwcpw/values/p053: 통로 및 확산
+  zh:
+    http://rs.tdwg.org/dwcpw/values/p001: 生物防治
+    http://rs.tdwg.org/dwcpw/values/p004: 狩獵

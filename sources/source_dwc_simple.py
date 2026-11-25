@@ -305,45 +305,165 @@ _DWC_ENUMS = {
 # ---------------------------------------------------------------------------
 
 _SECTION_META = {
+    # Each section defines "groups": a list of field groups.
+    # Each group has:
+    #   fields: list of camelCase local field names
+    #   bold:   True  → render at base font size, bold
+    #           False → render at base font size, normal weight
+    #   small:  True  → render at FONT_OTHER size, dimmed (least-used fields)
     "Record-Level Terms": {
-        "key_fields": ["basisOfRecord", "type", "institutionCode", "collectionCode", "license"],
         "fill": "#dae8fc", "stroke": "#6c8ebf",
+        "groups": [
+            {"fields": ["basisOfRecord", "type", "license"], "bold": True},
+            {"fields": ["institutionCode", "collectionCode", "datasetID",
+                        "institutionID", "collectionID", "datasetName"], "bold": False},
+            {"fields": ["modified", "language", "rightsHolder", "accessRights",
+                        "bibliographicCitation", "references",
+                        "informationWithheld", "dataGeneralizations",
+                        "dynamicProperties", "ownerInstitutionCode",
+                        "feedbackURL"], "bold": False},
+        ],
     },
     "Occurrence": {
-        "key_fields": ["occurrenceID", "sex", "lifeStage", "occurrenceStatus", "recordedBy"],
         "fill": "#fff2cc", "stroke": "#d6b656",
+        "groups": [
+            {"fields": ["occurrenceID", "occurrenceStatus", "recordedBy",
+                        "sex", "lifeStage"], "bold": True},
+            {"fields": ["individualCount", "organismQuantity", "organismQuantityType",
+                        "reproductiveCondition", "behavior", "vitality", "caste"], "bold": False},
+            {"fields": ["establishmentMeans", "degreeOfEstablishment", "pathway"], "bold": False},
+            {"fields": ["catalogNumber", "recordNumber", "recordedByID",
+                        "georeferenceVerificationStatus", "associatedMedia",
+                        "associatedOccurrences", "associatedReferences",
+                        "associatedTaxa", "otherCatalogNumbers",
+                        "occurrenceRemarks"], "bold": False},
+        ],
     },
     "Organism": {
-        "key_fields": ["organismID", "organismName", "associatedOrganisms"],
         "fill": "#f8cecc", "stroke": "#b85450",
+        "groups": [
+            {"fields": ["organismID", "organismName"], "bold": True},
+            {"fields": ["organismScope", "associatedOrganisms"], "bold": False},
+            {"fields": ["previousIdentifications", "organismRemarks"], "bold": False},
+        ],
     },
     "Material Entity": {
-        "key_fields": ["materialEntityID", "materialEntityType", "preparations", "disposition"],
         "fill": "#ffe6cc", "stroke": "#d79b00",
+        "groups": [
+            {"fields": ["materialEntityID", "materialEntityType",
+                        "preparations", "disposition"], "bold": True},
+            {"fields": ["materialEntityCategory", "materialDescription",
+                        "verbatimLabel", "materialRole"], "bold": False},
+            {"fields": ["digitalSpecimenID", "isPartOfMaterialEntityID",
+                        "materialProportion", "objectQuantity", "objectQuantityType",
+                        "verbatimMass", "measuredMassInGrams",
+                        "handlingRequirements", "hazardType", "hazardRemarks",
+                        "damageRemarks", "treatments", "substrate",
+                        "materialEntityRemarks"], "bold": False},
+        ],
     },
     "Material Sample": {
-        "key_fields": ["materialSampleID"],
         "fill": "#e1d5e7", "stroke": "#9673a6",
+        "groups": [
+            {"fields": ["materialSampleID"], "bold": True},
+        ],
     },
     "Event (Collection / Observation)": {
-        "key_fields": ["eventDate", "habitat", "samplingProtocol", "eventType", "eventID"],
         "fill": "#c8f0d8", "stroke": "#339966",
+        "groups": [
+            {"fields": ["eventID", "eventDate", "eventType", "habitat", "samplingProtocol"], "bold": True},
+            {"fields": ["parentEventID", "year", "month", "day",
+                        "sampledSubstrateCategory", "sampledSubstrateLayer",
+                        "sampleSizeValue", "sampleSizeUnit", "samplingEffort",
+                        "eventCategory"], "bold": False},
+            {"fields": ["fieldNumber", "verbatimEventDate", "eventTime",
+                        "startDayOfYear", "endDayOfYear",
+                        "fieldNotes", "isVegetationCoverReported",
+                        "reportedExtremeConditions", "reportedWeather",
+                        "eventDurationValue", "eventDurationUnit",
+                        "eventRemarks"], "bold": False},
+        ],
     },
     "Location (Geography)": {
-        "key_fields": ["decimalLatitude", "decimalLongitude", "country", "locality", "geodeticDatum"],
         "fill": "#c0e0ff", "stroke": "#3366cc",
+        "groups": [
+            {"fields": ["locationID"], "bold": True},
+            {"fields": ["decimalLatitude", "decimalLongitude", "geodeticDatum",
+                        "coordinateUncertaintyInMeters"], "bold": True},
+            {"fields": ["country", "stateProvince", "locality"], "bold": True},
+            {"fields": ["countryCode", "county", "municipality",
+                        "continent", "waterBody", "island", "islandGroup"], "bold": False},
+            {"fields": ["minimumElevationInMeters", "maximumElevationInMeters",
+                        "minimumDepthInMeters", "maximumDepthInMeters",
+                        "verticalDatum"], "bold": False},
+            {"fields": ["georeferencedBy", "georeferenceProtocol",
+                        "georeferenceRemarks", "footprintWKT", "footprintSRS"], "bold": False},
+            {"fields": ["higherGeographyID", "higherGeography", "namedPlace",
+                        "verbatimLocality", "verbatimElevation", "verbatimDepth",
+                        "verbatimLatitude", "verbatimLongitude",
+                        "verbatimCoordinates", "verbatimCoordinateSystem", "verbatimSRS",
+                        "coordinatePrecision", "pointRadiusSpatialFit", "footprintSpatialFit",
+                        "georeferencedDate", "georeferenceSources",
+                        "locationAccordingTo", "locationRemarks",
+                        "preferredSpatialRepresentation",
+                        "minimumDistanceAboveSurfaceInMeters",
+                        "maximumDistanceAboveSurfaceInMeters",
+                        "siteNumber"], "bold": False},
+        ],
     },
     "Geological Context": {
-        "key_fields": ["formation", "member", "bed", "earliestEpochOrLowestSeries"],
         "fill": "#fff0b0", "stroke": "#cc9900",
+        "groups": [
+            {"fields": ["geologicalContextID", "formation", "member", "bed", "group"], "bold": True},
+            {"fields": ["earliestEpochOrLowestSeries", "latestEpochOrHighestSeries",
+                        "earliestAgeOrLowestStage", "latestAgeOrHighestStage"], "bold": False},
+            {"fields": ["earliestEonOrLowestEonothem", "latestEonOrHighestEonothem",
+                        "earliestEraOrLowestErathem", "latestEraOrHighestErathem",
+                        "earliestPeriodOrLowestSystem", "latestPeriodOrHighestSystem",
+                        "lowestBiostratigraphicZone", "highestBiostratigraphicZone",
+                        "lithostratigraphicTerms", "geologicEvent",
+                        "geologicProvince", "lithodemicUnit",
+                        "tectonicUnits"], "bold": False},
+        ],
     },
     "Identification (Taxonomic)": {
-        "key_fields": ["identifiedBy", "identificationQualifier", "typeStatus", "dateIdentified"],
         "fill": "#ffd8d8", "stroke": "#cc3333",
+        "groups": [
+            {"fields": ["identificationID", "identifiedBy", "typeStatus",
+                        "identificationQualifier", "dateIdentified"], "bold": True},
+            {"fields": ["verbatimIdentification",
+                        "identificationVerificationStatus", "isAcceptedIdentification",
+                        "taxonFormula", "identifiedByID"], "bold": False},
+            {"fields": ["identificationType", "identificationReferences",
+                        "taxonSortOrder", "identificationRemarks"], "bold": False},
+        ],
     },
     "Taxon (Classification)": {
-        "key_fields": ["scientificName", "taxonRank", "kingdom→family", "NCBITaxon recommended"],
         "fill": "#d5e8d4", "stroke": "#82b366",
+        "groups": [
+            # Primary identifiers — taxonID first as the category ID
+            {"fields": ["taxonID", "scientificName", "taxonRank"], "bold": True},
+            # Infraspecific / cultivar epithets
+            {"fields": ["specificEpithet", "infraspecificEpithet", "cultivarEpithet"], "bold": True},
+            # Authorship and nomenclatural status
+            {"fields": ["scientificNameAuthorship", "taxonConceptID",
+                        "taxonomicStatus", "nomenclaturalCode",
+                        "nomenclaturalStatus", "vernacularName",
+                        "verbatimTaxonRank"], "bold": False},
+            # Higher taxonomy (not needed when scientificName/taxonID provided)
+            {"fields": ["kingdom", "phylum", "class", "order", "superfamily",
+                        "family", "subfamily", "tribe", "subtribe",
+                        "genus", "genericName", "subgenus",
+                        "infragenericEpithet"], "bold": False},
+            # Reference / provenance — small font
+            {"fields": ["scientificNameID", "acceptedNameUsage", "acceptedNameUsageID",
+                        "parentNameUsage", "parentNameUsageID",
+                        "originalNameUsage", "originalNameUsageID",
+                        "higherClassification",
+                        "nameAccordingTo", "nameAccordingToID",
+                        "namePublishedIn", "namePublishedInID", "namePublishedInYear",
+                        "taxonRemarks"], "bold": False},
+        ],
     },
 }
 
@@ -560,104 +680,194 @@ def _check_xsd_fields(key, source, config_file):
 def _generate_drawio_diagram(output_path, sections=None):
     """Generate a draw.io diagram file for the DWC Simple Record structure.
 
-    Writes an A3-landscape .drawio file with the Darwin Core Simple Record
-    as the central ellipse and 10 category boxes arranged in a rectangular
-    grid around it.  For other section counts falls back to a radial layout.
+    Writes a .drawio file with the Darwin Core Simple Record as the central
+    ellipse and 10 category boxes arranged in a rectangular grid around it.
+    Each box renders fields using semantic groups defined in _SECTION_META:
+    bold for high-priority fields, normal for secondary fields, and a smaller
+    dimmed font for rarely-used reference/provenance fields.  Box heights and
+    page height are computed dynamically from actual field counts.
+
+    Layout rule: sections with fewer fields sit above the centre line so the
+    top half of the diagram stays compact.  Taxon (40 fields) and Location
+    (47 fields) are placed in the bottom half; Material Sample (1 field) is
+    placed in the top half.  This is achieved by swapping the x-positions
+    for grid slots 4 (Material Sample) and 9 (Taxon) relative to the TSV
+    section order.
+
+    Falls back to a radial layout for non-standard section counts.
     """
     if sections is None:
         sections = _parse_txt_file()
 
-    page_w, page_h = 1654, 1169
-    box_w, box_h = 220, 130
+    # --- Typography constants ---
+    FONT_TITLE   = 14   # px — section title (larger than field text)
+    FONT_KEY     = 11   # px — base cell fontSize (bold and normal lines)
+    FONT_OTHER   = 9    # px — small/dimmed lines (least-used fields)
+    LH_TITLE     = 22   # line-height for section title (accommodates 14px font)
+    LH_KEY       = 15   # line-height per bold/normal field line
+    LH_OTHER     = 12   # line-height per small-font field line
+    PAD_TOP      = 8    # top padding inside each box
+    BOX_MIN_H    = 60   # minimum box height (px)
 
-    # Rectangular grid positions (x, y) for 10 sections arranged clockwise
-    # from top-left.  Index matches section order in the TSV.
-    _GRID_POSITIONS = [
-        (711, 320),   # s0  Record-Level Terms  — top centre-right
-        (952, 320),   # s1  Occurrence           — top right
-        (1210, 395),  # s2  Organism             — right top
-        (1210, 642),  # s3  Material Entity      — right bottom
-        (952, 700),   # s4  Material Sample      — bottom right
-        (711, 700),   # s5  Event               — bottom centre
-        (470, 700),   # s6  Location            — bottom left
-        (205, 642),   # s7  Geological Context   — left bottom (wider box)
-        (220, 395),   # s8  Identification       — left top
-        (470, 320),   # s9  Taxon               — top left
-    ]
-    # s7 (Geological Context) needs extra width for long field names
-    _WIDE_SECTIONS = {7: 250}
+    # --- Layout constants ---
+    page_w    = 1654
+    CENTER_W  = 193
+    CENTER_H  = 110
+    CENTER_X  = 725
+    MARGIN    = 30    # top/bottom page margin
+    GAP       = 30    # gap between box edges and centre ellipse
+    default_w = 220
 
-    section_names = [s["section"] for s in sections]
-    n_sections    = len(section_names)
-    use_grid      = (n_sections == len(_GRID_POSITIONS))
+    # --- x-positions for each section index ---
+    # Layout rules:
+    #   • Sections with fewer fields go above the centre line (smaller boxes).
+    #   • Record-Level Terms sits to the right of Identification (same y-tier).
+    #   • Material Entity is above centre (upper-right); Organism is below (lower-right).
+    #   • Geological Context is above centre (top-left); Material Sample is below (lower-left).
+    _GRID_X = [711, 952, 1210, 1210, 220, 711, 470, 470, 220, 952]
+    #           s0   s1   s2    s3    s4   s5   s6   s7   s8   s9
+    # s4 Material Sample  → lower-left  x=220 (horizontally centred with Identification s8)
+    # s7 Geological Context → top-left  x=470
 
+    # Tier membership by section index (10-section grid)
+    _TOP    = {1, 7}      # Occurrence, Geological Context — top row above centre
+    _UPPER  = {0, 3, 8}   # Record-Level, Material Entity, Identification — upper tier
+    _LOWER  = {2, 4}      # Organism, Material Sample — lower tier
+    _BOTTOM = {5, 6, 9}   # Event, Location, Taxon — bottom row below centre
+    _ABOVE  = _TOP | _UPPER   # all sections above the centre ellipse
+    _BELOW  = _LOWER | _BOTTOM  # all sections below the centre ellipse
+
+    n_sections = len(sections)
+    use_grid   = (n_sections == 10)
+
+    # --- Per-section: compute dynamic height from semantic groups ---
+    sec_info = []
+    for i, sec in enumerate(sections[:10] if use_grid else sections):
+        meta   = _SECTION_META.get(sec["section"],
+                                   {"groups": [], "fill": "#f5f5f5", "stroke": "#666666"})
+        groups = meta.get("groups", [])
+
+        h = PAD_TOP + LH_TITLE
+        for grp in groups:
+            h += len(grp["fields"]) * (LH_OTHER if grp.get("small") else LH_KEY)
+        h = int(h * 0.92)
+        h = max(h, BOX_MIN_H)
+
+        sec_info.append({
+            "section": sec["section"],
+            "meta":    meta,
+            "groups":  groups,
+            "height":  h,
+        })
+
+    # --- Dynamic y-layout (10-section grid only) ---
+    if use_grid:
+        max_above_h = max(sec_info[i]["height"] for i in _ABOVE)
+        max_below_h = max(sec_info[i]["height"] for i in _BELOW)
+
+        # All above-centre boxes share the same top y; centre sits below the tallest one.
+        # GAP_ABOVE is set to 5px: upper boxes pulled ~40px closer to the oval vs the
+        # original GAP (30px) by reducing that clearance to a visual minimum.
+        GAP_ABOVE     = 5
+        y_above       = MARGIN
+        center_y      = y_above + max_above_h + GAP_ABOVE
+        center_bottom = center_y + CENTER_H
+        # All below-centre boxes share the same top y.
+        y_below       = center_bottom + GAP
+
+        page_h = y_above + max_above_h + GAP_ABOVE + CENTER_H + GAP + max_below_h + MARGIN
+
+        def get_y(i):
+            return y_above if i in _ABOVE else y_below
+
+        cnode_x, cnode_y = CENTER_X, center_y
+
+    else:
+        # Radial fallback for non-standard section counts
+        page_h  = 1169
+        cnode_x = page_w // 2 - CENTER_W // 2
+        cnode_y = page_h // 2 - CENTER_H // 2
+
+    # --- Build XML ---
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         (f'<mxGraphModel dx="1475" dy="1159" grid="0" gridSize="10" guides="1" '
          f'tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" '
          f'pageWidth="{page_w}" pageHeight="{page_h}" math="0" shadow="0">'),
         "  <root>",
-        "    <mxCell id=\"0\"/>",
-        "    <mxCell id=\"1\" parent=\"0\"/>",
+        '    <mxCell id="0"/>',
+        '    <mxCell id="1" parent="0"/>',
     ]
 
     edge_style_base = (
         "edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;"
-        "jettySize=auto;strokeWidth=2;fontSize=17;"
+        "jettySize=auto;strokeWidth=2;fontSize=14;"
     )
 
-    for i, sec_name in enumerate(section_names):
+    for i, info in enumerate(sec_info):
+        sec_name = info["section"]
+        meta     = info["meta"]
+        groups   = info["groups"]
+        h        = info["height"]
+        fill     = meta["fill"]
+        stroke   = meta["stroke"]
+
         if use_grid:
-            sec_x, sec_y = _GRID_POSITIONS[i]
-            w = _WIDE_SECTIONS.get(i, box_w)
+            sec_x = _GRID_X[i]
+            sec_y = get_y(i)
+            w     = default_w
         else:
-            # Radial fallback for non-standard section counts
             cx, cy = page_w // 2, page_h // 2
-            radius = 400
             angle  = -math.pi / 2 + 2 * math.pi * i / n_sections
-            sec_x  = int(cx + radius * math.cos(angle) - box_w / 2)
-            sec_y  = int(cy + radius * math.sin(angle) - box_h / 2)
-            w = box_w
+            sec_x  = int(cx + 400 * math.cos(angle) - default_w / 2)
+            sec_y  = int(cy + 400 * math.sin(angle) - BOX_MIN_H / 2)
+            w      = default_w
 
-        meta       = _SECTION_META.get(sec_name, {"key_fields": [], "fill": "#f5f5f5", "stroke": "#666666"})
-        fill       = meta["fill"]
-        stroke     = meta["stroke"]
-        key_fields = meta.get("key_fields", [])[:5]
-
-        kf_html    = "".join(f"&lt;br/&gt;• {kf}" for kf in key_fields)
-        short_name = re.sub(r'\s*\(.*?\)', '', sec_name).strip()
-        label      = f"&lt;b&gt;{short_name}&lt;/b&gt;" + kf_html
+        # Build HTML label: larger bold title + per-group field lines
+        short_name  = re.sub(r'\s*\(.*?\)', '', sec_name).strip()
+        label_parts = [
+            f"&lt;font style='font-size:{FONT_TITLE}px;'&gt;&lt;b&gt;{short_name}&lt;/b&gt;&lt;/font&gt;"
+        ]
+        for grp in groups:
+            is_bold  = grp.get("bold", False)
+            is_small = grp.get("small", False)
+            fields   = grp["fields"]
+            if is_small:
+                inner = "&lt;br/&gt;".join(f"• {f}" for f in fields)
+                label_parts.append(
+                    f"&lt;br/&gt;&lt;font style='font-size:{FONT_OTHER}px;"
+                    f"color:#555555;'&gt;{inner}&lt;/font&gt;"
+                )
+            elif is_bold:
+                for f in fields:
+                    label_parts.append(f"&lt;br/&gt;&lt;b&gt;• {f}&lt;/b&gt;")
+            else:
+                for f in fields:
+                    label_parts.append(f"&lt;br/&gt;• {f}")
+        label = "".join(label_parts)
 
         sec_id    = f"s{i}"
         sec_style = (
             f"rounded=1;whiteSpace=wrap;html=1;arcSize=10;shadow=1;"
             f"fillColor={fill};strokeColor={stroke};strokeWidth=2;"
-            f"verticalAlign=top;align=left;spacingLeft=5;fontSize=17;"
+            f"verticalAlign=top;align=left;spacingLeft=5;fontSize={FONT_KEY};"
         )
         lines.append(
             f'    <mxCell id="{sec_id}" value="{label}" style="{sec_style}" '
             f'parent="1" vertex="1">'
-            f'<mxGeometry x="{sec_x}" y="{sec_y}" width="{w}" height="{box_h}" as="geometry"/>'
+            f'<mxGeometry x="{sec_x}" y="{sec_y}" width="{w}" height="{h}" as="geometry"/>'
             f'</mxCell>'
         )
 
-        # Edge from centre to section — no fixed entry/exit points so draw.io
-        # auto-snaps the connector to the nearest point on each shape.
         e_style = edge_style_base + f"strokeColor={stroke};"
         lines.append(
             f'    <mxCell id="e{i}" style="{e_style}" parent="1" '
-            f'source="c0" target="{sec_id}" edge="1">'
+            f'source="c0" target="s{i}" edge="1">'
             f'<mxGeometry relative="1" as="geometry"/>'
             f'</mxCell>'
         )
 
-    # Centre node last so section edges resolve cleanly
-    if use_grid:
-        cnode_x, cnode_y, cnode_w, cnode_h = 725, 530, 193, 110
-    else:
-        cx, cy = page_w // 2, page_h // 2
-        cnode_x, cnode_y, cnode_w, cnode_h = cx - 97, cy - 55, 193, 110
-
+    # Centre node written last so edges resolve cleanly
     center_style = (
         "ellipse;whiteSpace=wrap;html=1;"
         "fillColor=#0050ef;fontColor=#ffffff;strokeColor=#001DBC;"
@@ -666,14 +876,11 @@ def _generate_drawio_diagram(output_path, sections=None):
     lines.append(
         f'    <mxCell id="c0" value="Darwin Core Simple Record" '
         f'style="{center_style}" parent="1" vertex="1">'
-        f'<mxGeometry x="{cnode_x}" y="{cnode_y}" width="{cnode_w}" height="{cnode_h}" as="geometry"/>'
+        f'<mxGeometry x="{cnode_x}" y="{cnode_y}" width="{CENTER_W}" height="{CENTER_H}" as="geometry"/>'
         f'</mxCell>'
     )
 
-    lines += [
-        "  </root>",
-        "</mxGraphModel>",
-    ]
+    lines += ["  </root>", "</mxGraphModel>"]
 
     with open(output_path, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines))
@@ -1034,7 +1241,7 @@ def process_dwc_simple_source(key, source, config_file=MENU_CONFIG):
                     primary = enums[0]
                     enum_def = _DWC_ENUMS.get(primary, {})
                     if "examples" in enum_def and "permissible_values" not in enum_def:
-                        slot["examples"] = enum_def["examples"]
+                        slot["examples"] = [{"value": s} for s in enum_def["examples"]]
 
             slots[slot_name] = slot
 
