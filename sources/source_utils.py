@@ -193,7 +193,7 @@ def fetch_html(url):
 
 
 def add_permissible_value(permissible_values, code, *, title=None, description=None,
-                          is_a=None, status=None, comments=None,
+                          is_a=None, mixins=None, status=None, comments=None,
                           meaning=None, prefixes=None, exact_mappings=None,
                           broad_mappings=None):
     """Add one permissible value entry to *permissible_values* in-place.
@@ -207,7 +207,9 @@ def add_permissible_value(permissible_values, code, *, title=None, description=N
     code:            The permissible value code (used as the dict key).
     title:           Human-readable label.
     description:     Free-text definition.
-    is_a:            Parent code for hierarchy.
+    is_a:            Primary parent code for hierarchy.
+    mixins:          List of additional parent codes (for multi-parent placement,
+                     e.g. a lake that spans two provinces).
     status:          Status string (e.g. 'ACTIVE').
     comments:        Additional commentary (LOINC-specific).
     meaning:         IRI for the concept; compressed to a CURIE when prefixes is provided.
@@ -222,6 +224,7 @@ def add_permissible_value(permissible_values, code, *, title=None, description=N
             entry["title"] = title
     if description: entry["description"] = normalize_text(description)
     if is_a:        entry["is_a"]        = is_a
+    if mixins:      entry["mixins"]      = list(mixins)
     if status:      entry["status"]      = status
     if comments:    entry["comments"]    = normalize_text(comments)
     if meaning:
@@ -606,11 +609,18 @@ _RANK_PREFIX_PAT = re.compile(r'^([A-Za-z]*[._-]?)(\d+)(?:\s|$)')
 
 
 def rank_and_sort_permissible_values(permissible_values, sort_unranked=False):
-    """Detect consecutive numeric prefix patterns within is_a sibling groups,
+    """Detect consecutive numeric prefix patterns within sibling groups,
     add a 'rank' attribute to each matched permissible value, and return a
     reordered dict.
 
-    For each group of PVs sharing the same is_a parent (or sharing no is_a):
+    Sibling groups are determined by the primary ordering parent of each PV:
+      - is_a takes precedence; fallback to mixins[0]; fallback to None.
+    PVs that have no is_a but carry a mixins list are therefore placed after
+    their first mixin parent in the output ordering rather than floating to
+    the top-level group, so that rendering engines (DataHarmonizer,
+    SchemaEditor) can display them under their mixin parent in the picklist.
+
+    For each sibling group:
       - Extract any leading code of the form '{letters}{sep}{digits}' or bare
         '{digits}' from the title (e.g. 'LP.07', '3').
       - If at least two items in the group share the same prefix and their
@@ -630,12 +640,16 @@ def rank_and_sort_permissible_values(permissible_values, sort_unranked=False):
     """
     from collections import defaultdict
 
-    # Group PV keys by their is_a value (None for items with no is_a)
+    # Group PV keys by their primary ordering parent:
+    # is_a takes precedence; fallback to mixins[0]; fallback to None.
+    # This ensures PVs with no is_a but with mixins are ordered after
+    # their mixin parent rather than floating to the top-level (None) group.
     groups = defaultdict(list)  # parent_or_None -> [curie, ...]
     group_order = []            # first-seen order of each parent key
 
     for curie, pv in permissible_values.items():
-        parent = pv.get("is_a")
+        _mixins = pv.get("mixins") or []
+        parent = pv.get("is_a") or (_mixins[0] if _mixins else None)
         if parent not in groups:
             group_order.append(parent)
         groups[parent].append(curie)
