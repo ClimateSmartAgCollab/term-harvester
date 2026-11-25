@@ -15,6 +15,7 @@ FR for enums it already knows; the SSSOM file covers the remainder.
 Usage:
     python postharvest.py [--calibrate] [--build] [--compare]
                                   [--add SchemaEnumKey:json_picklist_key]
+                                  [--add-flat SchemaEnumKey:json_picklist_key]
         --calibrate  Write/refresh agrifoodca_mapping.yaml and agrifoodca_sssom.tsv
                      from schema.yaml + existing entry_code_picklists.json.
         --build      Produce entry_code_picklists.json from schema.yaml +
@@ -23,6 +24,12 @@ Usage:
                      existing entry_code_picklists.json without writing the file.
         --add        Register a schema enum as a new JSON picklist entry, populate
                      all permissible values from schema.yaml, and rebuild the JSON.
+                     Format: SchemaEnumKey:json_picklist_key
+        --add-flat   Same as --add but sets flatten: true in the mapping entry so
+                     that --build walks each permissible value's is_a chain and
+                     prefixes the title with ancestor titles separated by " - ".
+                     Permissible values are NOT pre-populated in the mapping (they
+                     are computed dynamically from schema.yaml on each --build).
                      Format: SchemaEnumKey:json_picklist_key
 
 Files (all relative to this script's directory):
@@ -47,7 +54,7 @@ import sys
 import yaml
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
-_SCHEMA_PATH   = os.path.join(_DIR, "schema.yaml")
+_SCHEMA_PATH   = os.path.join(_DIR, "agrifoodca_schema.yaml")
 _JSON_PATH     = os.path.join(_DIR, "entry_code_picklists.json")
 _MAPPING_PATH  = os.path.join(_DIR, "agrifoodca_mapping.yaml")
 _SSSOM_PATH    = os.path.join(_DIR, "agrifoodca_sssom.tsv")
@@ -192,6 +199,68 @@ def _load_sssom_raw_rows():
         if subject and label:
             rows.append((subject, label))
     return rows
+
+
+# ---------------------------------------------------------------------------
+# Flattened-title helpers (for flatten: true mapping entries)
+# ---------------------------------------------------------------------------
+
+def _build_pv_lookup(schema_enums):
+    """Return a merged {pv_key: pv_data} dict from every enum in schema_enums.
+
+    Used to resolve cross-enum is_a references when building flattened titles.
+    When the same key appears in multiple enums, an entry with a 'meaning' wins
+    over one without (grouping headers never displace QID-backed entries).
+    """
+    merged = {}
+    for enum_data in schema_enums.values():
+        for pv_key, pv_data in ((enum_data or {}).get("permissible_values") or {}).items():
+            if pv_key not in merged or (pv_data or {}).get("meaning"):
+                merged[pv_key] = pv_data or {}
+    return merged
+
+
+def _flatten_pv_title(pv_key, leaf_title, enum_pvs, pv_lookup):
+    """Walk the is_a chain of pv_key and return a hierarchically prefixed title.
+
+    enum_pvs is consulted first (enum-specific is_a context), then pv_lookup
+    (cross-enum ancestor resolution).  This matters for QIDs shared between a
+    flat enum (e.g. GeoWikiWaterbody, no is_a) and a hierarchical enum (e.g.
+    GeoWikiCountryWatersCA, is_a: Q16): the flat enum must not shadow the richer
+    is_a information carried by the hierarchical enum.
+
+    Ancestors that have a 'meaning' field are included in the prefix; grouping
+    headers without a 'meaning' (e.g. 'Province of Canada') are skipped.
+    Walking stops when a PV has no is_a or a cycle is detected.
+
+    Examples:
+        Q4878005 (Beaver County, is_a Q1951 → Alberta, is_a "Province of Canada")
+            → "Alberta - Beaver County"
+        Q271730 (Abbotsford, is_a Q1249798 → Fraser Valley RD, is_a Q1973 → BC)
+            → "British Columbia - Fraser Valley Regional District - Abbotsford"
+        Q4546464 (103 Mile Lake, is_a Q16 → Canada, no further is_a)
+            → "Canada - 103 Mile Lake"
+        Q13924 (Adriatic Sea, no is_a in GeoWikiWaterbody)
+            → "Adriatic Sea"
+    """
+    ancestors = []
+    visited = {pv_key}
+    # Use enum_pvs first so each enum's own is_a wiring takes precedence over
+    # whatever the global pv_lookup may have from a different enum for the same QID.
+    current_data = enum_pvs.get(pv_key) or pv_lookup.get(pv_key) or {}
+    parent_key = current_data.get("is_a")
+    while parent_key and parent_key not in visited:
+        visited.add(parent_key)
+        parent_data = enum_pvs.get(parent_key) or pv_lookup.get(parent_key) or {}
+        if parent_data.get("meaning"):
+            ancestors.append(parent_data.get("title") or parent_key)
+        current_data = parent_data
+        parent_key = current_data.get("is_a")
+    if not ancestors:
+        return leaf_title
+    # Ancestors collected bottom-up; reverse for top-down prefix.
+    prefix = " - ".join(reversed(ancestors))
+    return f"{prefix} - {leaf_title}"
 
 
 # ---------------------------------------------------------------------------
@@ -477,15 +546,21 @@ def generate_mapping():
 # --add: register a new schema enum as a JSON picklist entry
 # ---------------------------------------------------------------------------
 
-def add_enum(add_arg):
+def add_enum(add_arg, flat=False):
     """Add a new schema enum → JSON picklist entry, then rebuild the JSON.
 
     add_arg format: "SchemaEnumKey:json_picklist_key"
 
-    Adds the pair to schema_to_json, creates the enum entry in enums with all
-    permissible values pre-populated from schema.yaml, writes the mapping file,
-    and calls build_json() to update entry_code_picklists.json.
+    Adds the pair to schema_to_json, creates the enum entry in enums, writes
+    the mapping file, and calls build_json() to update entry_code_picklists.json.
     Keywords, category, and source must be filled in manually afterwards.
+
+    When flat=True the entry gets flatten: true and permissible_values are NOT
+    pre-populated; flattened titles are computed dynamically from the is_a chain
+    during --build using _flatten_pv_title.  Use this for large hierarchical enums
+    (GeoWikiAdm2CA, GeoWikiAdm3CA, GeoWikiCountryWatersCA, etc.) where storing
+    thousands of PV overrides in the mapping file would be impractical.
+    When flat=False all permissible values are pre-populated with their EN titles.
     """
     if ":" not in add_arg:
         print("Error: --add argument must be 'SchemaEnumKey:json_picklist_key'",
@@ -526,16 +601,22 @@ def add_enum(add_arg):
     has_fr     = bool(fr_pvs) or bool(fr_meta)
     languages  = ["en", "fr"] if has_fr else ["en"]
 
-    # Pre-populate all PV codes with their EN titles from schema for user visibility.
-    pv_map = {
-        pv_key: {"en": (pv_data or {}).get("title") or pv_key}
-        for pv_key, pv_data in schema_pvs.items()
-    }
+    # Pre-populate all PV codes with their EN titles from schema for user visibility,
+    # unless flat=True (titles computed dynamically from is_a chain during --build).
+    if flat:
+        pv_map = {}
+    else:
+        pv_map = {
+            pv_key: {"en": (pv_data or {}).get("title") or pv_key}
+            for pv_key, pv_data in schema_pvs.items()
+        }
 
     entry = {}
     if schema_enum_key != json_key:
         entry["schema_key"] = schema_enum_key
     entry["id"]        = next_id
+    if flat:
+        entry["flatten"] = True
     entry["category"]  = "general"
     entry["languages"] = languages
     if pv_map:
@@ -563,7 +644,8 @@ def add_enum(add_arg):
             print(f"  Added {len(new_sssom_rows)} FR enum translation(s) to {_SSSOM_PATH}")
 
     title = (senum or {}).get("title") or schema_enum_key
-    print(f"Added '{schema_enum_key}' → '{json_key}' (id {next_id}, {len(pv_map)} PVs,"
+    flatten_note = ", flatten: true" if flat else f", {len(pv_map)} PVs pre-populated"
+    print(f"Added '{schema_enum_key}' → '{json_key}' (id {next_id}{flatten_note},"
           f" title: {title!r})")
     print(f"  Add keywords/category/source to {_MAPPING_PATH} as needed, then run --build.")
     build_json()
@@ -579,6 +661,7 @@ def _build_output():
     schema_enums = schema.get("enums") or {}
     fr_pvs   = _schema_fr_pvs(schema)
     sssom_fr = _load_sssom()   # {json_key: {code: fr_label}}
+    pv_lookup = _build_pv_lookup(schema_enums)   # for flatten: true titles
 
     raw = _load_mapping_raw()
     # New format has schema_to_json + enums keys; legacy format was a bare enum dict.
@@ -615,7 +698,11 @@ def _build_output():
             # Schema PV key: use explicit override, else try code directly, else positional
             pv_schema_key = pv_over.get("schema_key", code)
             schema_pv = schema_pvs.get(pv_schema_key) or {}
-            en_title = pv_over.get("en") or schema_pv.get("title") or pv_schema_key or code
+            if entry.get("flatten") and not pv_over.get("en"):
+                raw_title = schema_pv.get("title") or pv_schema_key or code
+                en_title = _flatten_pv_title(pv_schema_key, raw_title, schema_pvs, pv_lookup)
+            else:
+                en_title = pv_over.get("en") or schema_pv.get("title") or pv_schema_key or code
 
             row = {"Code": code, "en": en_title}
 
@@ -722,10 +809,15 @@ def main():
                              " without writing the file")
     parser.add_argument("--add", metavar="SCHEMA_KEY:JSON_KEY",
                         help="Add a schema enum as a new picklist entry and rebuild the JSON")
+    parser.add_argument("--add-flat", metavar="SCHEMA_KEY:JSON_KEY",
+                        help="Add a schema enum with flatten: true (is_a-prefixed titles,"
+                             " no PV pre-population) and rebuild the JSON")
     args = parser.parse_args()
 
     if args.add:
         add_enum(args.add)
+    elif args.add_flat:
+        add_enum(args.add_flat, flat=True)
     else:
         if args.calibrate:
             generate_mapping()

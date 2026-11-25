@@ -14,7 +14,7 @@ schema_to_json:
   AgriFoodCA_ConceptAwareness: concept_awareness
   AgriFoodCA_DataQualityCodes: data_quality_codes
   AgriFoodCA_Days: days
-  STATSCAN_1313722: education_level_stats_can
+  STATSCAN_HighestLevelEducation: education_level_stats_can
   AgriFoodCA_EducationLevel: education_level
   AgriFoodCA_EightPointCardinality: eight_point_cardinality
   AgriFoodCA_Frequency: frequency
@@ -49,6 +49,10 @@ schema_to_json:
   AgriFoodCA_ThirtyTwoPointCardinality: thirty_two_point_cardinality
   NSDB_WATERTBL: water_table_characteristics
   TAXRANK_0000000: TaxonomicRank
+  GeoWikiAdm2CA: GeoWikiAdm2CA
+  GeoWikiAdm3CA: GeoWikiAdm3CA
+  GeoWikiCountryWatersCA: GeoWikiCountryWatersCA
+  GeoWikiWaterbody: GeoWikiWaterbody
 enums:
   agreement_scale:
     schema_key: AgriFoodCA_AgreementScale
@@ -228,7 +232,7 @@ enums:
         en: Sunday
         was_en: Sun
   education_level_stats_can:
-    schema_key: STATSCAN_1313722
+    schema_key: STATSCAN_HighestLevelEducation
     id: 7
     name:
       en: Highest level of education (Statistics Canada)
@@ -1005,3 +1009,29 @@ enums:
         en: subcohort
       TAXRANK:0001013:
         en: realm
+  GeoWikiAdm2CA:
+    id: 42
+    flatten: true
+    category: general
+    languages:
+    - en
+  GeoWikiAdm3CA:
+    id: 43
+    flatten: true
+    category: general
+    languages:
+    - en
+  GeoWikiCountryWatersCA:
+    id: 44
+    flatten: true
+    category: general
+    languages:
+    - en
+    - fr
+  GeoWikiWaterbody:
+    id: 45
+    flatten: true
+    category: general
+    languages:
+    - en
+    - fr
