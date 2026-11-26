@@ -53,6 +53,12 @@ schema_to_json:
   GeoWikiAdm3CA: GeoWikiAdm3CA
   GeoWikiCountryWatersCA: GeoWikiCountryWatersCA
   GeoWikiWaterbody: GeoWikiWaterbody
+  GeoWikiAdm1CA: GeoWikiAdm1CA
+  GeoWikiContinent: GeoWikiContinent
+  GeoWikiCountry: GeoWikiCountry
+  GeoWikiCountryExtended: GeoWikiCountryExtended
+  GeoWikiFirstNationsCA: GeoWikiFirstNationsCA
+  GeoWikiOcean: GeoWikiOcean
 enums:
   agreement_scale:
     schema_key: AgriFoodCA_AgreementScale
@@ -1032,6 +1038,52 @@ enums:
     id: 45
     flatten: true
     category: general
+    languages:
+    - en
+    - fr
+  GeoWikiAdm1CA:
+    id: 46
+    flatten: true
+    category: geopolitical
+    source: https://wikidata.org
+    languages:
+    - en
+  GeoWikiContinent:
+    id: 47
+    flatten: true
+    category: geopolitical
+    source: https://wikidata.org
+    languages:
+    - en
+    - fr
+  GeoWikiCountry:
+    id: 48
+    flatten: true
+    category: geopolitical
+    source: https://wikidata.org
+    languages:
+    - en
+    - fr
+  GeoWikiCountryExtended:
+    id: 49
+    flatten: true
+    category: geopolitical
+    source: https://wikidata.org
+    languages:
+    - en
+    - fr
+  GeoWikiFirstNationsCA:
+    id: 50
+    flatten: true
+    category: geopolitical
+    source: https://wikidata.org
+    languages:
+    - en
+  GeoWikiOcean:
+    id: 51
+    flatten: true
+    category: geopolitical
+    source: https://wikidata.org
     languages:
     - en
     - fr

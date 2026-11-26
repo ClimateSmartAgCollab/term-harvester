@@ -5,92 +5,14 @@ description: Example description ...
 version: ''
 license: CC0
 prefixes:
-  adms: http://www.w3.org/ns/adms#
-  AFO: http://purl.allotrope.org/ontologies/quality#
-  AGRO: http://purl.obolibrary.org/obo/AGRO_
   anthropics: https://github.com/anthropics/
-  BAO: http://www.bioassayontology.org/bao#BAO_
-  BSPO: http://purl.obolibrary.org/obo/BSPO_
-  CHEBI: http://purl.obolibrary.org/obo/CHEBI_
-  CHMO: http://purl.obolibrary.org/obo/CHMO_
-  CIO: http://purl.obolibrary.org/obo/CIO_
-  COB: http://purl.obolibrary.org/obo/COB_
-  CRediT: https://credit.niso.org/contributor-roles/
-  damlpt: http://www.daml.org/2003/01/periodictable/PeriodicTable#
-  DataCite: https://datacite.org/schema/kernel-4/
-  DCMITYPE: http://purl.org/dc/dcmitype/
-  dcterms: http://purl.org/dc/terms/
-  DUO: http://purl.obolibrary.org/obo/DUO_
-  EC: https://enzyme.expasy.org/EC/
-  ECO: http://purl.obolibrary.org/obo/ECO_
-  ECOCORE: http://purl.obolibrary.org/obo/ECOCORE_
-  ECTO: http://purl.obolibrary.org/obo/ECTO_
-  EDAM: http://edamontology.org/
-  EFO: http://www.ebi.ac.uk/efo/EFO_
-  ENM: http://purl.enanomapper.org/onto/ENM_
-  ENVO: http://purl.obolibrary.org/obo/ENVO_
-  euvoc: http://publications.europa.eu/resource/authority/
-  ExO: http://purl.obolibrary.org/obo/ExO_
-  FABIO: http://purl.org/spar/fabio/
-  FBbi: http://purl.obolibrary.org/obo/FBbi_
-  fhir_data_absent_reason: http://terminology.hl7.org/CodeSystem/data-absent-reason
-  FOODON: http://purl.obolibrary.org/obo/FOODON_
-  gc: http://purl.org/gc/
-  GENO: http://purl.obolibrary.org/obo/GENO_
-  geonames: http://sws.geonames.org/
   gnf: https://sws.geonames.org/
   gno: http://www.geonames.org/ontology#
-  GO: http://purl.obolibrary.org/obo/GO_
-  GO_REF: http://purl.obolibrary.org/obo/GO_REF_
-  greg: http://www.w3.org/ns/time/gregorian#
-  GSSO: http://purl.obolibrary.org/obo/GSSO_
-  HEX: https://www.color-hex.com/color/
   HL7: http://terminology.hl7.org/CodeSystem/
-  HP: http://purl.obolibrary.org/obo/HP_
-  HsapDv: http://purl.obolibrary.org/obo/HsapDv_
-  iana: https://www.iana.org/assignments/media-types/
-  IAO: http://purl.obolibrary.org/obo/IAO_
   iso: https://www.iso.org/iso-3166-country-codes/
-  iso3166loc: http://id.loc.gov/vocabulary/countries/
-  LOINC: https://loinc.org/
-  MFOEM: http://purl.obolibrary.org/obo/MFOEM_
-  MI: http://purl.obolibrary.org/obo/MI_
-  MICRO: http://purl.obolibrary.org/obo/MICRO_
-  mixs: http://purl.obolibrary.org/obo/MIXS_
-  MMO: http://purl.obolibrary.org/obo/MMO_
-  MmusDv: http://purl.obolibrary.org/obo/MmusDv_
-  MOD: http://purl.obolibrary.org/obo/MOD_
-  MOP: http://purl.obolibrary.org/obo/MOP_
-  MS: http://purl.obolibrary.org/obo/MS_
-  MSIO: http://purl.obolibrary.org/obo/MSIO_
-  NCBITaxon: http://purl.obolibrary.org/obo/NCBITaxon_
-  NCIT: http://purl.obolibrary.org/obo/NCIT_
-  OBCS: http://purl.obolibrary.org/obo/OBCS_
-  OBI: http://purl.obolibrary.org/obo/OBI_
-  OEO: http://openenergy-platform.org/ontology/oeo/OEO_
-  PATO: http://purl.obolibrary.org/obo/PATO_
-  PECO: http://purl.obolibrary.org/obo/PECO_
-  PO: http://purl.obolibrary.org/obo/PO_
-  premis: http://id.loc.gov/vocabulary/preservation/
-  quantitykind: http://qudt.org/vocab/quantitykind/
-  QUDT: http://qudt.org/vocab/unit/
-  RO: http://purl.obolibrary.org/obo/RO_
-  ROR: https://ror.org/
-  RXNO: http://purl.obolibrary.org/obo/RXNO_
-  SIO: http://semanticscience.org/resource/SIO_
   SNOMED: http://snomed.info/id/
-  SO: http://purl.obolibrary.org/obo/SO_
-  STATO: http://purl.obolibrary.org/obo/STATO_
-  SWO: http://purl.obolibrary.org/obo/SWO_
   TAXRANK: http://purl.obolibrary.org/obo/TAXRANK_
-  TIME: http://www.w3.org/2006/time#
-  UBERON: http://purl.obolibrary.org/obo/UBERON_
-  UO: http://purl.obolibrary.org/obo/UO_
-  VO: http://purl.obolibrary.org/obo/VO_
   wd: http://www.wikidata.org/entity/
-  xsd: http://www.w3.org/2001/XMLSchema#
-  mesh: http://id.nlm.nih.gov/mesh/
-  spdx: https://spdx.org/licenses/
 default_prefix: menu
 imports:
   - linkml:types
@@ -152,10 +74,10 @@ classes:
       - sodicity_hazard
       - soil_salinity_class
       - soil_structure_shape
+      - standards_maturity_level
       - statscan_highest_level_education
       - taxrank_0000000
       - gender_identity
-      - standards_maturity_level
 slots:
   agri_food_ca_agreement_scale:
     name: agri_food_ca_agreement_scale
@@ -384,13 +306,13 @@ slots:
     slot_group: AgriFoodCA_Picklists
   credit:
     name: credit
-    title: CRediT menu
-    range: CREDIT
-    multivalued: false
-    slot_group: CREDIT
+    title: CREDIT menu
     description: The Contributor Roles Taxonomy (CRediT) is a high-level taxonomy
       representing the 14 roles typically played by contributors to scientific scholarly
       output. Each role describes a specific contribution to the scholarly output.
+    range: CREDIT
+    multivalued: false
+    slot_group: CREDIT
   cssc_soil_order:
     name: cssc_soil_order
     title: CSSC_SoilOrder menu
@@ -410,15 +332,15 @@ slots:
     title: GeoWikiAdm1CA menu
     range: GeoWikiAdm1CA
     multivalued: false
-    slot_group: GeoWiki_ADM1_CA
     description: First-order administrative divisions of Canada from Wikidata.
+    slot_group: GeoWiki_ADM1_CA
   geowiki_adm2_ca:
     name: geowiki_adm2_ca
     title: GeoWikiAdm2CA menu
     range: GeoWikiAdm2CA
     multivalued: false
-    slot_group: GeoWiki_ADM2_CA
     description: Second-order administrative divisions of CA from Wikidata.
+    slot_group: GeoWiki_ADM2_CA
   geowiki_adm3_ca:
     name: geowiki_adm3_ca
     title: GeoWikiAdm3CA menu
@@ -465,7 +387,7 @@ slots:
     title: GeoWikiWaterbody menu
     range: GeoWikiWaterbody
     multivalued: false
-    description: 445 international water bodies (lakes, rivers, seas, gulfs, straits,
+    description: 452 international water bodies (lakes, rivers, seas, gulfs, straits,
       bays) with 30+ Wikipedia sitelinks, spanning two or more countries, plus all
       oceans inherited from GeoWikiOcean. Lakes and rivers require Wikidata P17 to
       reference at least two countries; seas, gulfs, straits, and bays are international
@@ -476,23 +398,25 @@ slots:
     title: GeoWikiCountryWatersCA menu
     range: GeoWikiCountryWatersCA
     multivalued: false
-    description: '1864 water bodies associated with Canada. Country entry (Q16) is
-      the root; each water body has is_a: Q16. Seas, gulfs, straits, bays, lakes,
-      and rivers with 5+ Wikipedia sitelinks.'
+    description: '1864 water bodies associated with Canada. Water bodies are grouped
+      by province/territory (ADM1) or district/county (ADM2) via Wikidata P131 when
+      available; bodies with no resolved ADM location have is_a: Q16 (country root).
+      Seas, gulfs, straits, bays, lakes, and rivers with 5+ Wikipedia sitelinks.'
     slot_group: GeoWiki_CountryWaters_CA
   geowiki_first_nations_ca:
     name: geowiki_first_nations_ca
     title: GeoWikiFirstNationsCA menu
     range: GeoWikiFirstNationsCA
     multivalued: false
-    slot_group: GeoWiki_FirstNations_CA
     description: Indigenous peoples in Canada who are neither Inuit nor Métis
+    slot_group: GeoWiki_FirstNations_CA
   iso_canada_adm1:
     name: iso_canada_adm1
-    title: Canada menu
+    title: ISO_Canada_ADM1 menu
     range: ISO_Canada_ADM1
     multivalued: false
-    description: country in North America
+    description: country in North America. Includes 10 provinces of Canada and 3 territories
+      of Canada.
     slot_group: ISO_COUNTRY_ADM1_CA
   grain_appearance_scale:
     name: grain_appearance_scale
@@ -575,6 +499,10 @@ slots:
     description: Categorical classification of soil aggregate shapes describing how
       soil particles group together into structural units.
     slot_group: SoilStructuralShape
+  standards_maturity_level:
+    description: Maturity levels for standards and specifications
+    range: StandardsMaturityLevel
+    slot_group: StandardsMaturityLevel
   statscan_highest_level_education:
     name: statscan_highest_level_education
     title: STATSCAN_HighestLevelEducation menu
@@ -596,10 +524,6 @@ slots:
     multivalued: false
     description: "Gender identity codes indicating an individual's personal sense\
       \ of gender"
-    slot_group: valuesets_merged_hierarchy
-  standards_maturity_level:
-    description: Maturity levels for standards and specifications
-    range: StandardsMaturityLevel
     slot_group: valuesets_merged_hierarchy
 enums:
   AgriFoodCA_AgreementScale:
@@ -44790,126 +44714,126 @@ extensions:
             permissible_values:
               Q1973:
                 title: Colombie-Britannique
-              Q1965:
-                title: Nouveau-Brunswick
-              Q1952:
-                title: Nouvelle-Écosse
-              Q2003:
-                title: Terre-Neuve-et-Labrador
-              Q2007:
-                title: Territoires du Nord-Ouest
               Q176:
                 title: Québec
+              Q2007:
+                title: Territoires du Nord-Ouest
+              Q2003:
+                title: Terre-Neuve-et-Labrador
+              Q1952:
+                title: Nouvelle-Écosse
+              Q1965:
+                title: Nouveau-Brunswick
               Q1978:
                 title: Île-du-Prince-Édouard
-              Q385780:
-                title: district de Timiskaming
-              Q1571033:
-                title: comté de Haliburton
-              Q1105193:
-                title: district de Cochrane
-              Q1815566:
-                title: district de Manitoulin
-              Q1801761:
-                title: comté de Lanark
-              Q1451335:
-                title: district régional de Fraser-Fort George
-              Q1436530:
-                title: district de Nipissing
-              Q1061069:
-                title: district régional du Grand Vancouver
-              Q1036125:
-                title: district régional de Cariboo
-              Q1364011:
-                title: "district régional d'East Kootenay"
-              Q564523:
-                title: "comté d'Annapolis"
-              Q2542491:
-                title: comté de Restigouche
-              Q1631665:
-                title: district régional de Sunshine Coast
-              Q385689:
-                title: district de Thunder Bay
-              Q500757:
-                title: "comté d'Elgin"
-              Q2095362:
-                title: district régional de Nanaimo
-              Q1120844:
-                title: district régional de Comox Valley
-              Q181004:
-                title: comté de Madawaska
-              Q382508:
-                title: municipalité de district de Muskoka
-              Q943829:
-                title: district de Rainy River
-              Q1546177:
-                title: comté de Grey
-              Q383600:
-                title: district de Sudbury
-              Q1638493:
-                title: comté de Huron
-              Q739928:
-                title: comté de Frontenac
-              Q2001097:
-                title: district régional de Northern Rockies
-              Q1780528:
-                title: district régional de qathet
-              Q1112324:
-                title: district régional de Columbia-Shuswap
-              Q3149506:
-                title: "district d'amélioration No 4 Waterton"
-              Q1588807:
-                title: comté de Hastings
-              Q1406913:
-                title: comté de Lambton
-              Q1752156:
-                title: comté de Northumberland
-              Q1053752:
-                title: district régional de Central Coast
-              Q1430348:
-                title: Région Stikine
-              Q1249798:
-                title: district régional de Fraser Valley
-              Q1661516:
-                title: "district régional d'Okanagan-Similkameen"
-              Q382652:
-                title: "comté d'Oxford"
-              Q1552137:
-                title: district régional de Strathcona
-              Q177690:
-                title: comté de Perth
               Q1815526:
                 title: comté de Renfrew
-              Q18458:
-                title: "municipalité régionale d'York"
-              Q671105:
-                title: comté de Kings
-              Q730542:
-                title: comté de Peterborough
-              Q4878005:
-                title: comté de Beaver
-              Q550219:
-                title: district régional de la Capitale
+              Q1661516:
+                title: "district régional d'Okanagan-Similkameen"
+              Q1112324:
+                title: district régional de Columbia-Shuswap
               Q1313055:
                 title: comté de Lennox et Addington
-              Q2140691:
-                title: "district d'Algoma"
-              Q6476613:
-                title: Lake Lenore No 399
-              Q384944:
-                title: comté de Brant
-              Q583957:
-                title: district régional de Thompson-Nicola
-              Q7797560:
-                title: Three Lakes No 400
-              Q1638386:
-                title: district de Kenora
+              Q550219:
+                title: district régional de la Capitale
+              Q382508:
+                title: municipalité de district de Muskoka
+              Q1638493:
+                title: comté de Huron
+              Q1801761:
+                title: comté de Lanark
+              Q1546177:
+                title: comté de Grey
+              Q500757:
+                title: "comté d'Elgin"
               Q132115:
                 title: district régional de Squamish-Lillooet
+              Q1061069:
+                title: district régional du Grand Vancouver
+              Q564523:
+                title: "comté d'Annapolis"
+              Q1436530:
+                title: district de Nipissing
+              Q2095362:
+                title: district régional de Nanaimo
+              Q943829:
+                title: district de Rainy River
+              Q181004:
+                title: comté de Madawaska
+              Q1406913:
+                title: comté de Lambton
+              Q7797560:
+                title: Three Lakes No 400
+              Q1105193:
+                title: district de Cochrane
+              Q1638386:
+                title: district de Kenora
+              Q18458:
+                title: "municipalité régionale d'York"
+              Q4878005:
+                title: comté de Beaver
+              Q1780528:
+                title: district régional de qathet
+              Q1430348:
+                title: Région Stikine
+              Q1451335:
+                title: district régional de Fraser-Fort George
+              Q583957:
+                title: district régional de Thompson-Nicola
+              Q730542:
+                title: comté de Peterborough
+              Q1364011:
+                title: "district régional d'East Kootenay"
+              Q2542491:
+                title: comté de Restigouche
               Q1138212:
                 title: district régional de Cowichan Valley
+              Q384944:
+                title: comté de Brant
+              Q1036125:
+                title: district régional de Cariboo
               Q1815593:
                 title: comtés unis de Prescott et Russell
+              Q383600:
+                title: district de Sudbury
+              Q1053752:
+                title: district régional de Central Coast
+              Q6476613:
+                title: Lake Lenore No 399
+              Q2001097:
+                title: district régional de Northern Rockies
+              Q1588807:
+                title: comté de Hastings
+              Q1571033:
+                title: comté de Haliburton
+              Q1631665:
+                title: district régional de Sunshine Coast
+              Q1752156:
+                title: comté de Northumberland
+              Q671105:
+                title: comté de Kings
+              Q382652:
+                title: "comté d'Oxford"
+              Q2140691:
+                title: "district d'Algoma"
+              Q385780:
+                title: district de Timiskaming
+              Q1249798:
+                title: district régional de Fraser Valley
+              Q1815566:
+                title: district de Manitoulin
+              Q1552137:
+                title: district régional de Strathcona
+              Q385689:
+                title: district de Thunder Bay
+              Q1120844:
+                title: district régional de Comox Valley
+              Q739928:
+                title: comté de Frontenac
+              Q3149506:
+                title: "district d'amélioration No 4 Waterton"
+              Q177690:
+                title: comté de Perth
               Q319492:
                 title: lac Aberdeen
               Q59647:
