@@ -75,9 +75,27 @@ def process_linkml_source(key, source, config_file=MENU_CONFIG):
 
     existing_pfx = source_data.get("prefixes") or {}
 
+    # Determine which enum names survive the source's include/minus concept filters.
+    # This ensures the prefix list reflects only what will actually appear in schema.yaml
+    # rather than every enum in the full upstream file.
+    all_enum_names  = set((source_data.get("enums") or {}).keys())
+    minus_concepts  = set(((source.get("minus")   or {}).get("concepts") or []))
+    include_concepts = set(((source.get("include") or {}).get("concepts") or []))
+    if include_concepts and not minus_concepts:
+        # Whitelist mode: only the explicitly listed enums
+        active_enums = include_concepts & all_enum_names
+    elif minus_concepts:
+        # Exclusion mode: remove minus set, then restore include set
+        active_enums = (all_enum_names - minus_concepts) | (include_concepts & all_enum_names)
+    else:
+        active_enums = all_enum_names
+
     # Collect only the prefixes actually referenced in permissible_value meanings
+    # of the active (post-filter) enums.
     meanings_pfx = {}
-    for enum_def in (source_data.get("enums") or {}).values():
+    for enum_name, enum_def in (source_data.get("enums") or {}).items():
+        if enum_name not in active_enums:
+            continue
         for pv in ((enum_def or {}).get("permissible_values") or {}).values():
             meaning = (pv or {}).get("meaning", "")
             if is_curie(meaning):
