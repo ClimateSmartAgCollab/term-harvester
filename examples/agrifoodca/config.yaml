@@ -200,6 +200,21 @@ sources:
       gno: http://www.geonames.org/ontology#
       iso: 'https://www.iso.org/obp/ui/#iso:code:3166:'
     license: CC0 1.0
+  GeoWiki_Settlement_CA:
+    title: Wikidata Settlements for CA
+    name: GeoWiki_Settlement_CA
+    version: null
+    content_type: GeoWikiSettlement
+    file_format: zip
+    reachable_from:
+      source_ontology: https://www.wikidata.org/
+    download_date: '2026-11-26'
+    description: Human settlements and populated places of Canada from Wikidata.
+    country: CA
+    prefixes:
+      wd: http://www.wikidata.org/entity/
+      gnf: https://sws.geonames.org/
+    license: CC0 1.0
   ISO_COUNTRY_ADM1_CA:
     title: Canada (ISO 3166-2)
     name: ISO_COUNTRY_ADM1_CA
