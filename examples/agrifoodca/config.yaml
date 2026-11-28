@@ -208,13 +208,27 @@ sources:
     file_format: zip
     reachable_from:
       source_ontology: https://www.wikidata.org/
-    download_date: '2026-11-26'
+    download_date: '2026-11-27'
     description: Human settlements and populated places of Canada from Wikidata.
     country: CA
     prefixes:
       wd: http://www.wikidata.org/entity/
       gnf: https://sws.geonames.org/
     license: CC0 1.0
+  HumanSettlementClassification:
+    title: Human Settlement Classification
+    name: HumanSettlementClassification
+    version: null
+    content_type: HumanSettlementClassification
+    file_format: yaml
+    reachable_from:
+      source_ontology: https://www.wikidata.org/wiki/Q98966309
+    download_date: '2026-11-27'
+    description: 'Wikidata classification of human settlements (Q98966309): settlement
+      size/type categories used as mixin targets.'
+    license: CC0 1.0
+    prefixes:
+      wd: http://www.wikidata.org/entity/
   ISO_COUNTRY_ADM1_CA:
     title: Canada (ISO 3166-2)
     name: ISO_COUNTRY_ADM1_CA

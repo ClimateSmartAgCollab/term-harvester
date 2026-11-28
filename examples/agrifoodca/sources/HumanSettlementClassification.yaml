@@ -1,0 +1,98 @@
+id: https://www.wikidata.org/wiki/Q98966309
+name: HumanSettlementClassification
+title: Human Settlement Classification
+description: 'Wikidata classification of human settlements (Q98966309): size/type
+  categories used as mixin targets in GeoWikiSettlement enums.'
+version: ''
+license: CC0 1.0
+in_language: en
+imports:
+  - linkml:types
+prefixes:
+  wd: http://www.wikidata.org/entity/
+default_prefix: ''
+classes:
+  HumanSettlementClassification:
+    name: HumanSettlementClassification
+    description: 'Wikidata classification of human settlements (Q98966309): size/type
+      categories used as mixin targets in GeoWikiSettlement enums.'
+    tree_root: true
+    slots:
+      - human_settlement_classification
+enums:
+  HumanSettlementClassification:
+    name: HumanSettlementClassification
+    title: Human Settlement Classification
+    permissible_values:
+      Q1637706:
+        title: million city
+        meaning: wd:Q1637706
+      Q1549591:
+        title: big city
+        meaning: wd:Q1549591
+      Q129676344:
+        title: large city
+        meaning: wd:Q129676344
+      Q515:
+        title: city
+        meaning: wd:Q515
+      Q896881:
+        title: average city
+        meaning: wd:Q896881
+      Q18466176:
+        title: small city
+        meaning: wd:Q18466176
+      Q7930989:
+        title: city or town
+        meaning: wd:Q7930989
+      Q3957:
+        title: town
+        meaning: wd:Q3957
+      Q747074:
+        title: urban municipality
+        meaning: wd:Q747074
+      Q532:
+        title: village
+        meaning: wd:Q532
+      Q5084:
+        title: hamlet
+        meaning: wd:Q5084
+      Q129676371:
+        title: rural settlement
+        meaning: wd:Q129676371
+      Q486972:
+        title: human settlement
+        meaning: wd:Q486972
+      Q2095140:
+        title: populated place
+        meaning: wd:Q2095140
+      Q350614:
+        title: ghost town
+        meaning: wd:Q350614
+      Q2974842:
+        title: abandoned village
+        meaning: wd:Q2974842
+      Q350895:
+        title: archaeological site
+        meaning: wd:Q350895
+      Q106071744:
+        title: former town
+        meaning: wd:Q106071744
+      Q21751582:
+        title: deserted medieval village
+        meaning: wd:Q21751582
+      Q22674925:
+        title: former settlement
+        meaning: wd:Q22674925
+      Q14616455:
+        title: destroyed city
+        meaning: wd:Q14616455
+      Q1434274:
+        title: archaic settlement
+        meaning: wd:Q1434274
+slots:
+  human_settlement_classification:
+    name: human_settlement_classification
+    title: HumanSettlementClassification menu
+    range: HumanSettlementClassification
+    multivalued: false

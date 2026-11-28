@@ -2018,26 +2018,29 @@ def _geo_enum_to_source_key(enum_name: str, all_sources: dict) -> str | None:
 
     Examples::
 
-        GeoWikiAdm2CA  → GeoWiki_ADM2_CA
-        GeoNamesAdm3CA → GeoNames_ADM3_CA  (split key preferred, ADM3ADM4 as fallback)
-        GeoNamesAdm4CA → GeoNames_ADM4_CA  (split key preferred, ADM3ADM4 as fallback)
-        GeoWikiAdm1US  → GeoWiki_ADM1_US
+        GeoWikiAdm2CA             → GeoWiki_ADM2_CA
+        GeoNamesAdm3CA            → GeoNames_ADM3_CA  (split key preferred, ADM3ADM4 as fallback)
+        GeoNamesAdm4CA            → GeoNames_ADM4_CA  (split key preferred, ADM3ADM4 as fallback)
+        GeoWikiAdm1US             → GeoWiki_ADM1_US
+        HumanSettlementClassification → HumanSettlementClassification (direct match)
     """
     m = re.match(r'^(GeoWiki|GeoNames)((?:Adm\d+)+)([A-Z]{2})?$', enum_name)
-    if not m:
-        return None
-    fam    = m.group(1)                          # "GeoWiki" | "GeoNames"
-    levels = re.findall(r'\d+', m.group(2))      # ['2'] | ['3','4']
-    cc     = m.group(3) or ""                    # "CA" | ""
-    combined = "ADM" + "ADM".join(levels)        # "ADM2" | "ADM3ADM4"
-    cands = [f"{fam}_{combined}_{cc}".rstrip("_")]
-    if len(levels) == 1:
-        n = int(levels[0])
-        # For ADM3/ADM4, try the combined key as fallback (backward compat)
-        cands.append(f"{fam}_ADM{n}ADM{n+1}_{cc}".rstrip("_"))
-    for cand in cands:
-        if cand in all_sources:
-            return cand
+    if m:
+        fam    = m.group(1)                          # "GeoWiki" | "GeoNames"
+        levels = re.findall(r'\d+', m.group(2))      # ['2'] | ['3','4']
+        cc     = m.group(3) or ""                    # "CA" | ""
+        combined = "ADM" + "ADM".join(levels)        # "ADM2" | "ADM3ADM4"
+        cands = [f"{fam}_{combined}_{cc}".rstrip("_")]
+        if len(levels) == 1:
+            n = int(levels[0])
+            # For ADM3/ADM4, try the combined key as fallback (backward compat)
+            cands.append(f"{fam}_ADM{n}ADM{n+1}_{cc}".rstrip("_"))
+        for cand in cands:
+            if cand in all_sources:
+                return cand
+    # Fallback: enum name is itself the source key (e.g. HumanSettlementClassification)
+    if enum_name in all_sources:
+        return enum_name
     return None
 
 

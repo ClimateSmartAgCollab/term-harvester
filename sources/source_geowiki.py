@@ -253,6 +253,8 @@ _WD_SETTLEMENT_TYPES = frozenset({
     "Q129676371", # rural settlement
     "Q7930989",   # city/town
     "Q747074",    # urban municipality
+    "Q27676416",  # city or town of Quebec (cité ou ville)
+    "Q27676422",  # township municipality of Quebec (municipalité de canton)
     "Q486972",    # human settlement
     "Q2095140",   # populated place below civil division level
 })
@@ -288,6 +290,8 @@ _STYPE_PRIORITY: list = [
     "Q7930989",    # city or town
     "Q3957",       # town
     "Q747074",     # urban municipality
+    "Q27676416",   # city or town of Quebec (cité ou ville du Québec)
+    "Q27676422",   # township municipality of Quebec (municipalité de canton)
     "Q532",        # village
     "Q5084",       # hamlet
     "Q129676371",  # rural settlement
@@ -305,6 +309,9 @@ _STYPE_PRIORITY: list = [
 ]
 _STYPE_RANK: dict = {q: i for i, q in enumerate(_STYPE_PRIORITY)}
 
+# Key used for the HumanSettlementClassification source entry and enum.
+_HSC_KEY = "HumanSettlementClassification"
+
 # Human-readable labels for settlement size type headers in the enum
 _STYPE_LABELS: dict = {
     "Q1637706":    "million city",
@@ -316,6 +323,8 @@ _STYPE_LABELS: dict = {
     "Q7930989":    "city or town",
     "Q3957":       "town",
     "Q747074":     "urban municipality",
+    "Q27676416":   "city or town of Quebec",
+    "Q27676422":   "township municipality of Quebec",
     "Q532":        "village",
     "Q5084":       "hamlet",
     "Q129676371":  "rural settlement",
@@ -329,6 +338,20 @@ _STYPE_LABELS: dict = {
     "Q22674925":   "former settlement",
     "Q14616455":   "destroyed city",
     "Q1434274":    "archaic settlement",
+}
+
+# Country+stype pairs that imply a specific ADM1 parent when P131 resolution
+# fails.  Used as a last-resort fallback in _build_ppl_yaml.
+# Format: (alpha2_upper, stype_qid) → adm1_qid
+_STYPE_IMPLIES_ADM1: dict[tuple[str, str], str] = {
+    ("CA", "Q27676416"): "Q222",   # city or town of Quebec → Quebec
+    ("CA", "Q27676422"): "Q222",   # township municipality (canton) → Quebec
+}
+
+# Fallback parent for settlements that couldn't be placed in the ADM hierarchy.
+# Used as a catch-all top-level group rather than leaving entries as orphaned roots.
+_SETTLEMENT_ORPHAN_FALLBACK: dict[str, tuple[str, str]] = {
+    "CA": ("Q6393961", "Populated places in Canada"),
 }
 
 # Top-level WD enum hierarchy headers
@@ -346,6 +369,14 @@ _ADM1_TYPE_HEADER_DESCRIPTIONS: dict[str, str] = {
         "A U.S. jurisdiction that is not one of the 50 U.S. states and not "
         "the District of Columbia."
     ),
+}
+
+# Wikidata QIDs for ADM1 type-group header terms (same keys as above).
+_ADM1_TYPE_HEADER_MEANINGS: dict[str, str] = {
+    "Province of Canada": "Q11828004",
+    "Territory of Canada": "Q2485016",
+    "U.S. state":          "Q35657",
+    "Insular area of the United States": "Q151261",
 }
 
 # Wikidata query batch size for WDQS (unused — batch sizes are set per-function)
@@ -1584,12 +1615,14 @@ def _build_countries_yaml(key, source, data, locales=None):
             gnid   = item.get("gnid", "")
             alpha2 = item.get("alpha2", "")
             lbl    = normalize_text(_lbl(item))
+            # Skip self-referential is_a (e.g. Antarctica Q51 whose continent is also Q51)
+            effective_is_a = cont_qid if cont_qid != qid else None
             pv = add_permissible_value(
                 country_pvs, qid,
                 title=lbl,
                 meaning=f"wd:{qid}",
                 description=normalize_text(item.get("desc", "")) or None,
-                is_a=cont_qid,
+                is_a=effective_is_a,
             )
             if alpha2:
                 pv["aliases"] = [alpha2]
@@ -1803,7 +1836,7 @@ def _build_countries_yaml(key, source, data, locales=None):
                 title=_lbl2,
                 meaning=f"wd:{_qid}",
                 description=normalize_text(_wbitem.get("desc", "")) or None,
-                is_a=_cont_qid,
+                is_a=_cont_qid if _cont_qid != _qid else None,
             )
             _wb_sssom(_qid, _gnid, _lbl2)
 
@@ -2126,18 +2159,24 @@ def _build_country_waters_yaml(key, source, data, locales=None):
     for _tl, _grp in sorted(_adm1_by_type.items(), key=lambda x: (-len(x[1]), x[0])):
         _add_hdr = _has_multi_type and len(_grp) >= 2 and _tl
         _hdr_code = (_tl[0].upper() + _tl[1:]) if _add_hdr else ""
-        if _add_hdr and _hdr_code not in pvs:
+        _hdr_qid  = _ADM1_TYPE_HEADER_MEANINGS.get(_hdr_code) if _hdr_code else None
+        _hdr_key  = _hdr_qid if _hdr_qid else _hdr_code
+        if _add_hdr and _hdr_key not in pvs:
             _tw = (_tl.split(" of ")[0].strip().capitalize()
                    if " of " in _tl else _tl.capitalize())
             _hdr_pv: dict = {"title": _tw + (f" of {country_name}" if country_name else "")}
             if _hdr_code in _ADM1_TYPE_HEADER_DESCRIPTIONS:
                 _hdr_pv["description"] = _ADM1_TYPE_HEADER_DESCRIPTIONS[_hdr_code]
-            pvs[_hdr_code] = _hdr_pv
+            if _hdr_qid:
+                _hdr_pv["meaning"] = f"wd:{_hdr_qid}"
+            if country_qid:
+                _hdr_pv["is_a"] = country_qid
+            pvs[_hdr_key] = _hdr_pv
         for _q1 in sorted(_grp, key=lambda q: _title_sort_key(
                 _best_label(_adm1_full_map.get(q, {"qid": q}), locales, "qid"))):
             _e1 = _adm1_full_map.get(_q1, {"qid": _q1})
             _lbl1 = normalize_text(_best_label(_e1, locales, "qid"))
-            _ia1 = _hdr_code if (_add_hdr and _hdr_code) else None
+            _ia1 = _hdr_key if (_add_hdr and _hdr_key) else None
             add_permissible_value(
                 pvs, _q1,
                 title=_lbl1,
@@ -2401,13 +2440,17 @@ def _build_adm1_yaml(key, source, data, locales=None, include_indigenous=False):
             # Add each type header immediately followed by its sorted children
             for tl in type_order:
                 type_word = tl.split(" of ")[0].strip() if " of " in tl else tl
-                code  = tl[0].upper() + tl[1:]   # e.g. "Province of Canada"
+                code    = tl[0].upper() + tl[1:]   # e.g. "Province of Canada"
+                hdr_qid = _ADM1_TYPE_HEADER_MEANINGS.get(code)
+                hdr_key = hdr_qid if hdr_qid else code
                 title = type_word.capitalize() + (f" of {country_name}"
                                                    if country_name else "")
                 hdr = {"title": title}
                 if code in _ADM1_TYPE_HEADER_DESCRIPTIONS:
                     hdr["description"] = _ADM1_TYPE_HEADER_DESCRIPTIONS[code]
-                pvs[code] = hdr
+                if hdr_qid:
+                    hdr["meaning"] = f"wd:{hdr_qid}"
+                pvs[hdr_key] = hdr
 
                 group = [e for e in entries if e.get("type_label") == tl]
                 for entry in sorted(group, key=lambda e: _title_sort_key(_lbl(e))):
@@ -2419,7 +2462,7 @@ def _build_adm1_yaml(key, source, data, locales=None, include_indigenous=False):
                         title=lbl,
                         meaning=f"wd:{qid}",
                         description=normalize_text(entry.get("desc", "")) or None,
-                        is_a=code,
+                        is_a=hdr_key,
                     )
                     sssom_rows.append({
                         "subject_id":            f"wd:{qid}",
@@ -2580,10 +2623,53 @@ def _build_adm1_yaml(key, source, data, locales=None, include_indigenous=False):
         print(f"  SSSOM: {len(sssom_rows)} mappings written to {_GEOWIKI_SSSOM}")
 
 
+def _build_settlement_classification_yaml(key, source, locales=None):
+    """Build sources/{key}.yaml for the HumanSettlementClassification enum.
+
+    Produces a flat enum keyed by Wikidata QID for every settlement size type
+    in _STYPE_PRIORITY, with meaning: wd:{qid}.  Country-independent; shared
+    by all GeoWikiSettlement enums via inherits: HumanSettlementClassification.
+    """
+    pvs = {}
+    for qid in _STYPE_PRIORITY:
+        label = _STYPE_LABELS.get(qid, qid)
+        add_permissible_value(pvs, qid, title=label, meaning=f"wd:{qid}")
+
+    source_url = "https://www.wikidata.org/wiki/Q98966309"
+    schema = make_config_schema(
+        id=source_url,
+        name=key,
+        title="Human Settlement Classification",
+        description=(
+            "Wikidata classification of human settlements (Q98966309): "
+            "size/type categories used as mixin targets in GeoWikiSettlement enums."
+        ),
+        license="CC0 1.0",
+        prefixes=_SOURCE_PREFIXES,
+        enums={
+            _HSC_KEY: {
+                "name":  _HSC_KEY,
+                "title": "Human Settlement Classification",
+                "permissible_values": pvs,
+            },
+        },
+    )
+    yaml_path = f"sources/{key}.yaml"
+    with open(yaml_path, "w") as f:
+        yaml.dump(schema, f, Dumper=IndentedDumper, default_flow_style=False, sort_keys=False)
+    log_extraction(_HSC_KEY, count=len(pvs))
+
+
 def _build_ppl_yaml(key, source, data, locales=None):
     """Write sources/{key}.yaml for GeoWikiSettlement scope (per-country only).
 
-    Produces a flat enum sorted alphabetically by name.
+    Produces an enum with:
+      - inherits: HumanSettlementClassification (stype QID nodes; not embedded inline)
+      - Pruned ADM1/ADM2/ADM3 entries (only those that are ancestors of at
+        least one settlement) inlined directly.
+      - Settlement entries with is_a pointing to their most specific ADM parent
+        (ADM3 > ADM2 > ADM1) and mixins referencing their stype QID.
+
     All non-current settlements are marked status: historical — both archaic P31
     types (ghost town, former settlement, etc.) and items with P576
     (dissolved/abolished date).  All can be suppressed at build time with
@@ -2591,7 +2677,6 @@ def _build_ppl_yaml(key, source, data, locales=None):
     historical settlements are excluded from picklists unless the user opts in.
     """
     locales      = locales or ["en"]
-    primary_lang = "en" if "en" in locales else locales[0]
 
     scope   = data.get("scope", "")
     entries = data.get("entries", [])
@@ -2600,31 +2685,482 @@ def _build_ppl_yaml(key, source, data, locales=None):
 
     sorted_entries = sorted(entries, key=lambda x: _title_sort_key(_lbl(x)))
 
-    # Collect which stype headers are actually needed (in priority order)
-    used_stypes = [
-        st for st in _STYPE_PRIORITY
-        if any(e.get("stype") == st for e in entries)
-    ]
+    alpha2_up = scope.upper() if scope else ""
 
+    # ----------------------------------------------------------------
+    # Load ADM data for this country to resolve settlement parents and
+    # inline the pruned ADM hierarchy (following CountryWaters pattern).
+    # ----------------------------------------------------------------
+    adm1_qids: set  = set()
+    adm2_qids: set  = set()
+    adm3_qids: set  = set()
+    adm1_full_map: dict = {}   # qid → entry
+    adm2_full_map: dict = {}
+    adm3_full_map: dict = {}
+    adm2_to_adm1: dict  = {}   # adm2_qid → adm1_qid
+    adm3_to_adm2: dict  = {}   # adm3_qid → adm2_qid (best available)
+    adm1_code_to_qid: dict = {}  # GeoNames adm1_code → adm1_qid
+    adm1_name_to_qid: dict = {}  # lowercased label → adm1_qid (description fallback)
+
+    if alpha2_up:
+        try:
+            a1_payload = _load_json(f"GeoWiki_ADM1_{alpha2_up}")
+            for _e in (a1_payload.get("entries") or []):
+                _q = _e.get("qid", "")
+                if _q:
+                    adm1_qids.add(_q)
+                    adm1_full_map[_q] = _e
+                    for _lbl_str in (_e.get("labels") or {}).values():
+                        if _lbl_str:
+                            adm1_name_to_qid[_lbl_str.lower()] = _q
+        except (FileNotFoundError, Exception):
+            pass
+
+        try:
+            a2_payload = _load_json(f"GeoWiki_ADM2_{alpha2_up}")
+            for _e in (a2_payload.get("entries") or []):
+                _q = _e.get("qid", "")
+                if _q:
+                    adm2_qids.add(_q)
+                    adm2_full_map[_q] = _e
+                    _a1q = _e.get("adm1_qid", "")
+                    if _a1q:
+                        adm2_to_adm1[_q] = _a1q
+        except (FileNotFoundError, Exception):
+            pass
+
+        try:
+            a3_payload = _load_json(f"GeoWiki_ADM3_{alpha2_up}")
+            # Build compound_code → adm2_qid from companion adm2_entries
+            adm2_comp_to_qid: dict = {}
+            for _ae2 in (a3_payload.get("adm2_entries") or []):
+                _cc2 = _ae2.get("compound_code", "")
+                _q2  = _ae2.get("qid", "")
+                if _cc2 and _q2:
+                    adm2_comp_to_qid[_cc2] = _q2
+                # Also build adm1_code -> qid from adm2_entries
+                _a1q2 = _ae2.get("adm1_qid", "")
+                if _cc2 and _a1q2:
+                    _parts2 = _cc2.split(".")
+                    if len(_parts2) >= 2:
+                        adm1_code_to_qid.setdefault(_parts2[1], _a1q2)
+            # Build ADM3 compound-code map first (needed to resolve ADM4→ADM3 parents)
+            _adm3_comp_to_qid: dict[str, str] = {}
+            _adm4_entries: list[dict] = []
+            for _e in (a3_payload.get("entries") or []):
+                _q  = _e.get("qid", "")
+                _fc = _e.get("feat_code", "")
+                if _q and _fc == "ADM3":
+                    adm3_qids.add(_q)
+                    adm3_full_map[_q] = _e
+                    _cc3 = _e.get("compound_code", "")
+                    if _cc3:
+                        _adm3_comp_to_qid[_cc3] = _q
+                    # Resolve ADM3 → ADM2 parent via compound code (primary)
+                    _pc = _e.get("parent_compound", "")
+                    if _pc and _pc in adm2_comp_to_qid:
+                        adm3_to_adm2[_q] = adm2_comp_to_qid[_pc]
+                    elif _e.get("parent_qid", "") in adm2_qids:
+                        adm3_to_adm2[_q] = _e["parent_qid"]
+                    # else: will fall back to ADM1 via compound code when needed
+                elif _q and _fc == "ADM4":
+                    _adm4_entries.append(_e)
+            # Second pass: register ADM4 entries, resolving parent → nearest ADM3
+            for _e4 in _adm4_entries:
+                _q4 = _e4.get("qid", "")
+                adm3_qids.add(_q4)
+                adm3_full_map[_q4] = _e4
+                _pc4 = _e4.get("parent_compound", "")
+                if _pc4 and _pc4 in _adm3_comp_to_qid:
+                    adm3_to_adm2[_q4] = _adm3_comp_to_qid[_pc4]
+                elif _e4.get("parent_qid", "") in adm3_qids:
+                    adm3_to_adm2[_q4] = _e4["parent_qid"]
+                # else: no resolved ADM3 parent — falls back via compound code
+        except (FileNotFoundError, Exception):
+            pass
+
+    # ----------------------------------------------------------------
+    # Resolve best ADM parent (ADM3 > ADM2 > ADM1) for each settlement
+    # ----------------------------------------------------------------
+    def _best_adm_parent(parent_qids):
+        for _pq in parent_qids:
+            if _pq in adm3_qids:
+                return _pq
+        for _pq in parent_qids:
+            if _pq in adm2_qids:
+                return _pq
+        for _pq in parent_qids:
+            if _pq in adm1_qids:
+                return _pq
+        return None
+
+    settlement_adm: dict = {}  # settlement_qid → best_adm_qid (or None)
+    used_adm_qids:  set  = set()
+    for _entry in entries:
+        _best = _best_adm_parent(_entry.get("parent_qids", []))
+        settlement_adm[_entry["qid"]] = _best
+        if _best:
+            used_adm_qids.add(_best)
+
+    # ----------------------------------------------------------------
+    # Pass 1: Transitive P131 chain through other settlement entries
+    # Follow P131 hops through settlements (not just direct ADM parents)
+    # e.g. Woodside → Dartmouth (settlement) → Halifax Regional Municipality
+    # ----------------------------------------------------------------
+    _entry_pqids: dict[str, frozenset] = {
+        e["qid"]: frozenset(e.get("parent_qids") or []) for e in entries
+    }
+
+    def _resolve_p131_chain(qid: str, _seen: set | None = None):
+        if _seen is None:
+            _seen = {qid}
+        for _pq in _entry_pqids.get(qid, frozenset()):
+            _best = _best_adm_parent({_pq})
+            if _best:
+                return _best
+            if _pq not in _seen:
+                _seen.add(_pq)
+                _chain = _resolve_p131_chain(_pq, _seen)
+                if _chain:
+                    return _chain
+        return None
+
+    n_chain = 0
+    for _entry in entries:
+        if settlement_adm[_entry["qid"]] is None:
+            _chain_result = _resolve_p131_chain(_entry["qid"])
+            if _chain_result:
+                settlement_adm[_entry["qid"]] = _chain_result
+                used_adm_qids.add(_chain_result)
+                n_chain += 1
+
+    # ----------------------------------------------------------------
+    # Pass 2: stype-implies-ADM1 fallback for country-specific types
+    # e.g. "city or town of Quebec" (Q27676416) implies is_a: Quebec (Q222)
+    # ----------------------------------------------------------------
+    _scope_up = scope.upper() if scope and scope != "global" else ""
+    n_stype_fallback = 0
+    if _scope_up:
+        for _entry in entries:
+            if settlement_adm[_entry["qid"]] is None:
+                _stype = _entry.get("stype") or ""
+                _implied = _STYPE_IMPLIES_ADM1.get((_scope_up, _stype))
+                if _implied and _implied in adm1_qids:
+                    settlement_adm[_entry["qid"]] = _implied
+                    used_adm_qids.add(_implied)
+                    n_stype_fallback += 1
+
+    if n_chain or n_stype_fallback:
+        print(f"  Resolved {n_chain} via transitive P131, "
+              f"{n_stype_fallback} via stype-implies-ADM1 fallback.")
+
+    # ----------------------------------------------------------------
+    # Pass 3: Intermediate group nodes for orphan P131 targets
+    # e.g. Quebec MRCs, Manitoba rural municipalities, NS municipal
+    # districts, NB parishes — not in ADM data but resolvable via
+    # their own P131 chain (up to two hops).
+    # ----------------------------------------------------------------
+    _entry_qid_set = {e["qid"] for e in entries}
+    _level1_qids: set[str] = set()
+    for _entry in entries:
+        if settlement_adm[_entry["qid"]] is None:
+            for _pq in _entry.get("parent_qids", []):
+                if (_pq not in adm1_qids and _pq not in adm2_qids
+                        and _pq not in adm3_qids and _pq not in _entry_qid_set):
+                    _level1_qids.add(_pq)
+
+    _intermediate_nodes: dict[str, dict] = {}  # qid → {title, desc, is_a, meaning}
+
+    if _level1_qids:
+        print(f"  Fetching {len(_level1_qids)} intermediate entities (MRCs, municipalities…)")
+        _level1_data = _fetch_wikidata_by_qids(_level1_qids, locales=locales)
+
+        # Level-2: parents of level-1 that are ALSO not yet in ADM data
+        _level2_qids: set[str] = set()
+        for _d1 in _level1_data.values():
+            _ppq = _d1.get("parent_qid", "")
+            if (_ppq and _ppq not in adm1_qids and _ppq not in adm2_qids
+                    and _ppq not in adm3_qids and _ppq not in _level1_qids
+                    and _ppq not in _entry_qid_set):
+                _level2_qids.add(_ppq)
+
+        _level2_data: dict = {}
+        if _level2_qids:
+            print(f"  Fetching {len(_level2_qids)} level-2 intermediate entities…")
+            _level2_data = _fetch_wikidata_by_qids(_level2_qids, locales=locales)
+
+        # Register level-2 nodes that resolve directly to ADM data
+        for _iq2, _d2 in _level2_data.items():
+            _ppq2 = _d2.get("parent_qid", "")
+            _best2: str = ""
+            if _ppq2 in adm3_qids:   _best2 = _ppq2
+            elif _ppq2 in adm2_qids: _best2 = _ppq2
+            elif _ppq2 in adm1_qids: _best2 = _ppq2
+            if _best2:
+                _lb2 = (_d2.get("labels") or {}).get("en", "") or _iq2
+                _intermediate_nodes[_iq2] = {
+                    "title":   _lb2,
+                    "desc":    _d2.get("desc", "") or "",
+                    "is_a":    _best2,
+                    "meaning": f"wd:{_iq2}",
+                }
+                used_adm_qids.add(_best2)
+
+        # Register level-1 nodes iteratively: some level-1 nodes have parents that
+        # are themselves level-1 nodes (e.g. settlement → MRC → region → ADM2).
+        # Repeat until no new nodes can be resolved.
+        _unresolved1 = dict(_level1_data)
+        while _unresolved1:
+            _resolved_this_pass: list[str] = []
+            for _iq1, _d1 in list(_unresolved1.items()):
+                _ppq1 = _d1.get("parent_qid", "")
+                _best1: str = ""
+                if _ppq1 in adm3_qids:              _best1 = _ppq1
+                elif _ppq1 in adm2_qids:            _best1 = _ppq1
+                elif _ppq1 in adm1_qids:            _best1 = _ppq1
+                elif _ppq1 in _intermediate_nodes:  _best1 = _ppq1  # chain
+                if _best1:
+                    _lb1 = (_d1.get("labels") or {}).get("en", "") or _iq1
+                    _intermediate_nodes[_iq1] = {
+                        "title":   _lb1,
+                        "desc":    _d1.get("desc", "") or "",
+                        "is_a":    _best1,
+                        "meaning": f"wd:{_iq1}",
+                    }
+                    # Add direct-ADM parents to used_adm_qids (not intermediate parents)
+                    if _best1 in adm1_qids or _best1 in adm2_qids or _best1 in adm3_qids:
+                        used_adm_qids.add(_best1)
+                    _resolved_this_pass.append(_iq1)
+            if not _resolved_this_pass:
+                break  # no progress — remaining level-1 nodes can't be resolved
+            for _iq1 in _resolved_this_pass:
+                del _unresolved1[_iq1]
+
+        # Assign orphan settlements to their resolved intermediate group node
+        n_intermediate = 0
+        for _entry in entries:
+            if settlement_adm[_entry["qid"]] is None:
+                for _pq in _entry.get("parent_qids", []):
+                    if _pq in _intermediate_nodes:
+                        settlement_adm[_entry["qid"]] = _pq
+                        n_intermediate += 1
+                        break
+
+        if n_intermediate:
+            _uniq_used = len({settlement_adm[e["qid"]] for e in entries
+                               if settlement_adm[e["qid"]] in _intermediate_nodes})
+            print(f"  Resolved {n_intermediate} via {len(_intermediate_nodes)} intermediate "
+                  f"group nodes ({_uniq_used} distinct nodes used).")
+
+    # ----------------------------------------------------------------
+    # Pass 4: Propagate resolved parents transitively through settlement chains
+    # e.g. orphan_A → settlement_B (now resolved) → assignment inherits
+    # Runs iteratively until no further progress.
+    # ----------------------------------------------------------------
+    n_pass4 = 0
+    while True:
+        _p4_progress = False
+        for _entry in entries:
+            if settlement_adm[_entry["qid"]] is None:
+                for _pq in _entry.get("parent_qids", []):
+                    _parent_assigned = settlement_adm.get(_pq)
+                    if _parent_assigned:
+                        settlement_adm[_entry["qid"]] = _parent_assigned
+                        n_pass4 += 1
+                        _p4_progress = True
+                        break
+        if not _p4_progress:
+            break
+
+    if n_pass4:
+        print(f"  Resolved {n_pass4} via propagated parent assignments (pass 4).")
+
+    # ----------------------------------------------------------------
+    # Pass 5: Assign remaining orphans to country-level fallback node
+    # ----------------------------------------------------------------
+    _scope_up5 = scope.upper() if scope and scope != "global" else ""
+    _fallback_info: tuple[str, str] | None = (
+        _SETTLEMENT_ORPHAN_FALLBACK.get(_scope_up5) if _scope_up5 else None
+    )
+    n_fallback = 0
+    if _fallback_info:
+        _fb_qid, _fb_title = _fallback_info
+        for _entry in entries:
+            if settlement_adm[_entry["qid"]] is None:
+                settlement_adm[_entry["qid"]] = _fb_qid
+                n_fallback += 1
+
+    # ----------------------------------------------------------------
+    # Determine minimal needed ADM node sets (with full ancestor chains)
+    # ----------------------------------------------------------------
+    needed_adm3: set = used_adm_qids & adm3_qids
+    needed_adm2: set = used_adm_qids & adm2_qids
+    needed_adm1: set = used_adm_qids & adm1_qids
+
+    # For each needed ADM3/ADM4, include its parent (two passes cover ADM4→ADM3→ADM2 depth)
+    for _ in range(2):
+        for _q3 in list(needed_adm3):
+            _parent = adm3_to_adm2.get(_q3, "")
+            if _parent and _parent in adm2_qids:
+                needed_adm2.add(_parent)
+            elif _parent and _parent in adm3_qids:
+                needed_adm3.add(_parent)  # ADM4 node: pull in its ADM3 parent
+            elif not _parent:
+                # No resolved parent → try ADM1 directly via compound code
+                _cc3 = adm3_full_map.get(_q3, {}).get("compound_code", "")
+                if _cc3:
+                    _parts3 = _cc3.split(".")
+                    if len(_parts3) >= 2:
+                        _q1_fb = adm1_code_to_qid.get(_parts3[1], "")
+                        if _q1_fb and _q1_fb in adm1_qids:
+                            needed_adm1.add(_q1_fb)
+
+    for _q2 in needed_adm2:
+        _q1 = adm2_to_adm1.get(_q2) or (adm2_full_map.get(_q2) or {}).get("adm1_qid", "")
+        if _q1 and _q1 in adm1_qids:
+            needed_adm1.add(_q1)
+
+    if adm1_qids or adm2_qids or adm3_qids:
+        _pr1 = len(adm1_qids) - len(needed_adm1)
+        _pr2 = len(adm2_qids) - len(needed_adm2)
+        _pr3 = len(adm3_qids) - len(needed_adm3)
+        print(f"  ADM: kept {len(needed_adm1)} ADM1, {len(needed_adm2)} ADM2, "
+              f"{len(needed_adm3)} ADM3 (pruned {_pr1}/{_pr2}/{_pr3} with no settlement children).")
+
+    # ----------------------------------------------------------------
+    # Build pvs
+    # ----------------------------------------------------------------
     sssom_rows = []
     pvs = {}
-    # Emit size-category headers first (in priority order, no meaning/is_a)
-    for st in used_stypes:
-        label = _STYPE_LABELS.get(st, st)
-        pvs[label] = {"title": label}
 
-    for entry in sorted_entries:
-        qid  = entry["qid"]
-        gnid = entry.get("gnid", "")
-        lbl  = normalize_text(_lbl(entry))
-        stype_label = _STYPE_LABELS.get(entry.get("stype", ""), None)
+    # Stype nodes come via inherits: HumanSettlementClassification — not embedded inline.
 
+    # Inline pruned ADM1 nodes grouped by type_label (like CountryWaters)
+    _adm1_by_type: defaultdict = defaultdict(list)
+    for _q1 in needed_adm1:
+        _adm1_by_type[(adm1_full_map.get(_q1) or {}).get("type_label", "")].append(_q1)
+
+    _has_multi_type = sum(1 for _g in _adm1_by_type.values() if len(_g) >= 2) >= 2
+
+    for _tl, _grp in sorted(_adm1_by_type.items(), key=lambda x: (-len(x[1]), x[0])):
+        _add_hdr = _has_multi_type and len(_grp) >= 2 and _tl
+        _hdr_code = (_tl[0].upper() + _tl[1:]) if _add_hdr else ""
+        _hdr_qid  = _ADM1_TYPE_HEADER_MEANINGS.get(_hdr_code) if _hdr_code else None
+        _hdr_key  = _hdr_qid if _hdr_qid else _hdr_code
+        if _add_hdr and _hdr_key not in pvs:
+            _tw = (_tl.split(" of ")[0].strip().capitalize()
+                   if " of " in _tl else _tl.capitalize())
+            _hdr_pv: dict = {"title": _tw}
+            if _hdr_code in _ADM1_TYPE_HEADER_DESCRIPTIONS:
+                _hdr_pv["description"] = _ADM1_TYPE_HEADER_DESCRIPTIONS[_hdr_code]
+            if _hdr_qid:
+                _hdr_pv["meaning"] = f"wd:{_hdr_qid}"
+            pvs[_hdr_key] = _hdr_pv
+        for _q1 in sorted(_grp, key=lambda q: _title_sort_key(
+                _best_label(adm1_full_map.get(q, {"qid": q}), locales, "qid"))):
+            _e1  = adm1_full_map.get(_q1, {"qid": _q1})
+            _lb1 = normalize_text(_best_label(_e1, locales, "qid"))
+            _ia1 = _hdr_key if (_add_hdr and _hdr_key) else None
+            add_permissible_value(pvs, _q1,
+                title=_lb1,
+                meaning=f"wd:{_q1}",
+                description=normalize_text(_e1.get("desc", "")) or None,
+                is_a=_ia1,
+            )
+
+    # Inline pruned ADM2 nodes
+    for _q2 in sorted(needed_adm2, key=lambda q: _title_sort_key(
+            _best_label(adm2_full_map.get(q, {"qid": q}), locales, "qid"))):
+        _e2  = adm2_full_map.get(_q2, {"qid": _q2})
+        _lb2 = normalize_text(_best_label(_e2, locales, "qid"))
+        _ia2 = adm2_to_adm1.get(_q2) or _e2.get("adm1_qid") or ""
+        if _ia2 not in pvs:
+            # Non-standard ADM1 parent — try description-based fallback
+            _ia2 = _desc_find_adm1(_e2.get("desc", ""), adm1_name_to_qid) or ""
+            if _ia2 not in pvs:
+                _ia2 = ""   # orphan ADM2 — appears as root
+        add_permissible_value(pvs, _q2,
+            title=_lb2,
+            meaning=f"wd:{_q2}",
+            description=normalize_text(_e2.get("desc", "")) or None,
+            is_a=_ia2 or None,
+        )
+
+    # Inline pruned ADM3/ADM4 nodes (ADM3 before ADM4 so ADM4 can reference them via is_a)
+    for _q3 in sorted(needed_adm3, key=lambda q: (
+            0 if adm3_full_map.get(q, {}).get("feat_code") == "ADM3" else 1,
+            _title_sort_key(_best_label(adm3_full_map.get(q, {"qid": q}), locales, "qid")))):
+        _e3  = adm3_full_map.get(_q3, {"qid": _q3})
+        _lb3 = normalize_text(_best_label(_e3, locales, "qid"))
+        _ia3 = adm3_to_adm2.get(_q3, "")
+        if _ia3 and _ia3 in pvs:
+            pass  # good — ADM2 parent is in pvs
+        else:
+            # Try ADM1 fallback via compound code
+            _ia3 = ""
+            _cc3e = _e3.get("compound_code", "")
+            if _cc3e:
+                _pt3 = _cc3e.split(".")
+                if len(_pt3) >= 2:
+                    _q1_fb3 = adm1_code_to_qid.get(_pt3[1], "")
+                    if _q1_fb3 and _q1_fb3 in pvs:
+                        _ia3 = _q1_fb3
+        add_permissible_value(pvs, _q3,
+            title=_lb3,
+            meaning=f"wd:{_q3}",
+            description=normalize_text(_e3.get("desc", "")) or None,
+            is_a=_ia3 or None,
+        )
+
+    # Intermediate group nodes (MRCs, rural municipalities, municipal districts,
+    # parishes, etc.) emitted in dependency order so is_a targets are always in
+    # pvs before the node that references them.
+    if _intermediate_nodes:
+        _pending_inodes = dict(_intermediate_nodes)
+        while _pending_inodes:
+            _emitted_this_pass = []
+            for _iq in sorted(_pending_inodes,
+                              key=lambda q: _title_sort_key(_pending_inodes[q].get("title", q))):
+                _inode = _pending_inodes[_iq]
+                if _inode["is_a"] in pvs:
+                    add_permissible_value(pvs, _iq,
+                        title=_inode["title"],
+                        meaning=_inode["meaning"],
+                        description=normalize_text(_inode.get("desc", "")) or None,
+                        is_a=_inode["is_a"],
+                    )
+                    _emitted_this_pass.append(_iq)
+            if not _emitted_this_pass:
+                # Remaining can't be placed — emit as roots (is_a omitted)
+                for _iq in sorted(_pending_inodes,
+                                  key=lambda q: _title_sort_key(_pending_inodes[q].get("title", q))):
+                    _inode = _pending_inodes[_iq]
+                    add_permissible_value(pvs, _iq,
+                        title=_inode["title"],
+                        meaning=_inode["meaning"],
+                        description=normalize_text(_inode.get("desc", "")) or None,
+                        is_a=None,
+                    )
+                break
+            for _iq in _emitted_this_pass:
+                del _pending_inodes[_iq]
+
+    _fb_qid_active = _fallback_info[0] if (_fallback_info and n_fallback) else None
+
+    def _emit_settlement(entry: dict) -> None:
+        """Emit one settlement entry into pvs and sssom_rows."""
+        qid   = entry["qid"]
+        gnid  = entry.get("gnid", "")
+        lbl   = normalize_text(_lbl(entry))
+        stype_qid = entry.get("stype") or None
+        best_adm  = settlement_adm[qid]
         pv = add_permissible_value(
             pvs, qid,
             title=lbl,
             meaning=f"wd:{qid}",
             description=normalize_text(entry.get("desc", "")) or None,
-            is_a=stype_label,
+            is_a=best_adm,
+            mixins=[stype_qid] if stype_qid else None,
         )
         if entry.get("is_archaic") or entry.get("is_dissolved"):
             pv["status"] = "historical"
@@ -2658,21 +3194,33 @@ def _build_ppl_yaml(key, source, data, locales=None):
                 "object_label":         "",
             })
 
-    # Mark stype headers status: historical when every child is historical so that
-    # minus: {status: [historical]} also prunes the now-empty category headers.
-    # Only synthetic headers (no "meaning") are eligible; real entities are not touched.
-    _hdr_all_hist: dict = {}   # header_key → True if all children seen so far are historical
-    for pv_val in pvs.values():
-        parent = pv_val.get("is_a")
-        if parent and parent in pvs and "meaning" not in pvs[parent]:
-            child_hist = pv_val.get("status") == "historical"
-            if parent not in _hdr_all_hist:
-                _hdr_all_hist[parent] = child_hist
-            else:
-                _hdr_all_hist[parent] = _hdr_all_hist[parent] and child_hist
-    for hdr_key, all_hist in _hdr_all_hist.items():
-        if all_hist:
-            pvs[hdr_key]["status"] = "historical"
+    # Settlement entries: pass 1 — all entries NOT assigned to the fallback node.
+    # Pass 2 (fallback node + its children) is appended at the bottom so that
+    # Q6393961 "Populated places in Canada" and its orphans follow the provincial/
+    # territorial hierarchy rather than appearing mid-alphabetically.
+    n_blank = 0
+    _fallback_entries: list[dict] = []
+    for entry in sorted_entries:
+        qid = entry["qid"]
+        lbl = normalize_text(_lbl(entry))
+        if not lbl or lbl.lower() == qid.lower():
+            n_blank += 1
+            continue
+        if settlement_adm[qid] == _fb_qid_active:
+            _fallback_entries.append(entry)
+            continue
+        _emit_settlement(entry)
+
+    # Pass 2 — fallback catch-all node followed by its orphan children
+    if _fb_qid_active and _fallback_entries:
+        _fb_qid, _fb_title = _fallback_info   # type: ignore[misc]
+        add_permissible_value(pvs, _fb_qid,
+            title=_fb_title,
+            meaning=f"wd:{_fb_qid}",
+            is_a=None,
+        )
+        for entry in _fallback_entries:
+            _emit_settlement(entry)
 
     n          = len(entries)
     n_archaic  = sum(1 for e in entries if e.get("is_archaic"))
@@ -2681,19 +3229,33 @@ def _build_ppl_yaml(key, source, data, locales=None):
     n_current  = n - n_hist
     n_gn       = sum(1 for e in entries if e.get("gnid"))
     pct        = 100 * n_gn // n if n else 0
-    print(f"  Settlement: {n_current} current + {n_dissolved} dissolved + {n_archaic} archaic = {n_hist} historical entries")
+    n_adm_res  = sum(1 for v in settlement_adm.values() if v)
+    _blank_note = f"; {n_blank} omitted (no English label)" if n_blank else ""
+    print(f"  Settlement: {n_current} current + {n_dissolved} dissolved + {n_archaic} archaic = {n_hist} historical entries{_blank_note}")
+    _n_true_orphans = n - n_adm_res
+    if _fallback_info and n_fallback:
+        _fb_qid2, _fb_title2 = _fallback_info
+        print(f"  ADM parent resolved: {n_adm_res - n_fallback}/{n} settlements; "
+              f"{n_fallback} assigned to {_fb_qid2} ({_fb_title2}).")
+    else:
+        print(f"  ADM parent resolved: {n_adm_res}/{n} settlements; {_n_true_orphans} orphans (no matching ADM1/2/3).")
     print(f"  Crosswalk: {n_gn}/{n} entries ({pct}%) have GeoNames P1566 links")
 
     source_url = (source.get("reachable_from") or {}).get("source_ontology",
                                                            "https://www.wikidata.org/")
     enum_key = f"GeoWikiSettlement{scope}"
+
+    # ADM nodes are inlined (following CountryWaters pattern).
+    # Stype nodes come via inherits: HumanSettlementClassification (standalone source).
     schema = make_config_schema(
         id=source_url,
         name=key,
         title=source.get("title") or f"Wikidata Settlements for {scope}",
         description=(
             f"{n_current} current + {n_hist} historical ({n_dissolved} dissolved, {n_archaic} archaic) "
-            f"settlements for {scope} from Wikidata."
+            f"settlements for {scope} from Wikidata. Settlements are grouped under their most "
+            f"specific Wikidata administrative parent (ADM3 > ADM2 > ADM1); {n - n_adm_res} "
+            f"settlements have no resolvable ADM parent and appear as top-level entries."
         ),
         license="CC0 1.0",
         prefixes=_SOURCE_PREFIXES,
@@ -2701,6 +3263,7 @@ def _build_ppl_yaml(key, source, data, locales=None):
             enum_key: {
                 "name":        enum_key,
                 "title":       "Town or City",
+                "inherits":    _HSC_KEY,
                 "permissible_values": pvs,
             },
         },
@@ -5459,7 +6022,33 @@ def _register_ppl(alpha2, config_file):
     write_config(config, config_file)
     print(f"  Added source '{key}' to {config_file}")
 
+    _register_settlement_classification(config_file)
     _build_ppl_yaml(key, config["sources"][key], payload, locales=locales)
+    return True
+
+
+def _register_settlement_classification(config_file):
+    """Register HumanSettlementClassification source if not already in config."""
+    key    = _HSC_KEY
+    config = _load_config(config_file)
+    if key in config.get("sources", {}):
+        return True
+
+    entry = make_source_entry(
+        key, "https://www.wikidata.org/wiki/Q98966309",
+        "HumanSettlementClassification", "yaml",
+        title="Human Settlement Classification",
+        description=(
+            "Wikidata classification of human settlements (Q98966309): "
+            "settlement size/type categories used as mixin targets."
+        ),
+    )
+    entry["license"] = "CC0 1.0"
+    config.setdefault("sources", {})[key] = entry
+    write_config(config, config_file)
+    print(f"  Added source '{key}' to {config_file}")
+
+    _build_settlement_classification_yaml(key, entry)
     return True
 
 
@@ -5628,6 +6217,13 @@ def fetch_geowiki_source(key, source, config_file=MENU_CONFIG):
     locales         = _get_project_locales(config_file)
     endpoint, use_p = _get_endpoint(source)
 
+    if content_type == "HumanSettlementClassification":
+        # Built entirely from local constants — no Wikidata query needed.
+        _build_settlement_classification_yaml(key, source, locales=locales)
+        update_source_config(key, {"download_date": datetime.date.today().isoformat()},
+                             config_file)
+        return
+
     if content_type == "GeoWikiCountries":
         print(f"  Re-querying Wikidata for countries, continents, oceans, and waterbodies ...")
         payload = _fetch_countries_payload(locales, endpoint, use_p)
@@ -5744,6 +6340,10 @@ def process_geowiki_source(key, source, config_file=MENU_CONFIG, locales=None):
     inc_indig   = bool(_top_config.get("include_indigenous"))
 
     # GeoWikiFirstNations reuses the ADM2 cache; it has no own zip entry.
+    if content_type == "HumanSettlementClassification":
+        _build_settlement_classification_yaml(key, source, locales=locales)
+        return
+
     if content_type == "GeoWikiFirstNations":
         alpha2 = source.get("country", "")
         if not alpha2:
@@ -5794,6 +6394,7 @@ def process_geowiki_source(key, source, config_file=MENU_CONFIG, locales=None):
         else:
             _build_adm34_yaml(key, source, data, locales=locales)
     elif dtype == "ppl":
+        _register_settlement_classification(config_file)
         _build_ppl_yaml(key, source, data, locales=locales)
     elif dtype == "country_waters":
         _build_country_waters_yaml(key, source, data, locales=locales)

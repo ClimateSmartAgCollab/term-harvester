@@ -220,7 +220,7 @@ def _build_pv_lookup(schema_enums):
     return merged
 
 
-def _flatten_pv_title(pv_key, leaf_title, enum_pvs, pv_lookup):
+def _flatten_pv_title(pv_key, leaf_title, enum_pvs, pv_lookup, anc_title_fn=None):
     """Walk the is_a chain of pv_key and return a hierarchically prefixed title.
 
     enum_pvs is consulted first (enum-specific is_a context), then pv_lookup
@@ -232,6 +232,10 @@ def _flatten_pv_title(pv_key, leaf_title, enum_pvs, pv_lookup):
     Ancestors that have a 'meaning' field are included in the prefix; grouping
     headers without a 'meaning' (e.g. 'Province of Canada') are skipped.
     Walking stops when a PV has no is_a or a cycle is detected.
+
+    anc_title_fn(key, pv_data) → str: optional override for the label used for
+    each meaningful ancestor.  When omitted, pv_data.get("title") or key is used
+    (EN title).  Pass a function that returns FR titles to build FR-prefixed labels.
 
     Examples:
         Q4878005 (Beaver County, is_a Q1951 → Alberta, is_a "Province of Canada")
@@ -253,7 +257,11 @@ def _flatten_pv_title(pv_key, leaf_title, enum_pvs, pv_lookup):
         visited.add(parent_key)
         parent_data = enum_pvs.get(parent_key) or pv_lookup.get(parent_key) or {}
         if parent_data.get("meaning"):
-            ancestors.append(parent_data.get("title") or parent_key)
+            if anc_title_fn is not None:
+                lbl = anc_title_fn(parent_key, parent_data)
+            else:
+                lbl = parent_data.get("title") or parent_key
+            ancestors.append(lbl)
         current_data = parent_data
         parent_key = current_data.get("is_a")
     if not ancestors:
@@ -652,6 +660,134 @@ def add_enum(add_arg, flat=False):
 
 
 # ---------------------------------------------------------------------------
+# Inheritance expansion helpers (for flatten: true + schema inherits)
+# ---------------------------------------------------------------------------
+
+def _cull_adm_no_settlement(expanded):
+    """Remove ADM entries that have no settlement descendant.
+
+    Settlement entries are identified by having 'mixins' in pv_data (they carry
+    their settlement-type category there).  ADM entries have 'meaning' but no
+    'mixins'.  Entries with no 'meaning' (stype and ADM-type category headers)
+    are also removed — they are schema metadata and should not appear as output
+    rows in a settlement flat list.
+
+    Returns a filtered [(pv_key, pv_data), ...] list.
+    """
+    expanded_dict = {k: v for k, v in expanded}
+
+    # Build children index from is_a links
+    children: dict = {}
+    for k, v in expanded:
+        parent = v.get("is_a")
+        if parent and parent in expanded_dict and parent != k:
+            children.setdefault(parent, []).append(k)
+
+    # Settlement entries have 'mixins'
+    settlement_set = {k for k, v in expanded if v.get("mixins")}
+
+    # Determine which entries have at least one settlement descendant (DFS)
+    has_settlement: dict = {}
+
+    def _check(key):
+        if key in has_settlement:
+            return has_settlement[key]
+        if key in settlement_set:
+            has_settlement[key] = True
+            return True
+        result = any(_check(c) for c in children.get(key, []))
+        has_settlement[key] = result
+        return result
+
+    for k in expanded_dict:
+        _check(k)
+
+    # Keep: settlement entries + ADM entries (have meaning) with settlement descendants.
+    # Drop: entries without meaning (stype/category headers) and ADM nodes with no
+    # settlement descendants.
+    return [
+        (k, v) for k, v in expanded
+        if v.get("meaning") and has_settlement.get(k, False)
+    ]
+
+
+def _resolve_inherits_chain(schema_key, schema_enums):
+    """Walk the inherits chain from leaf to root; return root-to-leaf list of enum keys.
+
+    E.g. for GeoWikiAdm3CA (inherits GeoWikiAdm2CA which inherits GeoWikiAdm1CA):
+        returns ["GeoWikiAdm1CA", "GeoWikiAdm2CA", "GeoWikiAdm3CA"]
+    """
+    chain = []
+    key = schema_key
+    visited = set()
+    while key and key not in visited:
+        visited.add(key)
+        chain.append(key)
+        key = (schema_enums.get(key) or {}).get("inherits")
+    chain.reverse()
+    return chain
+
+
+def _expand_inherited_pvs(schema_key, schema_enums):
+    """Return a DFS-ordered [(pv_key, pv_data), ...] list covering the full inherits chain.
+
+    When a schema enum declares 'inherits: ParentEnum', this function collects PVs
+    from all enums in the chain (root ancestor first) and returns them in DFS order
+    so each parent PV is immediately followed by its children (recursively).
+
+    Also handles single-enum DFS (no inherits) when the enum has embedded is_a hierarchy
+    (e.g. GeoWikiSettlement and GeoWikiCountryWaters with inlined ADM nodes).
+
+    Returns None if the enum has no inherits chain and no internal is_a structure.
+    """
+    chain = _resolve_inherits_chain(schema_key, schema_enums)
+    if len(chain) <= 1:
+        # Single-enum: only proceed if there is actual is_a nesting
+        pvs_check = (schema_enums.get(schema_key) or {}).get("permissible_values") or {}
+        if not any((pv or {}).get("is_a") for pv in pvs_check.values()):
+            return None
+        # Has nested structure — fall through to DFS
+
+    # Collect all PVs from all levels in insertion order (preserves schema sort order)
+    all_pvs_ordered = []
+    all_pvs_set = {}
+    for key in chain:
+        pvs = (schema_enums.get(key) or {}).get("permissible_values") or {}
+        for pv_key, pv_data in pvs.items():
+            if pv_key not in all_pvs_set:
+                all_pvs_ordered.append((pv_key, pv_data or {}))
+                all_pvs_set[pv_key] = pv_data or {}
+
+    # Build children index (parent_key → [child_key, ...] in insertion order).
+    # Skip self-referential is_a (e.g. Q51 Antarctica has is_a: Q51) — treat as root.
+    children = {}
+    roots = []
+    for pv_key, pv_data in all_pvs_ordered:
+        parent = pv_data.get("is_a")
+        if parent and parent in all_pvs_set and parent != pv_key:
+            children.setdefault(parent, []).append(pv_key)
+        else:
+            roots.append(pv_key)
+
+    # DFS traversal maintaining insertion order within each level
+    result = []
+    visited_dfs = set()
+
+    def _dfs(key):
+        if key in visited_dfs:
+            return
+        visited_dfs.add(key)
+        result.append((key, all_pvs_set[key]))
+        for child in children.get(key, []):
+            _dfs(child)
+
+    for root_key in roots:
+        _dfs(root_key)
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # --build / --compare: produce entry_code_picklists.json from schema + mapping
 # ---------------------------------------------------------------------------
 
@@ -679,49 +815,132 @@ def _build_output():
         # Collect PV overrides keyed by JSON Code
         pv_overrides = entry.get("permissible_values") or {}
 
-        # Build rows: use pv_overrides order if present, else schema PV order
-        if pv_overrides:
-            row_codes = list(pv_overrides.keys())
-        elif schema_pvs:
-            row_codes = list(schema_pvs.keys())
-        else:
-            row_codes = []
-
         extra_hdrs = entry.get("extra_mappings") or []
         languages = entry.get("languages") or ["en"]
         headers = ["Code"] + extra_hdrs + languages
         has_fr = "fr" in languages
 
+        # Expand for flatten:true enums that have a hierarchical PV structure — either
+        # via 'inherits' (ADM chain) or via inline is_a nesting (Settlement, CountryWaters).
+        # DFS expansion inserts parent rows immediately before their children.
+        _expanded = None
+        if entry.get("flatten") and not is_static:
+            _enum_inherits = (senum or {}).get("inherits")
+            _has_adm_struct = any(
+                (pv or {}).get("is_a")
+                for pv in list(((senum or {}).get("permissible_values") or {}).values())
+            )
+            if _enum_inherits or _has_adm_struct:
+                _expanded = _expand_inherited_pvs(schema_key, schema_enums)
+
+        # For settlement enums (inlined ADM + settlements), cull ADM nodes that have
+        # no settlement descendants (removes unpopulated branches from the flat output).
+        if _expanded is not None and schema_key.startswith("GeoWikiSettlement"):
+            _expanded = _cull_adm_no_settlement(_expanded)
+            if not _expanded:
+                _expanded = None  # nothing left after culling
+
         rows = []
-        for code in row_codes:
-            pv_over  = pv_overrides.get(code) or {}
-            # Schema PV key: use explicit override, else try code directly, else positional
-            pv_schema_key = pv_over.get("schema_key", code)
-            schema_pv = schema_pvs.get(pv_schema_key) or {}
-            if entry.get("flatten") and not pv_over.get("en"):
-                raw_title = schema_pv.get("title") or pv_schema_key or code
-                en_title = _flatten_pv_title(pv_schema_key, raw_title, schema_pvs, pv_lookup)
+        if _expanded is not None:
+            # Full hierarchy expansion: ancestor PVs included, titles prefixed with
+            # meaningful ancestors using " - " delimiter (same as non-expanded flatten).
+            _expanded_pvs_dict = {k: v for k, v in _expanded}
+            _chain = _resolve_inherits_chain(schema_key, schema_enums)
+
+            # Merge FR titles from every enum in the chain into a flat lookup.
+            # Used both for leaf FR resolution and for ancestor FR prefix labels.
+            _chain_fr = {}  # pv_key -> fr_title (first non-empty wins, chain order)
+            for _ck in _chain:
+                for _pk, _ft in (fr_pvs.get(_ck) or {}).items():
+                    if _pk not in _chain_fr and _ft:
+                        _chain_fr[_pk] = _ft
+
+            # SSSOM FR for this picklist's choices (may contain leaf-level translations)
+            _sssom_choice_fr = sssom_fr["choice"].get(json_key, {})
+
+            def _fr_anc_title(key, pv_data):
+                """FR label for a meaningful ancestor; falls back to EN title."""
+                return (_sssom_choice_fr.get(key)
+                        or _chain_fr.get(key)
+                        or pv_data.get("title")
+                        or key)
+
+            # For settlement enums and CountryWaters (inlined ADM hierarchy, no inherits),
+            # restrict ancestor lookups to the expanded dict itself.  Using the global
+            # pv_lookup can produce false positives when other enums happen to share a
+            # synthetic code (e.g. "Province of Canada" appears in ISO_Canada_ADM1 with a
+            # Wikidata meaning, causing it to be prepended as an extra ancestor prefix).
+            _anc_pv_lookup = (
+                _expanded_pvs_dict
+                if not (senum or {}).get("inherits")
+                else pv_lookup
+            )
+
+            _is_settlement_enum = schema_key.startswith("GeoWikiSettlement")
+            for pv_key, pv_data in _expanded:
+                # Settlement enums: only emit actual settlement rows (those with mixins).
+                # ADM ancestor nodes are retained in _expanded_pvs_dict for prefix
+                # traversal but must not appear as output rows in their own right.
+                if _is_settlement_enum and not pv_data.get("mixins"):
+                    continue
+                pv_over  = pv_overrides.get(pv_key) or {}
+                en_raw   = pv_over.get("en") or pv_data.get("title") or pv_key
+                en_title = _flatten_pv_title(pv_key, en_raw, _expanded_pvs_dict, _anc_pv_lookup)
+                row = {"Code": pv_key, "en": en_title}
+                if has_fr:
+                    fr_leaf = (_sssom_choice_fr.get(pv_key, "")
+                               or _chain_fr.get(pv_key, "")
+                               or pv_over.get("fr", ""))
+                    if fr_leaf:
+                        fr_title = _flatten_pv_title(
+                            pv_key, fr_leaf, _expanded_pvs_dict, _anc_pv_lookup,
+                            anc_title_fn=_fr_anc_title,
+                        )
+                    else:
+                        fr_title = ""
+                    if fr_title:
+                        row["fr"] = fr_title
+                for h in extra_hdrs:
+                    row[h] = pv_over.get(h, "")
+                rows.append({h: row[h] for h in headers if h in row})
+        else:
+            # Build rows: use pv_overrides order if present, else schema PV order
+            if pv_overrides:
+                row_codes = list(pv_overrides.keys())
+            elif schema_pvs:
+                row_codes = list(schema_pvs.keys())
             else:
-                en_title = pv_over.get("en") or schema_pv.get("title") or pv_schema_key or code
+                row_codes = []
 
-            row = {"Code": code, "en": en_title}
+            for code in row_codes:
+                pv_over  = pv_overrides.get(code) or {}
+                # Schema PV key: use explicit override, else try code directly, else positional
+                pv_schema_key = pv_over.get("schema_key", code)
+                schema_pv = schema_pvs.get(pv_schema_key) or {}
+                if entry.get("flatten") and not pv_over.get("en"):
+                    raw_title = schema_pv.get("title") or pv_schema_key or code
+                    en_title = _flatten_pv_title(pv_schema_key, raw_title, schema_pvs, pv_lookup)
+                else:
+                    en_title = pv_over.get("en") or schema_pv.get("title") or pv_schema_key or code
 
-            # FR priority: SSSOM (explicit reference override) → schema extension → mapping
-            if has_fr:
-                fr_val = (
-                    sssom_fr["choice"].get(json_key, {}).get(code, "")
-                    or (fr_pvs.get(schema_key) or {}).get(pv_schema_key, "")
-                    or pv_over.get("fr", "")
-                )
-                row["fr"] = fr_val
+                row = {"Code": code, "en": en_title}
 
-            # Extra columns
-            for h in extra_hdrs:
-                row[h] = pv_over.get(h, "")
+                # FR priority: SSSOM (explicit reference override) → schema extension → mapping
+                if has_fr:
+                    fr_val = (
+                        sssom_fr["choice"].get(json_key, {}).get(code, "")
+                        or (fr_pvs.get(schema_key) or {}).get(pv_schema_key, "")
+                        or pv_over.get("fr", "")
+                    )
+                    if fr_val:
+                        row["fr"] = fr_val
 
-            # Reorder row to match headers
-            ordered_row = {h: row[h] for h in headers if h in row}
-            rows.append(ordered_row)
+                # Extra columns
+                for h in extra_hdrs:
+                    row[h] = pv_over.get(h, "")
+
+                # Reorder row to match headers
+                rows.append({h: row[h] for h in headers if h in row})
 
         # EN from schema; FR from SSSOM (with mapping override as fallback).
         name_en = (senum.get("title") if senum else None) or json_key
