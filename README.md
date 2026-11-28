@@ -24,6 +24,7 @@ The term_harvester.py script fetches vocabulary sources, processes them into Lin
 ## Table of Contents
 
 - [Overview](#overview)
+- [Fields and Picklists (LinkML slots and enumerations)](#fields-and-picklists-linkml-slots-and-enumerations)
 - [Quick-start workflow](#quick-start-workflow)
 - [Command reference](#command-reference)
   - [Specify configuration folder: `-i`](#specify-configuration-folder--i)
@@ -104,6 +105,24 @@ Term Harvester processes authoritative vocabulary sources into a single merged, 
 3. **Merging of sources**: The `--build` parameter causes all sources or a given source to be merged into a single output LinkML `schema.yaml` file where extra include/exclude term filtering occurs, and where mappings via SSSOM tables can be included.
 
 Stage 3 yields a normalized format of reference vocabularies which can then be transformed into the format (and locale) required by an agency or project's network and database infrastructure. A demonstration of this post-processing is given in the Term Harvester [examples/agrifoodca/postharvest.py](https://github.com/ClimateSmartAgCollab/term-harvester/blob/main/examples/agrifoodca/postharvest.py) script (see [readme](https://github.com/ClimateSmartAgCollab/term-harvester/blob/main/examples/README_agrifoodca.md)).
+
+---
+
+## Fields and Picklists (LinkML slots and enumerations)
+
+Most vocabulary sources handled by Term Harvester represent **categorical variables** — a variable whose permissible values are drawn from a fixed list. This includes individual enumerations from ontologies or taxonomies (e.g. a branch of ENVO or AGROVOC), picklist CSVs, ISO code tables, controlled vocabulary tables from PDFs, and classification hierarchies from national databases. All of these are mapped to the LinkML `enums` section of the output schema: each source contributes one or more named enumerations, each with a list of `permissible_values`. A schema assembled entirely from such sources consists entirely of enumerations with no field (slot) definitions — the enumerations are available for downstream tools to assign to data columns as needed.
+
+The **Darwin Core Simple Record** source (`content_type: TDWG_DWC_Simple`) illustrates a different pattern: an imported vocabulary that is primarily a set of **field definitions** rather than a set of categorical values. Darwin Core defines 224 terms, each with a URI, label, definition, and usage notes — these are formalized as LinkML `slots`. Only a small number of Darwin Core terms have formally defined controlled vocabularies; these become enumerations whose URIs supply the slot `range`. The DWC project publishes many examples of field content (how to populate a field, example values) but none of this example content is itself formalized as controlled vocabulary, so only the field structure and the handful of explicit enumerations are captured.
+
+In LinkML terms the distinction is:
+
+| Concept | LinkML construct | Term Harvester source examples |
+|---|---|---|
+| Categorical variable / picklist | `enums` → `permissible_values` | AGROVOC, ENVO, ISO 3166, NSDB, STATSCAN, GeoWiki, AgriFoodCA picklists, … |
+| Field / attribute definition | `slots` (with `name`, `title`, `description`, `range`) | Darwin Core Simple Record (224 slots) |
+| Closed vocabulary for a field | `enums` referenced as a slot's `range` | DWC `basisOfRecord`, `sex`, `typeStatus`, `occurrenceStatus` |
+
+When a schema includes Darwin Core alongside enumeration sources, the `slots: all` option in `config.yaml` is required to include the slot definitions in the assembled `schema.yaml`; omitting it produces only the enumerations from the DWC source.
 
 ---
 
@@ -844,6 +863,57 @@ Both SSSOM files use a YAML metadata header declaring the `curie_map`, `mapping_
 and `license`, and are deduplicated on `(subject_id, predicate_id, object_id)` across
 incremental runs.
 
+#### GeoWiki enumeration types
+
+`source_geowiki.py` produces two families of geospatial enumerations: **Geopolitical** (countries, subdivisions, settlements, and Indigenous nations) and **Waters** (oceans, international waterbodies, and per-country water features).
+
+##### Geopolitical enumerations
+
+| Enum type | Scope | Description |
+|-----------|-------|-------------|
+| `GeoWikiContinent` | Global | The seven canonical continents plus the Americas supercontinent (Q828), validated against GeoNames. |
+| `GeoWikiCountry` | Global | Sovereign states only, grouped under continent headers. Territories and dependencies are excluded. |
+| `GeoWikiCountryExtended` | Global | Territories, dependencies, and other non-sovereign entities that have an ISO 3166-1 alpha-2 code. Used alongside `GeoWikiCountry` when broader coverage is needed. |
+| `GeoWikiAdm1{CC}` | Per-country | First-order administrative divisions (provinces, states, territories). |
+| `GeoWikiAdm2{CC}` | Per-country | Second-order divisions (counties, districts, regional municipalities). Inherits `GeoWikiAdm1{CC}`, so provincial header nodes are included. |
+| `GeoWikiAdm3{CC}` | Per-country | Third-order divisions (local municipalities, townships). Inherits `GeoWikiAdm2{CC}`. |
+| `GeoWikiSettlement{CC}` | Per-country | Populated places (cities, towns, villages, hamlets) from Wikidata P31 settlement types. ADM ancestor nodes (provinces through municipalities) are inlined for hierarchical grouping; settlement type classification uses `HumanSettlementClassification` mixins. Non-current settlements are emitted as `status: historical` and excluded by default via `minus: {status: [historical]}`. |
+| `GeoWikiFirstNations{CC}` | Per-country | Indigenous nations, bands, tribes, and Iwi, grouped under provincial/regional nodes. Derived from the same Wikidata query as ADM2. |
+
+The `{CC}` suffix is the ISO 3166-1 alpha-2 country code (e.g. `CA`, `US`, `NZ`).
+
+##### Waters enumerations
+
+| Enum type | Scope | Description |
+|-----------|-------|-------------|
+| `GeoWikiOcean` | Global | Major oceans and seas. |
+| `GeoWikiWaterbody` | Global | International lakes, rivers, straits, bays, and other named waterbodies with Wikidata QIDs. |
+| `GeoWikiCountryWaters{CC}` | Per-country | Rivers, lakes, and water features within a country, grouped under ADM1 and ADM2 header nodes. Only regions containing at least one water body are included as group headers; unpopulated branches are pruned. |
+
+##### Inheritance and term counts
+
+LinkML `inherits:` causes the parent enum's terms to be included in the child at schema-build time. The reported term count for an inheriting enum includes its own entries **plus** all header and grouping nodes pulled in from the parent.
+
+Example counts for Canada (agrifoodca picklist, 2026-11-27):
+
+| Enum | Terms | Notes |
+|------|------:|-------|
+| GeoWikiContinent | 8 | |
+| GeoWikiCountry | 209 | Grouped under continent headers |
+| GeoWikiCountryExtended | 54 | Territories/dependencies |
+| GeoWikiAdm1CA | 27 | Provinces and territories |
+| GeoWikiAdm2CA | 2,234 | Inherits GeoWikiAdm1CA (+27 provincial headers) |
+| GeoWikiAdm3CA | 1,326 | Inherits GeoWikiAdm2CA (+ADM2 and ADM1 headers) |
+| GeoWikiFirstNationsCA | 626 | Bands and nations grouped by province/region |
+| GeoWikiSettlementCA | 12,374 | ADM nodes inlined; inherits HumanSettlementClassification for stype mixins |
+| GeoWikiOcean | 10 | |
+| GeoWikiWaterbody | 452 | International waterbodies |
+| GeoWikiCountryWatersCA | 1,951 | ADM1/ADM2 grouping nodes inlined; pruned to regions containing water bodies |
+
+Counts vary with Wikidata snapshot date and any `minus`/`include` filters in `config.yaml`.
+
+For detailed technical notes on Wikidata and GeoNames data-structure behaviours — settlement-type P31 filtering, continent assignment, WDQS query limits, historical entity handling, duplicate continent items, and more — see [docs/GeoWiki_readme.md](docs/GeoWiki_readme.md).
+
 ---
 
 ### NASIS (USDA NRCS National Soil Information System)
@@ -1140,6 +1210,25 @@ python term_harvester.py -f TDWG_DWC_Simple   # re-fetches GBIF XML metadata and
 python term_harvester.py -c TDWG_DWC_Simple   # re-generates sources/TDWG_DWC_Simple.yaml
 python term_harvester.py -b                    # updates schema.yaml
 ```
+
+#### Configuration
+
+To include all 224 slots (not just the four enum-backed ones) in `schema.yaml`, set
+`slots: all` in `harvester_config.yaml`.  Optionally, use `key_slot` to promote a
+specific field to the first position in the slot list and its section to the first
+section — useful for DataHarmonizer presentation:
+
+```yaml
+sources:
+  TDWG_DWC_Simple:
+    content_type: TDWG_DWC_Simple
+    slots: all                      # include all 224 fields, not only enum-backed ones
+    key_slot: digital_specimen_id   # promote this slot and its section to first position
+    # … other fields …
+```
+
+If `slots: all` is set at the top level of `harvester_config.yaml` it applies to all
+sources including `TDWG_DWC_Simple`.
 
 #### What is generated
 
@@ -2202,6 +2291,7 @@ echo $ANTHROPIC_API_KEY
 | `source_linkml.py` | `content_type: LinkML` — YAML schema processing and `match_linkml` detection | |
 | `source_owl.py` | `content_type: OWL` — owlready2 class traversal and `match_owl` detection | |
 | `source_ontologyapi.py` | `content_type: OntologyAPI` — OLS4 / BioPortal / AGROVOC graph fetching and processing | |
+| `source_dwc_simple.py` | `content_type: TDWG_DWC_Simple` — parses `tdwg_dwc_simple.xsd` into 224 slots and 4 closed enumerations; fetches multilingual term metadata and vocabulary translations from TDWG/GBIF GitHub XMLs during `-f`; caches two sidecar YAML translation files alongside the module; generates a draw.io diagram | [XSD](https://dwc.tdwg.org/xml/tdwg_dwc_simple.xsd) |
 | `source_agrovoc.py` | AGROVOC SPARQL fetchers and `match_agrovoc` detection | [SPARQL endpoint](https://agrovoc.fao.org/sparql/) |
 | `source_loinc.py` | LOINC CodeSystem / ValueSet JSON conversion and HL7 table parsing | [HTML / JSON files](https://terminology.hl7.org/) |
 | `source_nasis.py` | `content_type: NASIS` — USDA NRCS NASIS Domains PDF parsing | [PDF file](https://www.nrcs.usda.gov/sites/default/files/2025-07/NASIS%207.4.3%20Domains.pdf) |

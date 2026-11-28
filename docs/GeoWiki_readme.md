@@ -5,6 +5,62 @@ This document records Wikidata and GeoNames data-structure behaviours that affec
 
 ---
 
+## Overview: GeoWiki Enumeration Types
+
+`source_geowiki.py` produces two families of geospatial enumerations: **Geopolitical**
+(countries, subdivisions, settlements, and Indigenous nations) and **Waters** (oceans,
+international waterbodies, and per-country water features).
+
+### Geopolitical enumerations
+
+| Enum type | Scope | Description |
+|-----------|-------|-------------|
+| `GeoWikiContinent` | Global | The seven canonical continents plus the Americas supercontinent (Q828), validated against GeoNames. |
+| `GeoWikiCountry` | Global | Sovereign states only, grouped under continent headers. Territories and dependencies are excluded. |
+| `GeoWikiCountryExtended` | Global | Territories, dependencies, and other non-sovereign entities that have an ISO 3166-1 alpha-2 code. Used alongside `GeoWikiCountry` when broader coverage is needed. |
+| `GeoWikiAdm1{CC}` | Per-country | First-order administrative divisions (provinces, states, territories). |
+| `GeoWikiAdm2{CC}` | Per-country | Second-order divisions (counties, districts, regional municipalities). Inherits `GeoWikiAdm1{CC}`, so provincial header nodes are included. |
+| `GeoWikiAdm3{CC}` | Per-country | Third-order divisions (local municipalities, townships). Inherits `GeoWikiAdm2{CC}`. |
+| `GeoWikiSettlement{CC}` | Per-country | Populated places (cities, towns, villages, hamlets) from Wikidata P31 settlement types. ADM ancestor nodes (provinces through municipalities) are inlined for hierarchical grouping; settlement type classification uses `HumanSettlementClassification` mixins. Non-current settlements are emitted as `status: historical` and excluded by default via `minus: {status: [historical]}`. |
+| `GeoWikiFirstNations{CC}` | Per-country | Indigenous nations, bands, tribes, and Iwi, grouped under provincial/regional nodes. Derived from the same Wikidata query as ADM2. |
+
+The `{CC}` suffix is the ISO 3166-1 alpha-2 country code (e.g. `CA`, `US`, `NZ`).
+
+### Waters enumerations
+
+| Enum type | Scope | Description |
+|-----------|-------|-------------|
+| `GeoWikiOcean` | Global | Major oceans and seas. |
+| `GeoWikiWaterbody` | Global | International lakes, rivers, straits, bays, and other named waterbodies with Wikidata QIDs. |
+| `GeoWikiCountryWaters{CC}` | Per-country | Rivers, lakes, and water features within a country, grouped under ADM1 and ADM2 header nodes. Only ADM1/ADM2 regions that contain at least one water body are included as group headers; regions with no water bodies are pruned. `inherits: GeoWikiAdm2{CC}` provides the structural link to the full administrative hierarchy. |
+
+### Inheritance and term counts
+
+LinkML `inherits:` causes the parent enum's terms to be included in the child at
+schema-build time.  This means the reported term count for an inheriting enum includes
+its own entries **plus** all header and grouping nodes pulled in from the parent.
+
+Example — agrifoodca picklist counts for Canada (as of 2026-11-27):
+
+| ID | Enum | Terms | Notes |
+|----|------|------:|-------|
+| 42 | GeoWikiContinent | 8 | |
+| 43 | GeoWikiCountry | 209 | Grouped under continent headers |
+| 44 | GeoWikiCountryExtended | 54 | Territories/dependencies |
+| 45 | GeoWikiFirstNationsCA | 626 | Bands and nations grouped by province/region |
+| 46 | GeoWikiAdm1CA | 27 | Provinces and territories |
+| 47 | GeoWikiAdm2CA | 2,234 | Inherits GeoWikiAdm1CA (+27 provincial headers) |
+| 48 | GeoWikiAdm3CA | 1,326 | Inherits GeoWikiAdm2CA (+ADM2 and ADM1 headers) |
+| 49 | GeoWikiSettlementCA | 12,374 | ADM nodes inlined; inherits HumanSettlementClassification for stype mixins |
+| 50 | GeoWikiOcean | 10 | |
+| 51 | GeoWikiWaterbody | 452 | International waterbodies |
+| 52 | GeoWikiCountryWatersCA | 1,951 | ADM1 and ADM2 grouping nodes included only where they have water body children; regions with no water bodies are pruned. `inherits: GeoWikiAdm2CA` provides the structural link. |
+
+Counts will vary with Wikidata snapshot date and any `minus`/`include` filters applied
+in `config.yaml`.
+
+---
+
 ## 1. Sub-national entities with ISO 3166-1 alpha-2 codes
 
 ### Root cause
@@ -195,8 +251,8 @@ This constrains which queries can run there:
 | Settlements single country (large, e.g. DE) | Timeout | Required |
 
 To use QLever, set `apis: {qlever: true}` in the source entry in `config.yaml`.
-QLever's endpoint (`https://qlever.cs.uni-freiburg.de/api/wikidata`) accepts the same
-SPARQL syntax and is queried via HTTP POST.
+QLever's endpoint (`https://qlever.dev/api/wikidata`) accepts the same SPARQL syntax
+and is queried via HTTP POST.
 
 ---
 
@@ -210,18 +266,38 @@ walk to avoid including non-settlement entities:
 
 ```python
 _WD_SETTLEMENT_TYPES = frozenset({
-    "Q515",      # city
-    "Q1549591",  # big city
-    "Q3957",     # town
-    "Q532",      # village
-    "Q7930989",  # city/town
-    "Q747074",   # urban municipality
-    "Q486972",   # human settlement
-    "Q2095140",  # populated place below civil division level
+    "Q1637706",   # million city
+    "Q1549591",   # big city
+    "Q129676344", # large city
+    "Q515",       # city
+    "Q896881",    # average city
+    "Q18466176",  # small city
+    "Q3957",      # town
+    "Q532",       # village
+    "Q5084",      # hamlet
+    "Q129676371", # rural settlement
+    "Q7930989",   # city/town
+    "Q747074",    # urban municipality
+    "Q27676416",  # city or town of Quebec (cité ou ville)
+    "Q27676422",  # township municipality of Quebec (municipalité de canton)
+    "Q486972",    # human settlement
+    "Q2095140",   # populated place below civil division level
+})
+
+# Non-current settlements — fetched but emitted as status: historical
+_WD_SETTLEMENT_ARCHAIC_TYPES = frozenset({
+    "Q350614",    # ghost town
+    "Q2974842",   # abandoned village / deserted settlement
+    "Q350895",    # archaeological site
+    "Q106071744", # former town
+    "Q21751582",  # deserted medieval village
+    "Q22674925",  # former settlement
+    "Q14616455",  # destroyed city
+    "Q1434274",   # archaic settlement type
 })
 ```
 
-This list may need expanding for countries whose editors use different instance types.
+These lists may need expanding for countries whose editors use different instance types.
 Check the Wikidata item for a known town in the target country if settlement coverage
 appears low.
 
