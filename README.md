@@ -504,12 +504,12 @@ identifier — no URL lookup needed:
 
 ```bash
 # Canada — provinces and territories (English + French)
-python term_harvester.py -a ISO_COUNTRY_CA
-python term_harvester.py -c ISO_COUNTRY_CA
+python term_harvester.py -a ISO_COUNTRY_ADM1_CA
+python term_harvester.py -c ISO_COUNTRY_ADM1_CA
 python term_harvester.py -b
 
 # United States
-python term_harvester.py -a ISO_COUNTRY_US
+python term_harvester.py -a ISO_COUNTRY_ADM1_US
 
 # All countries in one enum-per-country source
 python term_harvester.py -a ISO_COUNTRY
@@ -553,55 +553,55 @@ written to the source YAML and to the config entry's `prefixes:` block so that
 **Config entry produced:**
 
 ```yaml
-ISO_COUNTRY_CA:
-  title: Canada
-  name: ISO_COUNTRY_CA
+ISO_COUNTRY_ADM1_CA:
+  title: Canada (ISO 3166-2)
+  name: ISO_COUNTRY_ADM1_CA
   content_type: ISO_COUNTRY
   file_format: zip
   reachable_from:
     source_ontology: https://www.iso.org/obp/ui/#iso:code:3166:CA
-  download_date: '2026-06-09'
+  download_date: '2026-11-19'
   prefixes:
     iso: https://www.iso.org/iso-3166-country-codes.html
     wd: http://www.wikidata.org/entity/
 ```
 
-**Enum in `sources/ISO_COUNTRY_CA.yaml`:**
+**Enum in `sources/ISO_COUNTRY_ADM1_CA.yaml`:**
 
 ```yaml
 prefixes:
   iso: https://www.iso.org/iso-3166-country-codes.html
   wd: http://www.wikidata.org/entity/
 enums:
-  Canada:
-    name: Canada
-    title: Canada
+  ISO_Canada_ADM1:
+    name: ISO_Canada_ADM1
+    title: Canada (ISO 3166-2)
     description: country in North America. Includes 10 provinces of Canada and 3 territories of Canada.
     permissible_values:
       Province of Canada:          # group header
         title: Provinces of Canada
-        meaning: wd:Q11828
+        meaning: wd:Q11828004
       Territory of Canada:         # group header
         title: Territories of Canada
-        meaning: wd:Q1202063
-      CA-AB:
+        meaning: wd:Q9357527
+      AB:
         title: Alberta
         meaning: wd:Q1951
         is_a: Province of Canada
-      CA-BC:
+      BC:
         title: British Columbia
-        meaning: wd:Q1974
+        meaning: wd:Q1973
         is_a: Province of Canada
       # … 8 more provinces …
-      CA-NT:
+      NT:
         title: Northwest Territories
         meaning: wd:Q2007
         is_a: Territory of Canada
-      CA-NU:
+      NU:
         title: Nunavut
-        meaning: wd:Q204792
+        meaning: wd:Q2023
         is_a: Territory of Canada
-      CA-YT:
+      YT:
         title: Yukon
         meaning: wd:Q2009
         is_a: Territory of Canada
@@ -610,19 +610,19 @@ extensions:
     value:
       fr:
         enums:
-          Canada:
+          ISO_Canada_ADM1:
             permissible_values:
-              CA-AB: {title: Alberta}
-              CA-BC: {title: Colombie-Britannique}
+              AB: {title: Alberta}
+              BC: {title: Colombie-Britannique}
               # … remaining French labels …
 ```
 
 To refresh the data when Wikidata updates:
 
 ```bash
-python term_harvester.py -f ISO_COUNTRY_CA   # re-queries Wikidata SPARQL, updates sources/ISO_COUNTRY_CA.zip
-python term_harvester.py -c ISO_COUNTRY_CA   # regenerates sources/ISO_COUNTRY_CA.yaml
-python term_harvester.py -b                  # rebuilds schema.yaml
+python term_harvester.py -f ISO_COUNTRY_ADM1_CA   # re-queries Wikidata SPARQL, updates sources/ISO_COUNTRY_ADM1_CA.zip
+python term_harvester.py -c ISO_COUNTRY_ADM1_CA   # regenerates sources/ISO_COUNTRY_ADM1_CA.yaml
+python term_harvester.py -b                        # rebuilds schema.yaml
 ```
 
 ---
