@@ -65,8 +65,8 @@ The term_harvester.py script fetches vocabulary sources, processes them into Lin
   - [E Numbers (Wikidata P628)](#e-numbers-wikidata-p628-e_number)
   - [CANSIS Glossary of Terms in Soil Science](#cansis-glossary-of-terms-in-soil-science-cansis_glossary)
   - [CSSC (Canadian System of Soil Classification)](#cssc-canadian-system-of-soil-classification)
-  - [FreeText](#freetext)
-- [FreeText source type](#freetext-source-type)
+- [FreeText](#freetext)
+  - [FreeText source type](#freetext-source-type)
 - [Term Search](#term-search)
   - [Basic usage](#basic-usage)
   - [Structured queries (term:description)](#structured-queries-termdescription)
@@ -878,7 +878,7 @@ incremental runs.
 | `GeoWikiAdm2{CC}` | Per-country | Second-order divisions (counties, districts, regional municipalities). Inherits `GeoWikiAdm1{CC}`, so provincial header nodes are included. |
 | `GeoWikiAdm3{CC}` | Per-country | Third-order divisions (local municipalities, townships). Inherits `GeoWikiAdm2{CC}`. |
 | `GeoWikiSettlement{CC}` | Per-country | Populated places (cities, towns, villages, hamlets) from Wikidata P31 settlement types. ADM ancestor nodes (provinces through municipalities) are inlined for hierarchical grouping; settlement type classification uses `HumanSettlementClassification` mixins. Non-current settlements are emitted as `status: historical` and excluded by default via `minus: {status: [historical]}`. |
-| `GeoWikiFirstNations{CC}` | Per-country | Indigenous nations, bands, tribes, and Iwi, grouped under provincial/regional nodes. Derived from the same Wikidata query as ADM2. |
+| `GeoWikiFirstNations{CC}` | Per-country | Indigenous nations, bands, tribes, and Iwi, grouped under provincial/regional nodes. Derived from the same Wikidata query as ADM2. Developed and tested for Canada (`CA`); other countries are supported in principle but have not been validated — review results before use. |
 
 The `{CC}` suffix is the ISO 3166-1 alpha-2 country code (e.g. `CA`, `US`, `NZ`).
 
@@ -1485,7 +1485,7 @@ python term_harvester.py -b                    # rebuilds schema.yaml
 
 ---
 
-### FreeText
+## FreeText
 
 For picklists described in free prose — inline text, a `.txt` file, or a `.pdf`
 document.  See [FreeText source type](#freetext-source-type) for full details.
@@ -1512,7 +1512,7 @@ python3 ../term_harvester.py --input config.yaml \
 
 ---
 
-## FreeText source type
+### FreeText source type
 
 The `FreeText` content type lets you extract picklist enumerations from
 unstructured text — method-section descriptions, field-book prose, PDF

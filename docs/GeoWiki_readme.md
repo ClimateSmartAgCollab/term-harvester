@@ -22,7 +22,7 @@ international waterbodies, and per-country water features).
 | `GeoWikiAdm2{CC}` | Per-country | Second-order divisions (counties, districts, regional municipalities). Inherits `GeoWikiAdm1{CC}`, so provincial header nodes are included. |
 | `GeoWikiAdm3{CC}` | Per-country | Third-order divisions (local municipalities, townships). Inherits `GeoWikiAdm2{CC}`. |
 | `GeoWikiSettlement{CC}` | Per-country | Populated places (cities, towns, villages, hamlets) from Wikidata P31 settlement types. ADM ancestor nodes (provinces through municipalities) are inlined for hierarchical grouping; settlement type classification uses `HumanSettlementClassification` mixins. Non-current settlements are emitted as `status: historical` and excluded by default via `minus: {status: [historical]}`. |
-| `GeoWikiFirstNations{CC}` | Per-country | Indigenous nations, bands, tribes, and Iwi, grouped under provincial/regional nodes. Derived from the same Wikidata query as ADM2. |
+| `GeoWikiFirstNations{CC}` | Per-country | Indigenous nations, bands, tribes, and Iwi, grouped under provincial/regional nodes. Derived from the same Wikidata query as ADM2. **Developed and tested for Canada (`CA`); other countries (US, NZ, etc.) are supported in principle via `_INDIGENOUS_TOP_BY_COUNTRY` and `_INDIGENOUS_ADM1_GROUPS` but have not been validated — results for non-CA countries should be reviewed before use.** |
 
 The `{CC}` suffix is the ISO 3166-1 alpha-2 country code (e.g. `CA`, `US`, `NZ`).
 
